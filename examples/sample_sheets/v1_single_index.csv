@@ -1,0 +1,25 @@
+[Header]
+IEMFileVersion,4
+Experiment Name,230801_NB551089_0023_AHJKLLBGXM
+Date,2023-08-01
+Workflow,GenerateFASTQ
+Application,FASTQ Only
+Instrument Type,NextSeq 500
+Assay,TruSeq Small RNA
+Index Adapters,TruSeq Small RNA Indexes
+Chemistry,Default
+
+[Reads]
+76
+76
+
+[Settings]
+ReverseComplement,0
+Adapter,TGGAATTCTCGGGTGCCAAGG
+
+[Data]
+Lane,Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,Sample_Project,Description
+1,smRNA_01,Control_Rep1,,A01,RPI1,ATCACG,SmallRNA_Project,miRNA_screen
+1,smRNA_02,Control_Rep2,,B01,RPI2,CGATGT,SmallRNA_Project,miRNA_screen
+1,smRNA_03,Treatment_Rep1,,C01,RPI3,TTAGGC,SmallRNA_Project,miRNA_screen
+1,smRNA_04,Treatment_Rep2,,D01,RPI4,TGACCA,SmallRNA_Project,miRNA_screen
