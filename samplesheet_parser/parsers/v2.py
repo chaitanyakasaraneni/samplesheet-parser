@@ -34,8 +34,7 @@ Reference format
 
 Authors
 -------
-Chaitanya Kasaraneni — original BCLConvert pipeline enablement and
-SSv2 parser implementation; this is the generalised public release.
+Chaitanya Kasaraneni
 
 References
 ----------

@@ -31,9 +31,7 @@ Reference format
 
 Authors
 -------
-Chaitanya Kasaraneni — original V1 → V2 migration architect; this
-generalised rewrite strips proprietary internals while preserving the
-core parsing logic and public API.
+Chaitanya Kasaraneni
 
 References
 ----------
