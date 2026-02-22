@@ -4,7 +4,7 @@
 
 Supports IEM V1 (bcl2fastq / NovaSeq 6000 era) and BCLConvert V2 (NovaSeq X series) with automatic format detection, index validation, and `OverrideCycles` / UMI decoding — no format hints required from the caller.
 
-[![PyPI version](https://badge.fury.io/py/samplesheet-parser.svg)](https://badge.fury.io/py/samplesheet-parser)
+[![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Tests](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions)
