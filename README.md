@@ -8,7 +8,7 @@ Supports IEM V1 (bcl2fastq / NovaSeq 6000 era) and BCLConvert V2 (NovaSeq X seri
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Tests](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions)
-[![codecov](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser/branch/main/graph/badge.svg)](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser)
+[![codecov](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser/branch/main/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser)
 
 ---
 
@@ -315,7 +315,7 @@ If you use this library in a published pipeline or analysis, please cite:
   title   = {samplesheet-parser: Format-agnostic parser for Illumina SampleSheet.csv},
   year    = {2026},
   url     = {https://github.com/chaitanyakasaraneni/samplesheet-parser},
-  version = {0.1.0}
+  version = {0.1.3}
 }
 ```
 

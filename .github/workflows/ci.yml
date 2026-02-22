@@ -41,6 +41,7 @@ jobs:
         if: matrix.python-version == '3.12'
         with:
           file: ./coverage.xml
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   publish:
     needs: test
