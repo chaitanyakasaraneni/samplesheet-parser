@@ -315,7 +315,7 @@ If you use this library in a published pipeline or analysis, please cite:
   title   = {samplesheet-parser: Format-agnostic parser for Illumina SampleSheet.csv},
   year    = {2026},
   url     = {https://github.com/chaitanyakasaraneni/samplesheet-parser},
-  version = {0.1.4}
+  version = {0.1.5}
 }
 ```
 
