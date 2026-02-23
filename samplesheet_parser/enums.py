@@ -1,8 +1,5 @@
 """
 Enumerations for samplesheet-parser.
-
-All enums use standard Illumina terminology from public documentation.
-No proprietary assay codes are included.
 """
 
 from enum import Enum
