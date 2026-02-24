@@ -97,8 +97,9 @@ class SampleSheetConverter:
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
-        factory   = SampleSheetFactory()
-        self._sheet = factory.create_parser(self.path, parse=True)
+        factory = SampleSheetFactory()
+        # clean=False: converter must never modify or back up the source file
+        self._sheet = factory.create_parser(self.path, parse=True, clean=False)
         self.source_version: SampleSheetVersion = factory.version  # type: ignore[assignment]
         logger.info(f"SampleSheetConverter: detected {self.source_version} for {self.path}")
 
@@ -145,8 +146,9 @@ class SampleSheetConverter:
         run_name = sheet.experiment_name or ""
         if run_name:
             lines.append(f"RunName,{run_name}")
-        if sheet.date:
-            lines.append(f"RunDescription,{sheet.date}")
+        description = getattr(sheet, "description", None) or ""
+        if description:
+            lines.append(f"RunDescription,{description}")
         lines.append("")
 
         # [Reads]
@@ -289,16 +291,15 @@ class SampleSheetConverter:
         lines.append("")
 
         # Warn about dropped fields
+        # Check cloud_data first so the warning fires even when it is the only lossy part
+        if sheet.cloud_data:
+            dropped.append("[Cloud_Data] section (entire section — no V1 equivalent)")
         if dropped:
             logger.warning(
                 f"V2 → V1 conversion dropped {len(dropped)} field(s) with no V1 equivalent:"
             )
             for field in dropped:
                 logger.warning(f"  - {field}")
-            if sheet.cloud_data:
-                logger.warning(
-                    "  - [Cloud_Data] section (entire section dropped — no V1 equivalent)"
-                )
 
         out.write_text("\n".join(lines), encoding="utf-8")
         logger.info(f"Wrote V1 sheet to {out}")
