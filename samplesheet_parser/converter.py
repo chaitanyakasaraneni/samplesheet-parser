@@ -130,7 +130,11 @@ class SampleSheetConverter:
             )
 
         sheet = self._sheet
-        assert isinstance(sheet, SampleSheetV1)
+        if not isinstance(sheet, SampleSheetV1):
+            raise TypeError(
+                f"Expected SampleSheetV1 for V1 \N{RIGHTWARDS ARROW} V2 conversion, "
+                f"got {type(sheet).__name__!r}."
+            )
 
         out = Path(output_path)
         lines: list[str] = []
