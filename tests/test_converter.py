@@ -1,10 +1,10 @@
 """Tests for SampleSheetConverter."""
 
 import pytest
+
 from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

@@ -44,7 +44,6 @@ from samplesheet_parser.factory import SampleSheetFactory
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 
-
 # ---------------------------------------------------------------------------
 # Field mappings
 # ---------------------------------------------------------------------------
