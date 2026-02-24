@@ -10,7 +10,7 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 [![Tests](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions)
 [![codecov](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser/branch/main/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser)
 
-![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/docs/images/samplesheet_parser_overview.png)
+![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_overview.png)
 
 *`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — and `SampleSheetConverter` handles bidirectional conversion between them.*
 
