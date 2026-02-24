@@ -32,6 +32,7 @@ __author__ = "Chaitanya Kasaraneni"
 __email__  = "kc.kasaraneni@gmail.com"
 __license__ = "Apache 2.0"
 
+from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.enums import IndexType, SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
 from samplesheet_parser.parsers.v1 import SampleSheetV1
@@ -46,5 +47,6 @@ __all__ = [
     "IndexType",
     "SampleSheetValidator",
     "ValidationResult",
+    "SampleSheetConverter",
     "__version__",
 ]
