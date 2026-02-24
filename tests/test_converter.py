@@ -1,7 +1,6 @@
 """Tests for SampleSheetConverter."""
 
 import pytest
-
 from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
@@ -408,3 +407,76 @@ class TestRoundTrip:
         ids = [s["sample_id"] for s in sheet.samples()]
         assert "Sample1" in ids
         assert "Sample2" in ids
+
+    def test_header_only_v1_emits_column_header(self, tmp_path):
+        """V1 with columns but zero records should still emit [BCLConvert_Data] column header."""
+        p = tmp_path / "header_only_v1.csv"
+        p.write_text(
+            "[Header]\n"
+            "IEMFileVersion,5\n"
+            "Experiment Name,EmptyRun\n"
+            "\n"
+            "[Data]\n"
+            "Lane,Sample_ID,index,index2,Sample_Project\n"
+        )
+        out = tmp_path / "out_v2.csv"
+        SampleSheetConverter(str(p)).to_v2(out)
+        content = out.read_text()
+        assert "[BCLConvert_Data]" in content
+        assert "Sample_ID" in content
+
+    def test_header_only_v2_emits_column_header(self, tmp_path):
+        """V2 with columns but zero records should still emit [Data] column header."""
+        p = tmp_path / "header_only_v2.csv"
+        p.write_text(
+            "[Header]\n"
+            "FileFormatVersion,2\n"
+            "RunName,EmptyRun\n"
+            "InstrumentPlatform,NovaSeqXSeries\n"
+            "\n"
+            "[BCLConvert_Data]\n"
+            "Lane,Sample_ID,Index,Index2,Sample_Project\n"
+        )
+        out = tmp_path / "out_v1.csv"
+        SampleSheetConverter(str(p)).to_v1(out)
+        content = out.read_text()
+        assert "[Data]" in content
+        assert "Sample_ID" in content
+
+    def test_rundescription_maps_to_description_not_date(self, tmp_path):
+        """V2 RunDescription should map to V1 Description, not Date."""
+        p = tmp_path / "desc.csv"
+        p.write_text(
+            "[Header]\n"
+            "FileFormatVersion,2\n"
+            "RunName,MyRun\n"
+            "RunDescription,Free text description\n"
+            "InstrumentPlatform,NovaSeqXSeries\n"
+            "\n"
+            "[BCLConvert_Data]\n"
+            "Lane,Sample_ID,Index\n"
+            "1,S1,ATTACTCG\n"
+        )
+        out = tmp_path / "out_v1.csv"
+        SampleSheetConverter(str(p)).to_v1(out)
+        content = out.read_text()
+        assert "Description,Free text description" in content
+        assert "Date,Free text description" not in content
+
+    def test_override_cycles_is_valid_csv_field(self, tmp_path):
+        """OverrideCycles placeholder in V2 output should be a real CSV field, not a comment."""
+        p = tmp_path / "v1.csv"
+        p.write_text(
+            "[Header]\n"
+            "IEMFileVersion,5\n"
+            "Experiment Name,MyRun\n"
+            "\n"
+            "[Data]\n"
+            "Lane,Sample_ID,index,index2\n"
+            "1,S1,ATTACTCG,TATAGCCT\n"
+        )
+        out = tmp_path / "out_v2.csv"
+        SampleSheetConverter(str(p)).to_v2(out)
+        content = out.read_text()
+        assert "OverrideCycles," in content
+        assert "# OverrideCycles" not in content

@@ -48,13 +48,6 @@ from samplesheet_parser.parsers.v2 import SampleSheetV2
 # Field mappings
 # ---------------------------------------------------------------------------
 
-# IEM V1 [Header] key → BCLConvert V2 [Header] key
-_V1_TO_V2_HEADER: dict[str, str] = {
-    "Experiment Name": "RunName",
-    "Date":            "RunDescription",   # closest V2 equivalent
-    "Description":     "RunDescription",
-}
-
 # V2-only fields that have no V1 equivalent — dropped on V2 → V1
 _V2_ONLY_SETTINGS: set[str] = {
     "OverrideCycles",
@@ -166,18 +159,19 @@ class SampleSheetConverter:
             lines.append(f"AdapterRead1,{sheet.adapter_read1}")
         if sheet.adapter_read2:
             lines.append(f"AdapterRead2,{sheet.adapter_read2}")
-        # Emit empty OverrideCycles placeholder — caller can fill in
-        lines.append("# OverrideCycles — fill in if using UMIs or custom cycle counts")
+        # Emit empty OverrideCycles — caller should fill in if using UMIs or custom cycle counts
+        lines.append("OverrideCycles,")
         lines.append("")
 
         # [BCLConvert_Data]
         lines.append("[BCLConvert_Data]")
-        if sheet.records:
-            # Build V2 column header — remap V1 column names to V2
-            v2_columns = self._v1_data_columns_to_v2(sheet.columns or [])
+        if sheet.columns:
+            # Always emit column header even when records == [] to keep the
+            # section parseable by SampleSheetV2.parse_data()
+            v2_columns = self._v1_data_columns_to_v2(sheet.columns)
             lines.append(",".join(v2_columns))
-            for record in sheet.records:
-                row = self._v1_record_to_v2(record, sheet.columns or [], v2_columns)
+            for record in (sheet.records or []):
+                row = self._v1_record_to_v2(record, v2_columns)
                 lines.append(",".join(row))
         lines.append("")
 
@@ -233,7 +227,7 @@ class SampleSheetConverter:
 
         run_desc = sheet.header.get("RunDescription", "") if sheet.header else ""
         if run_desc:
-            lines.append(f"Date,{run_desc}")
+            lines.append(f"Description,{run_desc}")
 
         # Track dropped V2-only header fields
         if sheet.header:
@@ -274,7 +268,7 @@ class SampleSheetConverter:
 
         # [Data]
         lines.append("[Data]")
-        if sheet.records and sheet.columns:
+        if sheet.columns:
             v1_columns = self._v2_data_columns_to_v1(sheet.columns)
 
             # Track dropped V2-only data columns
@@ -282,9 +276,11 @@ class SampleSheetConverter:
                 if col in sheet.columns:
                     dropped.append(f"[BCLConvert_Data] column: {col}")
 
+            # Always emit column header even when records == [] to keep the
+            # section parseable by SampleSheetV1.parse_data()
             lines.append(",".join(v1_columns))
-            for record in sheet.records:
-                row = self._v2_record_to_v1(record, sheet.columns, v1_columns)
+            for record in (sheet.records or []):
+                row = self._v2_record_to_v1(record, v1_columns)
                 lines.append(",".join(row))
         lines.append("")
 
@@ -334,7 +330,6 @@ class SampleSheetConverter:
     def _v1_record_to_v2(
         self,
         record: dict[str, str],
-        v1_columns: list[str],
         v2_columns: list[str],
     ) -> list[str]:
         """Convert a single V1 data record to a V2 row."""
@@ -372,7 +367,6 @@ class SampleSheetConverter:
     def _v2_record_to_v1(
         self,
         record: dict[str, str],
-        v2_columns: list[str],
         v1_columns: list[str],
     ) -> list[str]:
         """Convert a single V2 data record to a V1 row."""
