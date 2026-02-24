@@ -1,0 +1,27 @@
+[Header]
+IEMFileVersion,5
+Experiment Name,NovaSeqRun_20240115
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Application,FASTQ Only
+Description,Amplicon panel - batch 7
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+AdapterRead2,CTGTCTCTTATACACATCT
+
+[Data]
+Lane,Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+1,SAMPLE_001,SAMPLE_001,,A01,D701,ATTACTCG,D501,TATAGCCT,Project_Amplicon,
+1,SAMPLE_002,SAMPLE_002,,B01,D702,TCCGGAGA,D502,ATAGAGGC,Project_Amplicon,
+1,SAMPLE_003,SAMPLE_003,,C01,D703,TAGGCATG,D503,CCTATCCT,Project_Amplicon,
+1,SAMPLE_004,SAMPLE_004,,D01,D704,CTCTCTAC,D504,GGCTCTGA,Project_Amplicon,
+2,SAMPLE_005,SAMPLE_005,,A02,D705,CTTGTAAT,D505,AGGCGAAG,Project_Amplicon,
+2,SAMPLE_006,SAMPLE_006,,B02,D706,GCCAATAT,D506,TAATCTTA,Project_Amplicon,
+2,SAMPLE_007,SAMPLE_007,,C02,D707,CAGATCAT,D507,CAGGACGT,Project_Amplicon,
+2,SAMPLE_008,SAMPLE_008,,D02,D708,ACAAACGG,D508,GTACTGAC,Project_Amplicon,

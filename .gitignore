@@ -1,4 +1,9 @@
+# SampleSheet Parser local files to ignore
 BLOGPOST.md
+tests/fixtures/outputs/
+demo_output.txt
+
+# Cache and build artifacts
 __pycache__/
 *.py[cod]
 *.pyo
