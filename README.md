@@ -2,7 +2,7 @@
 
 **Format-agnostic parser for Illumina SampleSheet.csv files.**
 
-Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, and UMI parsing.
+Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, and diff comparison between sheets.
 
 [![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -12,7 +12,7 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 ![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_overview.png)
 
-*`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — and `SampleSheetConverter` handles bidirectional conversion between them.*
+*`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — `SampleSheetConverter` handles bidirectional conversion, `SampleSheetValidator` catches index and adapter issues, and `SampleSheetDiff` compares two sheets across any combination of V1/V2 formats.*
 
 ---
 
@@ -20,7 +20,7 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 Labs running mixed instrument fleets — older NovaSeq 6000 alongside newer NovaSeq X series — produce two incompatible SampleSheet formats. BCLConvert V2 sheets use `[BCLConvert_Settings]` / `[BCLConvert_Data]` sections, `OverrideCycles` for UMI encoding, and `FileFormatVersion` in the header. IEM V1 sheets use `IEMFileVersion` and a flat `[Data]` section.
 
-Existing tools either hard-code one format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format, exposes a consistent interface for both, and can convert between them when needed.
+Existing tools either hard-code one format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format, exposes a consistent interface for both, converts between formats, validates index integrity (including Hamming distance), and diffs sheets to catch accidental changes before a run starts.
 
 ---
 
@@ -30,7 +30,7 @@ Existing tools either hard-code one format or require the caller to know which f
 pip install samplesheet-parser
 ```
 
-Requires Python 3.10+, no mandatory dependencies beyond `loguru`.
+Requires Python 3.10+. No mandatory dependencies beyond `loguru`.
 
 ---
 
@@ -98,21 +98,52 @@ SampleSheetConverter("SampleSheet_v2.csv").to_v1("SampleSheet_v1.csv")
 ### Validation
 
 ```python
-from samplesheet_parser import SampleSheetValidator, SampleSheetV1
-
-sheet = SampleSheetV1("SampleSheet.csv")
-sheet.parse()
+from samplesheet_parser import SampleSheetFactory, SampleSheetValidator
 
 sheet = SampleSheetFactory().create_parser("SampleSheet.csv", parse=True)
 result = SampleSheetValidator().validate(sheet)
 
 print(result.summary())
-# PASS — 0 error(s), 1 warning(s)
+# PASS — 0 error(s), 2 warning(s)
+
+for w in result.warnings:
+    print(w)
+# [WARNING] INDEX_DISTANCE_TOO_LOW: Indexes for 'S1' and 'S2' in lane '1'
+#   have a Hamming distance of 1 (minimum recommended: 3).
+#   This may cause demultiplexing bleed-through.
 
 for err in result.errors:
     print(err)
 # [ERROR] DUPLICATE_INDEX: Index 'ATTACTCG+TATAGCCT' appears more than once in lane 1
 ```
+
+### Diff two sheets
+
+```python
+from samplesheet_parser import SampleSheetDiff
+
+diff = SampleSheetDiff("old/SampleSheet.csv", "new/SampleSheet.csv")
+result = diff.compare()
+
+print(result.summary())
+# Diff (V1 → V2):
+#   2 header/settings change(s)
+#   1 sample(s) added: SAMPLE_009
+#   1 sample(s) with field changes
+
+if result.has_changes:
+    for change in result.sample_changes:
+        print(change)
+    # Sample 'SAMPLE_002' (lane 1):
+    #   Index: 'TCCGGAGA' → 'GGGGGGGG'
+
+    for s in result.samples_added:
+        print(f"Added: {s['Sample_ID']}")
+```
+
+Works across any combination of V1 and V2 — field names are normalised before
+comparison so V1-only columns (`I7_Index_ID`, `Sample_Name`, etc.) do not
+generate spurious diffs.
 
 ---
 
@@ -136,10 +167,67 @@ The detector reads only as much of the file as needed — stopping after `[Heade
 | `INVALID_INDEX_CHARS` | error | Index contains non-ACGTN characters |
 | `INDEX_TOO_LONG` | error | Index longer than 24 bp |
 | `DUPLICATE_INDEX` | error | Two samples share an index in the same lane |
-| `DUPLICATE_SAMPLE_ID` | error | Same Sample_ID appears twice in one lane |
+| `DUPLICATE_SAMPLE_ID` | error | Same `Sample_ID` appears twice in one lane |
 | `INDEX_TOO_SHORT` | warning | Index shorter than 6 bp |
+| `INDEX_DISTANCE_TOO_LOW` | warning | Two indexes in the same lane have Hamming distance < 3, risking demultiplexing bleed-through |
 | `NO_ADAPTERS` | warning | No adapter sequences configured |
 | `ADAPTER_MISMATCH` | warning | Adapter is non-standard |
+
+### Hamming distance checking
+
+Indexes that are too similar cause read bleed-through between samples during
+demultiplexing — a common cause of low-quality runs that is not caught by a
+simple duplicate check. The validator computes the Hamming distance between
+every pair of indexes within each lane and warns when the distance falls below
+the recommended minimum of 3.
+
+For dual-index sheets, the I7 and I5 sequences are combined before comparison,
+so a pair that is close on I7 but well-separated on I5 (as most dual-index
+kits are designed) is not incorrectly flagged.
+
+```python
+# Custom threshold — stricter than the default of 3
+from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
+
+samples = sheet.samples()
+result = ValidationResult()
+SampleSheetValidator()._check_index_distances(samples, result, min_distance=4)
+```
+
+---
+
+## Diff
+
+`SampleSheetDiff` compares two sheets — any combination of V1 and V2 — and
+returns a structured `DiffResult` across four dimensions:
+
+| Dimension | What is compared |
+|---|---|
+| Header | Key/value changes in `[Header]` / `[BCLConvert_Settings]` |
+| Reads | Read length or cycle count changes |
+| Samples added / removed | Keyed on `Sample_ID` + `Lane` |
+| Sample field changes | Per-sample field-level diffs (index, project, etc.) |
+
+```python
+result = SampleSheetDiff("before.csv", "after.csv").compare()
+
+result.has_changes          # bool
+result.summary()            # one-paragraph human-readable summary
+result.header_changes       # list[HeaderChange]
+result.samples_added        # list[dict]
+result.samples_removed      # list[dict]
+result.sample_changes       # list[SampleChange]
+
+# Inspect per-sample changes
+for sc in result.sample_changes:
+    print(sc.sample_id, sc.lane)
+    for field, (old, new) in sc.changes.items():
+        print(f"  {field}: {old!r} → {new!r}")
+```
+
+V1-only metadata columns (`I7_Index_ID`, `I5_Index_ID`, `Sample_Name`,
+`Description`) are suppressed when comparing V1 against V2 so that format
+differences do not generate noise.
 
 ---
 
@@ -163,14 +251,16 @@ sheet.get_read_structure()   # → ReadStructure dataclass
 ## API reference
 
 ### `SampleSheetFactory`
-| Method | Returns | Description |
+
+| Method / attribute | Returns | Description |
 |---|---|---|
-| `create_parser(path, *, clean, experiment_id, parse)` | `SampleSheetV1 \| SampleSheetV2` | Auto-detect and return appropriate parser |
-| `get_umi_length()` | `int` | UMI length from current parser |
-| `factory.version` | `SampleSheetVersion` | Detected format version |
+| `create_parser(path, *, clean, experiment_id, parse)` | `SampleSheetV1 \| SampleSheetV2` | Auto-detect format and return appropriate parser |
+| `get_umi_length()` | `int` | UMI length from the current parser |
+| `.version` | `SampleSheetVersion` | Detected format version |
 
 ### `SampleSheetV1` / `SampleSheetV2` (shared interface)
-| Method | Returns | Description |
+
+| Method / attribute | Returns | Description |
 |---|---|---|
 | `parse(do_clean=True)` | `None` | Parse all sections |
 | `samples()` | `list[dict]` | One record per unique sample |
@@ -189,7 +279,34 @@ sheet.get_read_structure()   # → ReadStructure dataclass
 |---|---|---|
 | `to_v2(output_path)` | `Path` | Converts IEM V1 → BCLConvert V2 |
 | `to_v1(output_path)` | `Path` | Converts BCLConvert V2 → IEM V1 (lossy) |
-| `.source_version` | `SampleSheetVersion` | Auto-detected format of input file |
+| `.source_version` | `SampleSheetVersion` | Auto-detected format of input |
+
+
+### `SampleSheetValidator`
+
+| Method | Returns | Description |
+|---|---|---|
+| `validate(sheet)` | `ValidationResult` | Run all checks; returns structured result |
+| `_check_index_distances(samples, result, min_distance=3)` | `None` | Hamming distance check (callable directly for custom thresholds) |
+
+### `SampleSheetDiff`
+
+| Method | Returns | Description |
+|---|---|---|
+| `compare()` | `DiffResult` | Full comparison across header, reads, settings, and samples |
+
+### `DiffResult`
+
+| Attribute / method | Type | Description |
+|---|---|---|
+| `has_changes` | `bool` | `True` if any difference was detected |
+| `summary()` | `str` | Human-readable one-paragraph summary |
+| `header_changes` | `list[HeaderChange]` | Header, reads, and settings diffs |
+| `samples_added` | `list[dict]` | Records present in new sheet only |
+| `samples_removed` | `list[dict]` | Records present in old sheet only |
+| `sample_changes` | `list[SampleChange]` | Per-sample field-level diffs |
+| `source_version` | `SampleSheetVersion` | Format of the old sheet |
+| `target_version` | `SampleSheetVersion` | Format of the new sheet |
 
 ---
 
@@ -203,8 +320,9 @@ pip install -e ".[dev]"
 # Run tests
 pytest tests/ -v
 
-# Run example demo
-python examples/parse_examples.py
+# Run demo scripts
+python scripts/demo_converter.py
+python scripts/demo_diff.py
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR checklist.
@@ -214,7 +332,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR c
 ## Citation
 
 ```bibtex
-@software{kasaraneni2026samplsheetparser,
+@software{kasaraneni2026samplesheetparser,
   author  = {Kasaraneni, Chaitanya},
   title   = {samplesheet-parser: Format-agnostic parser for Illumina SampleSheet.csv},
   year    = {2026},
@@ -236,3 +354,4 @@ Apache 2.0 — see [LICENSE](LICENSE).
 - [Illumina IEM V1 SampleSheet reference (Knowledge Article #2204)](https://knowledge.illumina.com/software/on-premises-software/software-on-premises-software-reference_material-list/000002204)
 - [BCLConvert Software Guide](https://support.illumina.com/sequencing/sequencing_software/bcl-convert.html)
 - [Upgrading from bcl2fastq to BCLConvert](https://knowledge.illumina.com/software/general/software-general-reference_material-list/000003710)
+- [Illumina index design recommendations](https://support.illumina.com/bulletins/2020/06/index-misassignment-between-samples-on-the-novaseq-6000.html)
