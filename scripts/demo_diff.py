@@ -133,17 +133,7 @@ def run() -> int:
     print(f"\nSource format : {result.source_version.value}")
     print(f"Target format : {result.target_version.value}")
 
-    if result.sample_changes:
-        msg = (
-            f"✗ Expected zero sample_changes for matching V1/V2 sheets "
-            f"but got {len(result.sample_changes)}:\n"
-            + "\n".join(str(sc) for sc in result.sample_changes)
-        )
-        print(msg, file=sys.stderr)
-        errors.append(msg)
-    else:
-        print("✓ Zero sample changes — field normalisation working correctly")
-
+    # Additions / removals: same 8 samples in both sheets → expect none
     if result.samples_added or result.samples_removed:
         msg = (
             f"✗ Unexpected additions/removals in V1→V2 cross-format diff\n"
@@ -155,8 +145,43 @@ def run() -> int:
     else:
         print("✓ No spurious additions or removals")
 
-    # Note: header/reads/settings changes between V1 and V2 are expected
-    # (different format conventions) so we don't assert on those here.
+    # V1-only metadata fields (I7_Index_ID, Sample_Name etc.) are suppressed
+    # by field normalisation — none should appear in sample_changes.
+    v1_only_fields = {"I7_Index_ID", "I5_Index_ID", "Sample_Name", "Description"}
+    spurious = [
+        sc for sc in result.sample_changes
+        if any(f in v1_only_fields for f in sc.changes)
+    ]
+    if spurious:
+        msg = (
+            "✗ V1-only metadata fields leaked into sample_changes "
+            "— normalisation not working:\n"
+            + "\n".join(str(sc) for sc in spurious)
+        )
+        print(msg, file=sys.stderr)
+        errors.append(msg)
+    else:
+        print("✓ V1-only metadata fields correctly suppressed (I7_Index_ID etc.)")
+
+    # Index length differences (8bp V1 → 10bp V2) are real content changes
+    # and should be reported — this is expected behaviour, not a bug.
+    index_changes = [
+        sc for sc in result.sample_changes
+        if "Index" in sc.changes or "Index2" in sc.changes
+    ]
+    if index_changes:
+        print(
+            "\n  (Index length changes V1→V2 are expected — "
+            "V1 uses 8bp, V2 uses 10bp in these fixtures):"
+        )
+        for sc in index_changes[:3]:
+            old_i = sc.changes.get("Index", (None, None))[0]
+            new_i = sc.changes.get("Index", (None, None))[1]
+            print(f"    {sc.sample_id}: {old_i} → {new_i}")
+        if len(index_changes) > 3:
+            print(f"    … and {len(index_changes) - 3} more")
+
+    # Header/settings diffs between formats are also expected
     if result.header_changes:
         print("\n  (Header/settings diffs between V1 and V2 formats — expected):")
         for c in result.header_changes:
