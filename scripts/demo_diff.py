@@ -158,7 +158,7 @@ def run() -> int:
     # Note: header/reads/settings changes between V1 and V2 are expected
     # (different format conventions) so we don't assert on those here.
     if result.header_changes:
-        print(f"\n  (Header/settings diffs between V1 and V2 formats — expected):")
+        print("\n  (Header/settings diffs between V1 and V2 formats — expected):")
         for c in result.header_changes:
             print(f"    {c}")
 

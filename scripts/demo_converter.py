@@ -55,7 +55,11 @@ def run() -> int:
         from samplesheet_parser.parsers.v1 import SampleSheetV1
         from samplesheet_parser.parsers.v2 import SampleSheetV2
     except ImportError as exc:
-        print(f"ERROR: could not import samplesheet_parser — did you run 'pip install -e .[dev]'?\n{exc}", file=sys.stderr)
+        print(
+            f"ERROR: could not import samplesheet_parser — "
+            f"did you run 'pip install -e .[dev]'?\n{exc}",
+            file=sys.stderr,
+        )
         return 1
 
     errors: list[str] = []
@@ -114,7 +118,11 @@ def run() -> int:
     if orig_ids == rt_ids:
         print(f"✓ Sample IDs match after V1→V2→V1 round-trip: {sorted(orig_ids)}")
     else:
-        msg = f"✗ Sample ID mismatch after V1→V2→V1 round-trip\n  original : {sorted(orig_ids)}\n  round-trip: {sorted(rt_ids)}"
+        msg = (
+            f"✗ Sample ID mismatch after V1→V2→V1 round-trip\n"
+            f"  original  : {sorted(orig_ids)}\n"
+            f"  round-trip: {sorted(rt_ids)}"
+        )
         print(msg, file=sys.stderr)
         errors.append(msg)
 
@@ -136,7 +144,11 @@ def run() -> int:
     if orig_ids_v2 == rt_ids_v2:
         print(f"✓ Sample IDs match after V2→V1→V2 round-trip: {sorted(orig_ids_v2)}")
     else:
-        msg = f"✗ Sample ID mismatch after V2→V1→V2 round-trip\n  original : {sorted(orig_ids_v2)}\n  round-trip: {sorted(rt_ids_v2)}"
+        msg = (
+            f"✗ Sample ID mismatch after V2→V1→V2 round-trip\n"
+            f"  original  : {sorted(orig_ids_v2)}\n"
+            f"  round-trip: {sorted(rt_ids_v2)}"
+        )
         print(msg, file=sys.stderr)
         errors.append(msg)
 

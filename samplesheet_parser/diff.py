@@ -38,7 +38,6 @@ from loguru import logger
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
 
-
 # ---------------------------------------------------------------------------
 # Field normalisation map
 # V1 and V2 use different names for the same logical field.
@@ -192,7 +191,11 @@ class DiffResult:
             parts.append(f"  {len(self.samples_added)} sample(s) added: {ids}{tail}")
         if self.samples_removed:
             ids = ", ".join(r.get("Sample_ID", "?") for r in self.samples_removed[:5])
-            tail = f" … +{len(self.samples_removed) - 5} more" if len(self.samples_removed) > 5 else ""
+            tail = (
+                f" … +{len(self.samples_removed) - 5} more"
+                if len(self.samples_removed) > 5
+                else ""
+            )
             parts.append(f"  {len(self.samples_removed)} sample(s) removed: {ids}{tail}")
         if self.sample_changes:
             parts.append(f"  {len(self.sample_changes)} sample(s) with field changes")

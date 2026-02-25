@@ -14,7 +14,6 @@ import pytest
 
 from samplesheet_parser.diff import DiffResult, HeaderChange, SampleChange, SampleSheetDiff
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -310,7 +309,9 @@ class TestDiffResult:
 
     def test_sample_change_sets_has_changes(self):
         r = DiffResult(source_version=None, target_version=None)  # type: ignore
-        r.sample_changes.append(SampleChange(lane="1", sample_id="S1", changes={"Index": ("A", "B")}))
+        r.sample_changes.append(
+            SampleChange(lane="1", sample_id="S1", changes={"Index": ("A", "B")})
+        )
         assert r.has_changes
 
     def test_summary_no_changes(self):
@@ -337,7 +338,9 @@ class TestDiffResult:
         assert "Changed samples" in text
 
     def test_header_change_str(self):
-        c = HeaderChange(field="AdapterRead1", old_value="AAAA", new_value="CCCC", section="settings")
+        c = HeaderChange(
+            field="AdapterRead1", old_value="AAAA", new_value="CCCC", section="settings"
+        )
         assert "settings" in str(c)
         assert "AdapterRead1" in str(c)
         assert "AAAA" in str(c)
