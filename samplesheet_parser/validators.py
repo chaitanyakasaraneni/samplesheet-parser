@@ -40,6 +40,12 @@ MIN_INDEX_LENGTH = 6
 #: a data error).
 MAX_INDEX_LENGTH = 24
 
+#: Minimum Hamming distance required between any two index sequences
+#: within the same lane. Illumina recommends ≥ 3 for robust demultiplexing;
+#: sequences with fewer mismatches risk read bleed-through between samples.
+#: Reference: https://support.illumina.com/bulletins/2020/06/index-misassignment-between-samples-on-the-novaseq-6000.html
+MIN_HAMMING_DISTANCE: int = 3
+
 #: Standard Illumina adapter sequences (subset; not exhaustive).
 #: Full sequences from: https://support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
 KNOWN_ADAPTERS = {
@@ -125,6 +131,34 @@ class ValidationResult:
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _hamming_distance(a: str, b: str) -> int:
+    """Return the Hamming distance between two index sequences.
+
+    Sequences of unequal length are compared up to the shorter length —
+    a conservative approach matching how the instrument reads cycles.
+
+    Parameters
+    ----------
+    a, b:
+        Uppercase index strings (ACGTN).
+
+    Examples
+    --------
+    >>> _hamming_distance("ATTACTCG", "ATTACTCG")
+    0
+    >>> _hamming_distance("ATTACTCG", "ATTACTCA")
+    1
+    >>> _hamming_distance("ATTACTCG", "GCTAGCTA")
+    6
+    """
+    length = min(len(a), len(b))
+    return sum(x != y for x, y in zip(a[:length], b[:length], strict=False))
+
+
+# ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
 
@@ -143,6 +177,10 @@ class SampleSheetValidator:
     * **MISSING_INDEX2**       — Sheet has an ``Index2`` / ``index2`` column but
                                  one or more samples have it empty.
     * **DUPLICATE_SAMPLE_ID**  — ``Sample_ID`` appears more than once per lane.
+    * **INDEX_DISTANCE_TOO_LOW** — Two indexes in the same lane have a Hamming
+                                 distance below :data:`MIN_HAMMING_DISTANCE`
+                                 (default 3), risking demultiplexing bleed-through
+                                 (warning only).
     * **NO_ADAPTERS**          — ``[Settings]`` / ``[BCLConvert_Settings]`` has
                                  no adapter sequences (warning only).
     * **ADAPTER_MISMATCH**     — Adapter does not match any known Illumina
@@ -181,6 +219,7 @@ class SampleSheetValidator:
 
         self._check_index_sequences(samples, result)
         self._check_duplicate_indices(samples, result)
+        self._check_index_distances(samples, result)
         self._check_duplicate_sample_ids(samples, result)
         self._check_adapters(sheet, result)
 
@@ -274,6 +313,77 @@ class SampleSheetValidator:
                 )
             else:
                 bucket[index_key] = sid
+
+    def _check_index_distances(
+        self,
+        samples: list[dict],
+        result: ValidationResult,
+        min_distance: int = MIN_HAMMING_DISTANCE,
+    ) -> None:
+        """Warn if any two indexes in the same lane are too similar.
+
+        Computes the Hamming distance between every pair of index sequences
+        within each lane. Pairs with a distance below ``min_distance``
+        (default: :data:`MIN_HAMMING_DISTANCE` = 3) are reported as warnings
+        because they risk read bleed-through during demultiplexing.
+
+        For dual-index sheets the combined index (I7+I5 concatenated) is
+        used so that a pair which is close on I7 but well-separated on I5
+        is not incorrectly flagged.
+
+        Sequences of different lengths are compared up to the length of the
+        shorter sequence — a conservative approach since the instrument reads
+        only as many cycles as configured.
+
+        Parameters
+        ----------
+        samples:
+            Output of ``sheet.samples()``.
+        result:
+            :class:`ValidationResult` to append warnings to.
+        min_distance:
+            Minimum acceptable Hamming distance. Pairs below this threshold
+            generate a ``INDEX_DISTANCE_TOO_LOW`` warning.
+        """
+        # Group by lane; treat None as lane-unaware (compare all samples)
+        lane_buckets: dict[str | None, list[tuple[str, str, str]]] = {}
+        # bucket entry: (sample_id, index1, combined_index)
+
+        for sample in samples:
+            lane = sample.get("lane")
+            idx1 = (sample.get("index") or "").upper()
+            idx2 = (sample.get("index2") or "").upper()
+            sid  = sample.get("sample_id", "?")
+
+            if not idx1:
+                continue  # no index to compare
+
+            combined = idx1 + idx2 if idx2 else idx1
+            lane_buckets.setdefault(lane, []).append((sid, idx1, combined))
+
+        for lane, entries in lane_buckets.items():
+            # Compare every pair — O(n²) but n is always small (< 200 samples)
+            for i in range(len(entries)):
+                for j in range(i + 1, len(entries)):
+                    sid_a, _, combined_a = entries[i]
+                    sid_b, _, combined_b = entries[j]
+
+                    dist = _hamming_distance(combined_a, combined_b)
+                    if dist < min_distance:
+                        result.add_warning(
+                            "INDEX_DISTANCE_TOO_LOW",
+                            f"Indexes for '{sid_a}' and '{sid_b}' in lane "
+                            f"{lane!r} have a Hamming distance of {dist} "
+                            f"(minimum recommended: {min_distance}). "
+                            f"This may cause demultiplexing bleed-through.",
+                            lane=lane,
+                            sample_a=sid_a,
+                            sample_b=sid_b,
+                            index_a=combined_a,
+                            index_b=combined_b,
+                            distance=dist,
+                            min_distance=min_distance,
+                        )
 
     def _check_duplicate_sample_ids(
         self,
