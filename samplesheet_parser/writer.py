@@ -97,32 +97,6 @@ def _validate_field(value: str, field_name: str) -> str:
     return value
 
 
-# ---------------------------------------------------------------------------
-# V1 Data column order (from IEM spec)
-# ---------------------------------------------------------------------------
-
-_V1_DATA_COLUMNS = [
-    "Lane",
-    "Sample_ID",
-    "Sample_Name",
-    "Sample_Plate",
-    "Sample_Well",
-    "I7_Index_ID",
-    "index",
-    "I5_Index_ID",
-    "index2",
-    "Sample_Project",
-    "Description",
-]
-
-_V2_DATA_COLUMNS = [
-    "Lane",
-    "Sample_ID",
-    "Index",
-    "Index2",
-    "Sample_Project",
-]
-
 
 # ---------------------------------------------------------------------------
 # Internal sample record
@@ -297,6 +271,16 @@ class SampleSheetWriter:
         SampleSheetWriter
             ``self``, for method chaining.
         """
+        _validate_field(run_name,   "run_name")
+        _validate_field(run_desc,   "run_desc")
+        _validate_field(platform,   "platform")
+        _validate_field(instrument, "instrument")
+        _validate_field(date_str,   "date_str")
+        _validate_field(workflow,   "workflow")
+        _validate_field(chemistry,  "chemistry")
+        for k, v in extra.items():
+            _validate_field(k, f"extra header key '{k}'")
+            _validate_field(v, k)
         self._run_name   = run_name
         self._run_desc   = run_desc
         self._platform   = platform
@@ -369,6 +353,8 @@ class SampleSheetWriter:
         SampleSheetWriter
             ``self``, for method chaining.
         """
+        _validate_field(adapter_read1, "adapter_read1")
+        _validate_field(adapter_read2, "adapter_read2")
         self._adapter_read1 = adapter_read1
         self._adapter_read2 = adapter_read2
         return self
@@ -387,6 +373,7 @@ class SampleSheetWriter:
         SampleSheetWriter
             ``self``, for method chaining.
         """
+        _validate_field(override, "override_cycles")
         self._override_cycles = override
         return self
 
@@ -411,6 +398,8 @@ class SampleSheetWriter:
         SampleSheetWriter
             ``self``, for method chaining.
         """
+        _validate_field(key,   "key")
+        _validate_field(value, key)
         self._extra_settings[key] = value
         return self
 
@@ -594,9 +583,10 @@ class SampleSheetWriter:
             matched = True
             for k, v in fields.items():
                 if k in _KNOWN:
-                    setattr(s, k, str(v).upper() if k in ("index", "index2") else str(v))
+                    value_str = _validate_field(str(v), k)
+                    setattr(s, k, value_str.upper() if k in ("index", "index2") else value_str)
                 else:
-                    s.extra[k] = str(v)
+                    s.extra[k] = _validate_field(str(v), k)
         if not matched:
             raise KeyError(
                 f"Sample '{sample_id}'"

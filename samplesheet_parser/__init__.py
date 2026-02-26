@@ -39,6 +39,7 @@ from samplesheet_parser.factory import SampleSheetFactory
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
+from samplesheet_parser.writer import SampleSheetWriter
 
 __all__ = [
     "SampleSheetV1",
@@ -51,5 +52,6 @@ __all__ = [
     "SampleSheetConverter",
     "SampleSheetDiff",
     "DiffResult",
+    "SampleSheetWriter",
     "__version__",
 ]

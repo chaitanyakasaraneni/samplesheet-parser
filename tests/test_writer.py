@@ -423,6 +423,75 @@ class TestCSVSafety:
 
 
 # ---------------------------------------------------------------------------
+# CSV safety — set_header / set_adapter / set_setting / update_sample
+# ---------------------------------------------------------------------------
+
+class TestCSVSafetyConfiguration:
+    def test_comma_in_run_name_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="run_name"):
+            w.set_header(run_name="Run,Bad")
+
+    def test_comma_in_platform_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="platform"):
+            w.set_header(platform="Nova,Seq")
+
+    def test_comma_in_extra_header_key_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError):
+            w.set_header(**{"Bad,Key": "val"})
+
+    def test_comma_in_extra_header_value_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError):
+            w.set_header(**{"CustomKey": "val,bad"})
+
+    def test_comma_in_adapter_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="adapter_read1"):
+            w.set_adapter("CTGTCTCT,TACACATCT")
+
+    def test_comma_in_override_cycles_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="override_cycles"):
+            w.set_override_cycles("Y151,I10;I10;Y151")
+
+    def test_comma_in_setting_key_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="key"):
+            w.set_setting("Bad,Key", "value")
+
+    def test_comma_in_setting_value_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError):
+            w.set_setting("GoodKey", "bad,value")
+
+    def test_comma_in_update_sample_index_raises(self):
+        w = _writer_v2()
+        with pytest.raises(ValueError):
+            w.update_sample("S1", index="ATTACT,CG")
+
+    def test_comma_in_update_sample_project_raises(self):
+        w = _writer_v2()
+        with pytest.raises(ValueError):
+            w.update_sample("S1", project="Proj,Bad")
+
+    def test_comma_in_update_sample_extra_raises(self):
+        w = _writer_v2()
+        with pytest.raises(ValueError):
+            w.update_sample("S1", CustomCol="val,bad")
+
+    def test_valid_set_header_passes(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        w.set_header(run_name="ValidRun", platform="NovaSeqXSeries")  # no raise
+
+    def test_valid_set_adapter_passes(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        w.set_adapter("CTGTCTCTTATACACATCT")  # no raise
+
+
+# ---------------------------------------------------------------------------
 # Extra columns
 # ---------------------------------------------------------------------------
 
