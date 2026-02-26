@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "samplesheet-parser"
-version = "0.1.5"
+version = "0.2.0"
 description = "Format-agnostic parser for Illumina SampleSheet.csv files — supports IEM V1 and BCLConvert V2"
 readme = "README.md"
 license = { file = "LICENSE" }

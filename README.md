@@ -2,7 +2,7 @@
 
 **Format-agnostic parser for Illumina SampleSheet.csv files.**
 
-Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, and diff comparison between sheets.
+Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, diff comparison, and programmatic sheet creation.
 
 [![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -12,7 +12,7 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 ![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_overview.png)
 
-*`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — `SampleSheetConverter` handles bidirectional conversion, `SampleSheetValidator` catches index and adapter issues, and `SampleSheetDiff` compares two sheets across any combination of V1/V2 formats.*
+*`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — `SampleSheetConverter` handles bidirectional conversion, `SampleSheetValidator` catches index and adapter issues, `SampleSheetDiff` compares two sheets across any combination of V1/V2 formats, and `SampleSheetWriter` builds or edits sheets programmatically.*
 
 ---
 
@@ -20,7 +20,7 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 Labs running mixed instrument fleets — older NovaSeq 6000 alongside newer NovaSeq X series — produce two incompatible SampleSheet formats. BCLConvert V2 sheets use `[BCLConvert_Settings]` / `[BCLConvert_Data]` sections, `OverrideCycles` for UMI encoding, and `FileFormatVersion` in the header. IEM V1 sheets use `IEMFileVersion` and a flat `[Data]` section.
 
-Existing tools either hard-code one format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format, exposes a consistent interface for both, converts between formats, validates index integrity (including Hamming distance), and diffs sheets to catch accidental changes before a run starts.
+Existing tools either hard-code one format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format, exposes a consistent interface for both, converts between formats, validates index integrity (including Hamming distance), diffs sheets to catch accidental changes before a run starts, and writes new sheets programmatically — so you never have to hand-edit a CSV again.
 
 ---
 
@@ -144,6 +144,36 @@ if result.has_changes:
 Works across any combination of V1 and V2 — field names are normalised before
 comparison so V1-only columns (`I7_Index_ID`, `Sample_Name`, etc.) do not
 generate spurious diffs.
+
+### Build or edit a sheet
+
+```python
+from samplesheet_parser import SampleSheetWriter
+from samplesheet_parser.enums import SampleSheetVersion
+
+# Build a V2 sheet from scratch
+writer = SampleSheetWriter(version=SampleSheetVersion.V2)
+writer.set_header(run_name="MyRun_20240115", platform="NovaSeqXSeries")
+writer.set_reads(read1=151, read2=151, index1=10, index2=10)
+writer.set_adapter("CTGTCTCTTATACACATCT")
+writer.set_override_cycles("Y151;I10;I10;Y151")
+writer.add_sample("SAMPLE_001", index="ATTACTCGAT", index2="TATAGCCTGT", project="Proj")
+writer.add_sample("SAMPLE_002", index="TCCGGAGACC", index2="ATAGAGGCAC", project="Proj")
+writer.write("SampleSheet.csv")   # validates before writing by default
+
+# Load an existing sheet, edit it, write back
+from samplesheet_parser import SampleSheetFactory
+
+sheet = SampleSheetFactory().create_parser("SampleSheet.csv", parse=True)
+editor = SampleSheetWriter.from_sheet(sheet)
+editor.remove_sample("SAMPLE_005")
+editor.update_sample("SAMPLE_002", index="GGGGGGGGGG")
+editor.write("SampleSheet_updated.csv")
+```
+
+`write()` runs `SampleSheetValidator` before writing by default — pass
+`validate=False` to skip. `from_sheet(sheet, version=SampleSheetVersion.V1)`
+converts format while editing.
 
 ---
 
@@ -281,13 +311,34 @@ sheet.get_read_structure()   # → ReadStructure dataclass
 | `to_v1(output_path)` | `Path` | Converts BCLConvert V2 → IEM V1 (lossy) |
 | `.source_version` | `SampleSheetVersion` | Auto-detected format of input |
 
-
 ### `SampleSheetValidator`
 
 | Method | Returns | Description |
 |---|---|---|
 | `validate(sheet)` | `ValidationResult` | Run all checks; returns structured result |
 | `_check_index_distances(samples, result, min_distance=3)` | `None` | Hamming distance check (callable directly for custom thresholds) |
+
+### `SampleSheetWriter`
+
+| Method / attribute | Returns | Description |
+|---|---|---|
+| `SampleSheetWriter(version=)` | — | Instantiate for `SampleSheetVersion.V1` or `.V2` |
+| `from_sheet(sheet, version=)` | `SampleSheetWriter` | Load a parsed sheet for editing; optionally change output format |
+| `set_header(*, run_name, platform, ...)` | `self` | Set header fields (fluent) |
+| `set_reads(*, read1, read2, index1, index2)` | `self` | Set read cycle counts (fluent) |
+| `set_adapter(adapter_read1, adapter_read2)` | `self` | Set adapter sequences (fluent) |
+| `set_override_cycles(override)` | `self` | Set `OverrideCycles` string — V2 only (fluent) |
+| `set_software_version(version)` | `self` | Set `SoftwareVersion` — V2 only (fluent) |
+| `set_setting(key, value)` | `self` | Set an arbitrary settings key/value (fluent) |
+| `add_sample(sample_id, *, index, ...)` | `self` | Append a sample row (fluent) |
+| `remove_sample(sample_id, *, lane=)` | `self` | Remove sample(s) by ID, optionally scoped to a lane (fluent) |
+| `update_sample(sample_id, *, lane=, **fields)` | `self` | Update fields on an existing sample in-place (fluent) |
+| `write(path, *, validate=True)` | `Path` | Serialise to disk; validates first by default |
+| `to_string()` | `str` | Serialise to string without writing to disk |
+| `.sample_count` | `int` | Number of samples currently in the writer |
+| `.sample_ids` | `list[str]` | Sample IDs currently in the writer |
+
+---
 
 ### `SampleSheetDiff`
 
@@ -323,6 +374,7 @@ pytest tests/ -v
 # Run demo scripts
 python scripts/demo_converter.py
 python scripts/demo_diff.py
+python scripts/demo_writer.py
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR checklist.
@@ -337,7 +389,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR c
   title   = {samplesheet-parser: Format-agnostic parser for Illumina SampleSheet.csv},
   year    = {2026},
   url     = {https://github.com/chaitanyakasaraneni/samplesheet-parser},
-  version = {0.1.5}
+  version = {0.2.0}
 }
 ```
 
