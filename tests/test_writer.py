@@ -371,6 +371,58 @@ class TestSampleManagement:
 
 
 # ---------------------------------------------------------------------------
+# CSV safety — _validate_field
+# ---------------------------------------------------------------------------
+
+class TestCSVSafety:
+    def test_comma_in_sample_id_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="sample_id"):
+            w.add_sample("S1,bad", index="ATTACTCG")
+
+    def test_newline_in_sample_id_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="sample_id"):
+            w.add_sample("S1\nbad", index="ATTACTCG")
+
+    def test_comma_in_index_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="index"):
+            w.add_sample("S1", index="ATTACT,CG")
+
+    def test_comma_in_project_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="project"):
+            w.add_sample("S1", index="ATTACTCG", project="Proj,A")
+
+    def test_quote_in_project_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError, match="project"):
+            w.add_sample("S1", index="ATTACTCG", project='Proj"A')
+
+    def test_comma_in_extra_key_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError):
+            w.add_sample("S1", index="ATTACTCG", **{"Bad,Key": "val"})
+
+    def test_comma_in_extra_value_raises(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        with pytest.raises(ValueError):
+            w.add_sample("S1", index="ATTACTCG", CustomCol="val,bad")
+
+    def test_safe_values_pass_through(self):
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        # Should not raise
+        w.add_sample(
+            "SAMPLE-001",
+            index="ATTACTCG",
+            project="Project_A",
+            description="Normal description",
+        )
+        assert w.sample_count == 1
+
+
+# ---------------------------------------------------------------------------
 # Extra columns
 # ---------------------------------------------------------------------------
 

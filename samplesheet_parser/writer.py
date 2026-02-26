@@ -58,6 +58,46 @@ from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 
 # ---------------------------------------------------------------------------
+# CSV safety
+# ---------------------------------------------------------------------------
+
+#: Characters that would corrupt the simple comma-delimited CSV structure
+#: that Illumina SampleSheet.csv uses (no quoting or escaping is applied).
+_UNSAFE_CHARS = frozenset(",\n\r\"'")
+
+
+def _validate_field(value: str, field_name: str) -> str:
+    """Raise ``ValueError`` if *value* contains characters unsafe for CSV.
+
+    Parameters
+    ----------
+    value:
+        The string to check.
+    field_name:
+        Human-readable field name used in the error message.
+
+    Returns
+    -------
+    str
+        *value* unchanged if safe.
+
+    Raises
+    ------
+    ValueError
+        If *value* contains a comma, newline, carriage return, or quote.
+    """
+    bad = _UNSAFE_CHARS & set(value)
+    if bad:
+        escaped = ", ".join(repr(c) for c in sorted(bad))
+        raise ValueError(
+            f"Field '{field_name}' contains character(s) that would corrupt "
+            f"the SampleSheet CSV structure: {escaped}. "
+            f"Value was: {value!r}"
+        )
+    return value
+
+
+# ---------------------------------------------------------------------------
 # V1 Data column order (from IEM spec)
 # ---------------------------------------------------------------------------
 
@@ -428,6 +468,21 @@ class SampleSheetWriter:
             raise ValueError("sample_id must not be empty.")
         if not index:
             raise ValueError(f"index must not be empty for sample '{sample_id}'.")
+
+        _validate_field(sample_id,    "sample_id")
+        _validate_field(index,        "index")
+        _validate_field(index2,       "index2")
+        _validate_field(lane,         "lane")
+        _validate_field(sample_name,  "sample_name")
+        _validate_field(sample_plate, "sample_plate")
+        _validate_field(sample_well,  "sample_well")
+        _validate_field(i7_index_id,  "i7_index_id")
+        _validate_field(i5_index_id,  "i5_index_id")
+        _validate_field(project,      "project")
+        _validate_field(description,  "description")
+        for k, v in extra.items():
+            _validate_field(k, f"extra key '{k}'")
+            _validate_field(v, k)
 
         self._samples.append(
             _SampleRecord(
