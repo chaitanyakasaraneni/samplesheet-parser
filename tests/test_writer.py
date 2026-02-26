@@ -25,7 +25,6 @@ import pytest
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.writer import SampleSheetWriter
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -149,7 +148,7 @@ class TestWriteV2FromScratch:
         w.add_sample("S1", index="ATTACTCG")
         content = w.to_string()
         # Index2 column should not appear
-        data_line = [l for l in content.splitlines() if l.startswith("Lane,")][0]
+        data_line = [line for line in content.splitlines() if line.startswith("Lane,")][0]
         assert "Index2" not in data_line
 
     def test_project_column_omitted_when_no_project(self, tmp_path):
@@ -159,7 +158,7 @@ class TestWriteV2FromScratch:
         w.set_adapter("CTGTCTCTTATACACATCT")
         w.add_sample("S1", index="ATTACTCG")
         content = w.to_string()
-        data_line = [l for l in content.splitlines() if l.startswith("Lane,")][0]
+        data_line = [line for line in content.splitlines() if line.startswith("Lane,")][0]
         assert "Sample_Project" not in data_line
 
     def test_software_version_written(self, tmp_path):
@@ -253,7 +252,7 @@ class TestWriteV1FromScratch:
         w.set_adapter("CTGTCTCTTATACACATCT")
         w.add_sample("S1", index="ATTACTCG")
         content = w.to_string()
-        data_line = [l for l in content.splitlines() if l.startswith("Lane,")][0]
+        data_line = [line for line in content.splitlines() if line.startswith("Lane,")][0]
         assert "index2" not in data_line
 
     def test_plate_well_columns_included_when_set(self, tmp_path):
@@ -263,13 +262,13 @@ class TestWriteV1FromScratch:
         w.set_adapter("CTGTCTCTTATACACATCT")
         w.add_sample("S1", index="ATTACTCG", sample_plate="Plate1", sample_well="A01")
         content = w.to_string()
-        data_line = [l for l in content.splitlines() if l.startswith("Lane,")][0]
+        data_line = [line for line in content.splitlines() if line.startswith("Lane,")][0]
         assert "Sample_Plate" in data_line
         assert "Sample_Well" in data_line
 
     def test_plate_well_columns_omitted_when_not_set(self, tmp_path):
         content = _writer_v1().to_string()
-        data_line = [l for l in content.splitlines() if l.startswith("Lane,")][0]
+        data_line = [line for line in content.splitlines() if line.startswith("Lane,")][0]
         assert "Sample_Plate" not in data_line
         assert "Sample_Well" not in data_line
 
@@ -382,7 +381,7 @@ class TestExtraColumns:
         w.set_reads(read1=76)
         w.add_sample("S1", index="ATTACTCG", MyCustomCol="val1")
         content = w.to_string()
-        data_line = [l for l in content.splitlines() if l.startswith("Lane,")][0]
+        data_line = [line for line in content.splitlines() if line.startswith("Lane,")][0]
         assert "MyCustomCol" in data_line
 
     def test_extra_column_values_written(self, tmp_path):
@@ -404,7 +403,7 @@ class TestExtraColumns:
         # S2 row should have an empty trailing field
         lines = content.splitlines()
         data_lines = lines[lines.index("[BCLConvert_Data]") + 2:]
-        s2_line = next(l for l in data_lines if l.startswith("1,S2,"))
+        s2_line = next(line for line in data_lines if line.startswith("1,S2,"))
         assert s2_line.endswith(",")
 
 

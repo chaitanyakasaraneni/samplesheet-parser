@@ -46,8 +46,6 @@ Illumina BCLConvert Software Guide (document # 1000000004084)
 
 from __future__ import annotations
 
-import csv
-import io
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -175,7 +173,7 @@ class SampleSheetWriter:
         sheet: SampleSheetV1 | SampleSheetV2,
         *,
         version: SampleSheetVersion | None = None,
-    ) -> "SampleSheetWriter":
+    ) -> SampleSheetWriter:
         """
         Create a writer pre-populated from an existing parsed sheet.
 
@@ -229,7 +227,7 @@ class SampleSheetWriter:
         workflow:   str = "",
         chemistry:  str = "",
         **extra: str,
-    ) -> "SampleSheetWriter":
+    ) -> SampleSheetWriter:
         """
         Set [Header] / header fields.
 
@@ -280,7 +278,7 @@ class SampleSheetWriter:
         read2:  int = 0,
         index1: int = 0,
         index2: int = 0,
-    ) -> "SampleSheetWriter":
+    ) -> SampleSheetWriter:
         """
         Set read cycle counts.
 
@@ -314,7 +312,7 @@ class SampleSheetWriter:
         self,
         adapter_read1: str,
         adapter_read2: str = "",
-    ) -> "SampleSheetWriter":
+    ) -> SampleSheetWriter:
         """
         Set adapter sequences.
 
@@ -335,7 +333,7 @@ class SampleSheetWriter:
         self._adapter_read2 = adapter_read2
         return self
 
-    def set_override_cycles(self, override: str) -> "SampleSheetWriter":
+    def set_override_cycles(self, override: str) -> SampleSheetWriter:
         """
         Set the ``OverrideCycles`` string (V2 only).
 
@@ -352,7 +350,7 @@ class SampleSheetWriter:
         self._override_cycles = override
         return self
 
-    def set_software_version(self, version: str) -> "SampleSheetWriter":
+    def set_software_version(self, version: str) -> SampleSheetWriter:
         """
         Set ``SoftwareVersion`` in ``[BCLConvert_Settings]`` (V2 only).
 
@@ -364,7 +362,7 @@ class SampleSheetWriter:
         self._software_version = version
         return self
 
-    def set_setting(self, key: str, value: str) -> "SampleSheetWriter":
+    def set_setting(self, key: str, value: str) -> SampleSheetWriter:
         """
         Set an arbitrary key/value in the settings section.
 
@@ -395,7 +393,7 @@ class SampleSheetWriter:
         project:      str = "",
         description:  str = "",
         **extra: str,
-    ) -> "SampleSheetWriter":
+    ) -> SampleSheetWriter:
         """
         Append a sample to the sheet.
 
@@ -454,7 +452,7 @@ class SampleSheetWriter:
         sample_id: str,
         *,
         lane: str | None = None,
-    ) -> "SampleSheetWriter":
+    ) -> SampleSheetWriter:
         """
         Remove sample(s) by ``sample_id``.
 
@@ -501,7 +499,7 @@ class SampleSheetWriter:
         *,
         lane: str | None = None,
         **fields: Any,
-    ) -> "SampleSheetWriter":
+    ) -> SampleSheetWriter:
         """
         Update fields on an existing sample in-place.
 
