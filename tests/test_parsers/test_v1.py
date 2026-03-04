@@ -294,3 +294,159 @@ class TestSampleSheetV1Equality:
         r = repr(sheet)
         assert "SampleSheetV1" in r
         assert "records=2" in r
+
+
+# ---------------------------------------------------------------------------
+# Custom section tests
+# ---------------------------------------------------------------------------
+
+class TestSampleSheetV1ParseCustomSection:
+    """Tests for parse_custom_section() — the new non-standard section API."""
+
+    def test_manifests_section_returns_key_value_dict(self, v1_with_manifests):
+        """[Manifests] section is parsed into a key-value dict."""
+        sheet = SampleSheetV1(v1_with_manifests)
+        sheet.parse()
+        result = sheet.parse_custom_section("Manifests")
+        assert result["MFGmanifest"] == "HyperCapture_manifest_v2.0.txt"
+        assert result["PoolingManifest"] == "pooling_v1.txt"
+
+    def test_manifests_section_case_insensitive(self, v1_with_manifests):
+        """Section name lookup is case-insensitive."""
+        sheet = SampleSheetV1(v1_with_manifests)
+        sheet.parse()
+        assert sheet.parse_custom_section("manifests") == sheet.parse_custom_section("MANIFESTS")
+
+    def test_custom_lab_section_parsed(self, v1_with_custom_section):
+        """A fully custom lab-specific section is parsed correctly."""
+        sheet = SampleSheetV1(v1_with_custom_section)
+        sheet.parse()
+        result = sheet.parse_custom_section("Lab_QC_Settings")
+        assert result["MinQ30"] == "85"
+        assert result["TargetCoverage"] == "100x"
+        assert result["LibraryKit"] == "TruSeq_Nano"
+
+    def test_missing_section_returns_empty_dict_by_default(self, v1_minimal):
+        """Absent section with required=False (default) returns {}."""
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        result = sheet.parse_custom_section("NonExistent_Section")
+        assert result == {}
+
+    def test_missing_section_required_raises(self, v1_minimal):
+        """Absent section with required=True raises ValueError."""
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        with pytest.raises(ValueError, match="NonExistent_Section"):
+            sheet.parse_custom_section("NonExistent_Section", required=True)
+
+    def test_raises_before_parse_or_read(self, v1_minimal):
+        """Calling parse_custom_section before parse()/read() raises RuntimeError."""
+        sheet = SampleSheetV1(v1_minimal, clean=False)
+        with pytest.raises(RuntimeError, match="parse()"):
+            sheet.parse_custom_section("Manifests")
+
+    def test_malformed_lines_are_skipped(self, v1_with_malformed_custom_section):
+        """Lines with a missing key (empty first field) are skipped; valid lines returned."""
+        sheet = SampleSheetV1(v1_with_malformed_custom_section)
+        sheet.parse()
+        result = sheet.parse_custom_section("Lab_QC_Settings")
+        # Only the well-formed lines should be present
+        assert "MinQ30" in result
+        assert "ValidKey" in result
+        # The malformed line (,MissingKey) should not produce a key called ""
+        assert "" not in result
+
+    def test_multiple_custom_sections_accessible(self, v1_with_multiple_custom_sections):
+        """Multiple non-standard sections are all accessible independently."""
+        sheet = SampleSheetV1(v1_with_multiple_custom_sections)
+        sheet.parse()
+        manifests = sheet.parse_custom_section("Manifests")
+        cloud = sheet.parse_custom_section("Cloud_Settings")
+        assert manifests["MFGmanifest"] == "HyperCapture_manifest_v2.0.txt"
+        assert cloud["GeneratedVersion"] == "3.9.14"
+        assert cloud["UploadToBaseSpace"] == "1"
+
+    def test_custom_section_does_not_interfere_with_standard_parsing(
+        self, v1_with_custom_section
+    ):
+        """Standard [Data] and [Header] parse correctly alongside custom sections."""
+        sheet = SampleSheetV1(v1_with_custom_section)
+        sheet.parse()
+        assert sheet.experiment_name == "CustomSectionRun"
+        assert len(sheet.records) == 1
+        assert sheet.records[0]["Sample_ID"] == "Sample1"
+
+    def test_standard_section_via_parse_custom_section(self, v1_minimal):
+        """Standard sections (e.g. Settings) are also accessible via parse_custom_section."""
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        # [Settings] is a standard section but should still be in _section_dict
+        result = sheet.parse_custom_section("Settings")
+        assert "Adapter" in result or "AdapterRead1" in result or "ReverseComplement" in result
+
+    def test_empty_custom_section_returns_empty_dict(self, tmp_path):
+        """A section present but with no content returns {}."""
+        p = tmp_path / "empty_section.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Lab_QC_Settings]\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        result = sheet.parse_custom_section("Lab_QC_Settings")
+        assert result == {}
+
+
+class TestSampleSheetV1RequiredSections:
+    """Tests for parse(required_sections=[...]) — enforcing section presence."""
+
+    def test_required_section_present_does_not_raise(self, v1_with_manifests):
+        """parse() with a required section that exists should complete normally."""
+        sheet = SampleSheetV1(v1_with_manifests, clean=False)
+        sheet.parse(do_clean=False, required_sections=["Manifests"])
+        assert sheet.records is not None
+
+    def test_required_section_missing_raises(self, v1_minimal):
+        """parse() raises ValueError when a required section is absent."""
+        sheet = SampleSheetV1(v1_minimal, clean=False)
+        with pytest.raises(ValueError, match="Cloud_Settings"):
+            sheet.parse(do_clean=False, required_sections=["Cloud_Settings"])
+
+    def test_multiple_required_sections_all_present(self, v1_with_multiple_custom_sections):
+        """All required sections present — no error raised."""
+        sheet = SampleSheetV1(v1_with_multiple_custom_sections, clean=False)
+        sheet.parse(do_clean=False, required_sections=["Manifests", "Cloud_Settings"])
+        assert sheet.records is not None
+
+    def test_multiple_required_sections_one_missing_raises(
+        self, v1_with_multiple_custom_sections
+    ):
+        """One of several required sections missing — ValueError raised."""
+        sheet = SampleSheetV1(v1_with_multiple_custom_sections, clean=False)
+        with pytest.raises(ValueError, match="Pipeline_Settings"):
+            sheet.parse(
+                do_clean=False,
+                required_sections=["Manifests", "Pipeline_Settings"],
+            )
+
+    def test_required_sections_check_is_case_insensitive(self, v1_with_manifests):
+        """required_sections matching is case-insensitive."""
+        sheet = SampleSheetV1(v1_with_manifests, clean=False)
+        # Both "manifests" and "MANIFESTS" should find the [Manifests] section
+        sheet.parse(do_clean=False, required_sections=["manifests"])
+        assert sheet.records is not None
+
+    def test_required_section_error_raised_before_other_parsing(self, v1_minimal):
+        """The required_sections check fires before Header/Data parsing completes."""
+        sheet = SampleSheetV1(v1_minimal, clean=False)
+        # records should remain None because parse() aborts early
+        with pytest.raises(ValueError):
+            sheet.parse(do_clean=False, required_sections=["Missing_Section"])
+
+    def test_none_required_sections_is_no_op(self, v1_minimal):
+        """required_sections=None (default) behaves identically to not passing it."""
+        sheet = SampleSheetV1(v1_minimal, clean=False)
+        sheet.parse(do_clean=False, required_sections=None)
+        assert sheet.records is not None

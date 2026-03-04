@@ -61,8 +61,8 @@ DEFAULT_SECTIONS = [
     "reads",
     "bclconvert_settings",
     "bclconvert_data",
-    "cloud_settings",
-    "cloud_data",
+    "Custom_Settings",
+    "Custom_Data",
 ]
 SheetInfo = namedtuple("SheetInfo", DEFAULT_SECTIONS, defaults=([], [], [], [], [], []))
 
@@ -184,13 +184,16 @@ class SampleSheetV2:
         self.columns:           list[str] | None      = None
         self.records:           list[dict[str, str]]  = []
         self.adapters:          list[str]             = []
-        self.cloud_data:        list[dict[str, str]]  = []
+        self.Custom_Data:        list[dict[str, str]]  = []
         self.sections:          list[str]             = []
 
         # Header-derived
         self.experiment_name:    str | None = None
         self.instrument_platform: str | None = None
         self.software_version:   str | None = None
+
+        # Full section dict — includes custom sections — used by parse_custom_section
+        self._section_dict: dict[str, list[str]] = {}
 
         # Custom field tracking
         self.custom_fields: dict[str, set[str]] = {
@@ -204,22 +207,41 @@ class SampleSheetV2:
     # Public interface
     # ------------------------------------------------------------------
 
-    def parse(self, do_clean: bool = True) -> None:
+    def parse(self, do_clean: bool = True, required_sections: list[str] | None = None) -> None:
         """Parse all sections of the sample sheet.
 
         Parameters
         ----------
         do_clean:
             Run :meth:`clean` before parsing (default ``True``).
+        required_sections:
+            An optional list of custom section names that must be present
+            in the sample sheet. If any are missing a ``ValueError`` is
+            raised before any other parsing takes place. Section names are
+            case-insensitive.
+
+            Example::
+
+                sheet.parse(required_sections=["Custom_Settings", "Custom_Data"])
 
         Raises
         ------
         ValueError
-            If ``[Header]`` or ``[BCLConvert_Data]`` cannot be parsed.
+            If ``[Header]``, ``[BCLConvert_Data]``, or any section listed
+            in ``required_sections`` cannot be parsed.
         """
         if do_clean:
             self.clean()
         self.read()
+
+        # Validate caller-specified required sections up front
+        if required_sections:
+            present = set(self._section_dict.keys())
+            for section in required_sections:
+                if section.lower() not in present:
+                    raise ValueError(
+                        f"Required section [{section}] is missing from the sample sheet."
+                    )
 
         for name, method in [("Header", self.parse_header), ("BCLConvert_Data", self.parse_data)]:
             try:
@@ -232,7 +254,7 @@ class SampleSheetV2:
         for name, method in [
             ("Reads",             self.parse_reads),
             ("BCLConvert_Settings", self.parse_settings),
-            ("Cloud_Data",        self.parse_cloud_data),
+            ("Custom_Data",        self.parse_Custom_Data),
         ]:
             try:
                 method()
@@ -418,6 +440,9 @@ class SampleSheetV2:
 
                 section_dict[curr].append(stripped)
 
+        # Full dict — includes custom sections — used by parse_custom_section
+        self._section_dict = section_dict
+
         self.raw      = SheetInfo(**{s: section_dict.get(s, []) for s in DEFAULT_SECTIONS})
         self.sections = section_list
 
@@ -530,6 +555,80 @@ class SampleSheetV2:
             records.append({h: v.strip() for h, v in zip(headers, values, strict=False)})
 
         self.cloud_data = records
+
+    def parse_custom_section(
+        self,
+        section_name: str,
+        *,
+        required: bool = False,
+    ) -> dict[str, str]:
+        """Parse a non-standard section as a key-value dict.
+
+        Handles any section not covered by the built-in parsers — e.g.
+        ``[Custom_Settings]``, ``[Custom_Data]``, or any lab-specific section
+        added by downstream tools.
+
+        Each line is expected to be a CSV row of the form ``Key,Value,...``.
+        Only the first two comma-separated fields are used; trailing fields
+        are silently ignored. Lines that cannot be split into at least two
+        non-empty fields are skipped with a warning.
+
+        Parameters
+        ----------
+        section_name:
+            Name of the section to parse, e.g. ``"Custom_Settings"``.
+            Case-insensitive.
+        required:
+            If ``True``, raise ``ValueError`` when the section is absent.
+            If ``False`` (default), return an empty dict when absent.
+
+        Returns
+        -------
+        dict[str, str]
+            Mapping of ``key → value`` for each line in the section.
+            Returns ``{}`` if the section is absent and ``required=False``.
+
+        Raises
+        ------
+        ValueError
+            If ``required=True`` and the section is not present.
+        RuntimeError
+            If :meth:`parse` / :meth:`read` has not been called yet.
+
+        Examples
+        --------
+        >>> sheet.parse_custom_section("Custom_Settings")
+        {'GeneratedVersion': '3.9.14', 'UploadToBaseSpace': '1'}
+
+        >>> sheet.parse_custom_section("Custom_Settings", required=True)
+        # raises ValueError if [Custom_Settings] is absent
+        """
+        if not self._section_dict:
+            raise RuntimeError(
+                "Sample sheet has not been read yet — call parse() or read() first."
+            )
+
+        key = section_name.lower()
+
+        if key not in self._section_dict:
+            if required:
+                raise ValueError(
+                    f"Required section [{section_name}] is missing from the sample sheet."
+                )
+            logger.debug(f"Section [{section_name}] not found — returning empty dict.")
+            return {}
+
+        result: dict[str, str] = {}
+        for line in self._section_dict[key]:
+            parts = line.split(",", 1)
+            if len(parts) < 2 or not parts[0].strip():
+                logger.warning(
+                    f"Skipping malformed line in [{section_name}]: {line!r}"
+                )
+                continue
+            result[parts[0].strip()] = parts[1].strip()
+
+        return result
 
     # ------------------------------------------------------------------
     # OverrideCycles decoder

@@ -6,7 +6,8 @@ Run from the repo root:
     python examples/parse_examples.py
 
 Demonstrates auto-detection, samples(), index_type(), UMI extraction,
-and validation for every example sheet in examples/sample_sheets/.
+validation, and custom section parsing for every example sheet in
+examples/sample_sheets/.
 """
 
 from __future__ import annotations
@@ -22,18 +23,23 @@ from samplesheet_parser import SampleSheetFactory, SampleSheetValidator
 SHEETS_DIR = Path(__file__).parent / "sample_sheets"
 
 # Ordered for readability: V1 first, then V2
-EXAMPLE_FILES = [
-    "v1_dual_index.csv",
-    "v1_single_index.csv",
-    "v1_multi_lane.csv",
-    "v2_novaseq_x_dual_index.csv",
-    "v2_with_index_umi.csv",
-    "v2_with_read_umi.csv",
-    "v2_nextseq_single_index.csv",
+# Each entry is (filename, list of custom section names to demo, or [])
+EXAMPLE_FILES: list[tuple[str, list[str]]] = [
+    ("v1_dual_index.csv",            []),
+    ("v1_single_index.csv",          []),
+    ("v1_multi_lane.csv",            []),
+    ("v1_with_manifests.csv",        ["Manifests"]),
+    ("v1_with_lab_qc_settings.csv",  ["Lab_QC_Settings"]),
+    ("v2_novaseq_x_dual_index.csv",  []),
+    ("v2_with_index_umi.csv",        []),
+    ("v2_with_read_umi.csv",         []),
+    ("v2_nextseq_single_index.csv",  []),
+    ("v2_with_cloud_settings.csv",   ["Cloud_Settings"]),
+    ("v2_with_pipeline_settings.csv",["Pipeline_Settings"]),
 ]
 
 
-def parse_sheet(path: Path) -> None:
+def parse_sheet(path: Path, custom_sections: list[str]) -> None:
     print(f"\n{'='*60}")
     print(f"  {path.name}")
     print(f"{'='*60}")
@@ -70,6 +76,18 @@ def parse_sheet(path: Path) -> None:
         print(f"  UMI location    : {rs.umi_location}")
         print(f"  Read structure  : {rs.read_structure}")
 
+    # Custom sections
+    if custom_sections:
+        print(f"\n  Custom sections:")
+        for section_name in custom_sections:
+            data = sheet.parse_custom_section(section_name)
+            if data:
+                print(f"    [{section_name}]")
+                for key, value in data.items():
+                    print(f"      {key:<28} {value}")
+            else:
+                print(f"    [{section_name}] — (empty or not present)")
+
     # Samples table
     samples = sheet.samples()
     print(f"\n  Samples ({len(samples)} total):")
@@ -97,14 +115,14 @@ def main() -> None:
     print("samplesheet-parser — Example Sheet Demo")
     print(f"Parsing {len(EXAMPLE_FILES)} example sheets from {SHEETS_DIR}\n")
 
-    missing = [f for f in EXAMPLE_FILES if not (SHEETS_DIR / f).exists()]
+    missing = [f for f, _ in EXAMPLE_FILES if not (SHEETS_DIR / f).exists()]
     if missing:
         print(f"Warning: missing files: {missing}")
 
-    for filename in EXAMPLE_FILES:
+    for filename, custom_sections in EXAMPLE_FILES:
         path = SHEETS_DIR / filename
         if path.exists():
-            parse_sheet(path)
+            parse_sheet(path, custom_sections)
 
     print(f"\n{'='*60}")
     print("Done.")

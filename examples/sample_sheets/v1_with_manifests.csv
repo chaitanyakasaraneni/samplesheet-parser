@@ -1,0 +1,32 @@
+[Header]
+IEMFileVersion,5
+Experiment Name,240501_A01234_0088_AHJNYGDRX3
+Date,2024-05-01
+Workflow,GenerateFASTQ
+Application,FASTQ Only
+Instrument Type,NovaSeq 6000
+Assay,Nextera DNA Flex for Enrichment
+Index Adapters,IDT for Illumina DNA/RNA UD Indexes (96 Indexes)
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+ReverseComplement,0
+Adapter,CTGTCTCTTATACACATCT
+AdapterRead2,CTGTCTCTTATACACATCT
+
+[Manifests]
+MFGmanifest,HyperCapture_ExomeV2_manifest.txt
+PoolingManifest,pooling_batch3_v1.txt
+
+[Data]
+Lane,Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+1,WES_001,TumorA_WES,,A01,UDP0001,CAAGACAGAT,UDP0001,ACTATAGCCT,WES_Project,tumor_normal_pair
+1,WES_002,NormalA_WES,,B01,UDP0002,TGAACCTGAT,UDP0002,TGATACGTCC,WES_Project,tumor_normal_pair
+1,WES_003,TumorB_WES,,C01,UDP0003,GCACAACGTT,UDP0003,CATCTCACAG,WES_Project,tumor_normal_pair
+1,WES_004,NormalB_WES,,D01,UDP0004,ATCGCCTGTT,UDP0004,GACTAGCATG,WES_Project,tumor_normal_pair
+2,WES_005,TumorC_WES,,E01,UDP0005,CTTGTAGCAA,UDP0005,TGCGTCAGCC,WES_Project,tumor_normal_pair
+2,WES_006,NormalC_WES,,F01,UDP0006,GATCCTAAGT,UDP0006,CATGCGGTTG,WES_Project,tumor_normal_pair
