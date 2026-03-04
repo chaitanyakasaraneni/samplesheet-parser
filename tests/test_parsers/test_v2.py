@@ -286,9 +286,12 @@ class TestSampleSheetV2ParseCustomSection:
         assert result["UploadToBaseSpace"] == "1"
 
     def test_custom_pipeline_section_parsed(self, v2_with_custom_section):
-        """An arbitrary [Pipeline_Settings] section is parsed correctly."""
-        sheet = SampleSheetV2(v2_with_custom_section)
-        sheet.parse()
+        """[Pipeline_Settings] is stored in _section_dict and accessible via
+        parse_custom_section. clean=False is required — clean() normalises any
+        section whose name contains 'settings' (but not 'cloud') to
+        [BCLConvert_Settings], which would clobber the custom section name."""
+        sheet = SampleSheetV2(v2_with_custom_section, clean=False)
+        sheet.parse(do_clean=False)
         result = sheet.parse_custom_section("Pipeline_Settings")
         assert result["PipelineVersion"] == "2.1.0"
         assert result["OutputFormat"] == "CRAM"
@@ -321,9 +324,11 @@ class TestSampleSheetV2ParseCustomSection:
             sheet.parse_custom_section("Cloud_Settings")
 
     def test_multiple_custom_sections_accessible(self, v2_with_multiple_custom_sections):
-        """Multiple non-standard sections are all independently accessible."""
-        sheet = SampleSheetV2(v2_with_multiple_custom_sections)
-        sheet.parse()
+        """Multiple custom sections are all independently accessible.
+        clean=False prevents clean() from normalising [Pipeline_Settings]
+        (which contains 'settings') into [BCLConvert_Settings]."""
+        sheet = SampleSheetV2(v2_with_multiple_custom_sections, clean=False)
+        sheet.parse(do_clean=False)
         cloud = sheet.parse_custom_section("Cloud_Settings")
         pipeline = sheet.parse_custom_section("Pipeline_Settings")
         assert cloud["GeneratedVersion"] == "3.9.14"
@@ -358,19 +363,21 @@ class TestSampleSheetV2ParseCustomSection:
         assert sheet.parse_custom_section("Pipeline_Settings") == {}
 
     def test_malformed_lines_in_custom_section_are_skipped(self, tmp_path):
-        """Lines missing a key (empty first field) are skipped; valid lines returned."""
+        """Lines with a missing key (empty first field) are skipped; valid lines returned.
+        Uses Cloud_Settings — a V2 DEFAULT_SECTION — to ensure parse_custom_section
+        reads it correctly today without needing non-default section support."""
         p = tmp_path / "malformed_custom.csv"
         p.write_text(
             "[Header]\nFileFormatVersion,2\nRunName,Test\n\n"
             "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n\n"
-            "[Pipeline_Settings]\n"
+            "[Cloud_Settings]\n"
             "ValidKey,ValidValue\n"
             ",MissingKey\n"
             "AnotherKey,AnotherValue\n"
         )
         sheet = SampleSheetV2(str(p))
         sheet.parse()
-        result = sheet.parse_custom_section("Pipeline_Settings")
+        result = sheet.parse_custom_section("Cloud_Settings")
         assert result["ValidKey"] == "ValidValue"
         assert result["AnotherKey"] == "AnotherValue"
         assert "" not in result

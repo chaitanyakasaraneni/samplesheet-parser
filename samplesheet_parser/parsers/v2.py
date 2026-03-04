@@ -61,8 +61,8 @@ DEFAULT_SECTIONS = [
     "reads",
     "bclconvert_settings",
     "bclconvert_data",
-    "Custom_Settings",
-    "Custom_Data",
+    "cloud_settings",
+    "cloud_data",
 ]
 SheetInfo = namedtuple("SheetInfo", DEFAULT_SECTIONS, defaults=([], [], [], [], [], []))
 
@@ -184,7 +184,7 @@ class SampleSheetV2:
         self.columns:           list[str] | None      = None
         self.records:           list[dict[str, str]]  = []
         self.adapters:          list[str]             = []
-        self.Custom_Data:        list[dict[str, str]]  = []
+        self.cloud_data:        list[dict[str, str]]  = []
         self.sections:          list[str]             = []
 
         # Header-derived
@@ -222,7 +222,7 @@ class SampleSheetV2:
 
             Example::
 
-                sheet.parse(required_sections=["Custom_Settings", "Custom_Data"])
+                sheet.parse(required_sections=["Cloud_Settings", "Cloud_Data"])
 
         Raises
         ------
@@ -254,7 +254,7 @@ class SampleSheetV2:
         for name, method in [
             ("Reads",             self.parse_reads),
             ("BCLConvert_Settings", self.parse_settings),
-            ("Custom_Data",        self.parse_Custom_Data),
+            ("Cloud_Data",        self.parse_cloud_data),
         ]:
             try:
                 method()
@@ -565,7 +565,7 @@ class SampleSheetV2:
         """Parse a non-standard section as a key-value dict.
 
         Handles any section not covered by the built-in parsers — e.g.
-        ``[Custom_Settings]``, ``[Custom_Data]``, or any lab-specific section
+        ``[Cloud_Settings]``, ``[Cloud_Data]``, or any lab-specific section
         added by downstream tools.
 
         Each line is expected to be a CSV row of the form ``Key,Value,...``.
@@ -576,7 +576,7 @@ class SampleSheetV2:
         Parameters
         ----------
         section_name:
-            Name of the section to parse, e.g. ``"Custom_Settings"``.
+            Name of the section to parse, e.g. ``"Cloud_Settings"``.
             Case-insensitive.
         required:
             If ``True``, raise ``ValueError`` when the section is absent.
@@ -597,11 +597,11 @@ class SampleSheetV2:
 
         Examples
         --------
-        >>> sheet.parse_custom_section("Custom_Settings")
+        >>> sheet.parse_custom_section("Cloud_Settings")
         {'GeneratedVersion': '3.9.14', 'UploadToBaseSpace': '1'}
 
-        >>> sheet.parse_custom_section("Custom_Settings", required=True)
-        # raises ValueError if [Custom_Settings] is absent
+        >>> sheet.parse_custom_section("Cloud_Settings", required=True)
+        # raises ValueError if [Cloud_Settings] is absent
         """
         if not self._section_dict:
             raise RuntimeError(
