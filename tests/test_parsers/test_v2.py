@@ -287,11 +287,11 @@ class TestSampleSheetV2ParseCustomSection:
 
     def test_custom_pipeline_section_parsed(self, v2_with_custom_section):
         """[Pipeline_Settings] is stored in _section_dict and accessible via
-        parse_custom_section. clean=False is required — clean() normalises any
-        section whose name contains 'settings' (but not 'cloud') to
-        [BCLConvert_Settings], which would clobber the custom section name."""
-        sheet = SampleSheetV2(v2_with_custom_section, clean=False)
-        sheet.parse(do_clean=False)
+        parse_custom_section. clean() only normalises the exact canonical names
+        [Settings] and [BCLConvert_Settings] → [BCLConvert_Settings], so custom
+        sections like [Pipeline_Settings] pass through cleaning untouched."""
+        sheet = SampleSheetV2(v2_with_custom_section)
+        sheet.parse()
         result = sheet.parse_custom_section("Pipeline_Settings")
         assert result["PipelineVersion"] == "2.1.0"
         assert result["OutputFormat"] == "CRAM"
@@ -324,11 +324,11 @@ class TestSampleSheetV2ParseCustomSection:
             sheet.parse_custom_section("Cloud_Settings")
 
     def test_multiple_custom_sections_accessible(self, v2_with_multiple_custom_sections):
-        """Multiple custom sections are all independently accessible.
-        clean=False prevents clean() from normalising [Pipeline_Settings]
-        (which contains 'settings') into [BCLConvert_Settings]."""
-        sheet = SampleSheetV2(v2_with_multiple_custom_sections, clean=False)
-        sheet.parse(do_clean=False)
+        """Multiple non-standard sections are all independently accessible.
+        Both [Cloud_Settings] and [Pipeline_Settings] survive clean() because
+        clean() now only normalises exact canonical BCLConvert section names."""
+        sheet = SampleSheetV2(v2_with_multiple_custom_sections)
+        sheet.parse()
         cloud = sheet.parse_custom_section("Cloud_Settings")
         pipeline = sheet.parse_custom_section("Pipeline_Settings")
         assert cloud["GeneratedVersion"] == "3.9.14"

@@ -383,10 +383,14 @@ class SampleSheetV2:
                     section_lower = line.lower()
                     in_data = "data" in section_lower and "cloud" not in section_lower
 
-                    # Standardise section names
-                    if "settings" in section_lower and "cloud" not in section_lower:
+                    # Normalise only the two standard BCLConvert section names.
+                    # Match exact canonical names (case-insensitive) so arbitrary
+                    # custom sections like [Pipeline_Settings] are left untouched.
+                    _BCL_SETTINGS = {"[settings]", "[bclconvert_settings]", "[bclconvertsettings]"}
+                    _BCL_DATA     = {"[data]", "[bclconvert_data]", "[bclconvertdata]"}
+                    if section_lower in _BCL_SETTINGS:
                         line = "[BCLConvert_Settings]"
-                    elif "data" in section_lower and "cloud" not in section_lower:
+                    elif section_lower in _BCL_DATA:
                         line = "[BCLConvert_Data]"
 
                     oh.write(line + "\n")

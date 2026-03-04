@@ -112,7 +112,7 @@ Lane,Sample_ID,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 1,Sample1,D701,ATTACTCG,D501,TATAGCCT,Project1
 """
 
-# NEW: V1 sheet with a [Manifests] custom section
+# V1 sheet with a [Manifests] custom section
 V1_WITH_MANIFESTS = """\
 [Header]
 IEMFileVersion,5
@@ -137,7 +137,7 @@ Lane,Sample_ID,index,index2,Sample_Project
 1,Sample2,TCCGGAGA,ATAGAGGC,Project1
 """
 
-# NEW: V1 sheet with a fully custom lab-specific section
+# V1 sheet with a fully custom lab-specific section
 V1_WITH_CUSTOM_SECTION = """\
 [Header]
 IEMFileVersion,5
@@ -162,7 +162,7 @@ Lane,Sample_ID,index,index2,Sample_Project
 1,Sample1,ATTACTCG,TATAGCCT,Project1
 """
 
-# NEW: V1 sheet with multiple custom sections
+# V1 sheet with multiple custom sections
 V1_WITH_MULTIPLE_CUSTOM_SECTIONS = """\
 [Header]
 IEMFileVersion,5
@@ -189,7 +189,7 @@ Lane,Sample_ID,index,index2,Sample_Project
 1,Sample1,ATTACTCG,TATAGCCT,Project1
 """
 
-# NEW: V1 sheet with a custom section that has malformed lines
+# V1 sheet with a custom section that has malformed lines
 V1_WITH_MALFORMED_CUSTOM_SECTION = """\
 [Header]
 IEMFileVersion,5
@@ -318,7 +318,7 @@ Sample_ID,Index,Index2
 Sample1,ATTACTCG,TATAGCCT
 """
 
-# NEW: V2 sheet with a [Cloud_Settings] custom section
+# V2 sheet with a [Cloud_Settings] custom section
 V2_WITH_CLOUD_SETTINGS = """\
 [Header]
 FileFormatVersion,2
@@ -345,7 +345,7 @@ GeneratedVersion,3.9.14
 UploadToBaseSpace,1
 """
 
-# NEW: V2 sheet with a fully arbitrary custom section
+# V2 sheet with a fully arbitrary custom section
 V2_WITH_CUSTOM_SECTION = """\
 [Header]
 FileFormatVersion,2
@@ -373,7 +373,7 @@ OutputFormat,CRAM
 ReferenceGenome,hg38
 """
 
-# NEW: V2 sheet with multiple custom sections
+# V2 sheet with multiple custom sections
 V2_WITH_MULTIPLE_CUSTOM_SECTIONS = """\
 [Header]
 FileFormatVersion,2
