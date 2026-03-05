@@ -23,7 +23,7 @@ Panel_003,CancerHotspot_Rep3,TAGGCATG,AmpliconPanel
 Panel_004,NormalControl_Rep1,CTCTCTAC,AmpliconPanel
 Panel_005,NormalControl_Rep2,TAATCTTA,AmpliconPanel
 
-[BCLConvert_Settings]
+[Pipeline_Settings]
 PipelineVersion,2.1.0
 ReferenceGenome,hg38
 OutputFormat,CRAM
