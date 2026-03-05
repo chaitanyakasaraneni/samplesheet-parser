@@ -243,9 +243,12 @@ class SampleSheetV2:
             self.clean()
         self.read()
 
-        # Validate caller-specified required sections up front
+        # Validate caller-specified required sections up front.
+        # Use self.sections (sections actually encountered in the file) rather than
+        # self._section_dict.keys(), which is pre-populated with DEFAULT_SECTIONS keys
+        # and would mask absent DEFAULT_SECTIONS members (e.g. a missing [Cloud_Settings]).
         if required_sections:
-            present = set(self._section_dict.keys())
+            present = set(self.sections)  # lowercased names seen during read()
             for section in required_sections:
                 if section.lower() not in present:
                     raise ValueError(
@@ -390,7 +393,8 @@ class SampleSheetV2:
 
                 if line.startswith("["):
                     section_lower = line.lower()
-                    in_data = "data" in section_lower and "cloud" not in section_lower
+                    # Use exact matching so custom sections like [Pipeline_Data] are not mangled.
+                    in_data = section_lower in _BCL_DATA
 
                     # Normalise only the two standard BCLConvert section names.
                     # Match exact canonical names (case-insensitive) so arbitrary
@@ -621,7 +625,12 @@ class SampleSheetV2:
 
         key = section_name.lower()
 
-        if key not in self._section_dict:
+        # Check self.sections (sections actually seen in the file) so that a DEFAULT_SECTIONS
+        # member that is absent from the file (e.g. [Cloud_Settings] on a minimal sheet)
+        # is correctly detected as missing, rather than being masked by the pre-populated
+        # empty-list entry in _section_dict.
+        section_present = key in self.sections
+        if not section_present:
             if required:
                 raise ValueError(
                     f"Required section [{section_name}] is missing from the sample sheet."

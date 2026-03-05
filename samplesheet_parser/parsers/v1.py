@@ -227,8 +227,10 @@ class SampleSheetV1:
 
         # Validate caller-specified required sections up front, before any
         # other parsing, so the error is clean and actionable.
+        # Use self.sections (sections actually encountered in the file) — not
+        # _section_dict.keys() which is pre-populated with DEFAULT_SECTIONS.
         if required_sections:
-            present = set(self._section_dict.keys())
+            present = set(self.sections)
             for section in required_sections:
                 if section.lower() not in present:
                     raise ValueError(
@@ -312,7 +314,10 @@ class SampleSheetV1:
 
         key = section_name.lower()
 
-        if key not in self._section_dict:
+        # Use self.sections (sections actually seen) not _section_dict key presence,
+        # since _section_dict is pre-seeded with DEFAULT_SECTIONS empty lists.
+        section_present = key in self.sections
+        if not section_present:
             if required:
                 raise ValueError(
                     f"Required section [{section_name}] is missing from the sample sheet."
@@ -466,6 +471,7 @@ class SampleSheetV1:
         :meth:`parse_custom_section` reads from.
         """
         section_dict: dict[str, list[str]] = {s: [] for s in DEFAULT_SECTIONS}
+        section_list: list[str] = []  # lowercased names actually seen in the file
         curr_section: str | None = None
 
         with open(self.path, newline="\n", encoding="utf-8-sig") as fh:
@@ -477,8 +483,10 @@ class SampleSheetV1:
                         curr_section = line[1 : line.index("]")].lower()
                     except ValueError:
                         continue
-                    if curr_section not in section_dict:
-                        section_dict[curr_section] = []
+                    if curr_section:
+                        section_list.append(curr_section)
+                        if curr_section not in section_dict:
+                            section_dict[curr_section] = []
                     continue
 
                 if not curr_section:
@@ -492,6 +500,10 @@ class SampleSheetV1:
 
         # Full dict — includes custom sections — used by parse_custom_section
         self._section_dict = section_dict
+
+        # Track sections actually present in the file (used by required_sections checks).
+        # _section_dict is pre-seeded with DEFAULT_SECTIONS so its keys() cannot be used.
+        self.sections = section_list
 
         # SheetInfo only covers the well-known standard sections
         self.raw = SheetInfo(**{k: section_dict.get(k, []) for k in DEFAULT_SECTIONS})

@@ -317,6 +317,18 @@ class TestSampleSheetV2ParseCustomSection:
         with pytest.raises(ValueError, match="NonExistent_Section"):
             sheet.parse_custom_section("NonExistent_Section", required=True)
 
+    def test_cloud_settings_missing_required_raises(self, v2_minimal):
+        """parse_custom_section raises when a DEFAULT_SECTIONS member is absent.
+
+        v2_minimal has no [Cloud_Settings]. Before the self.sections fix,
+        cloud_settings was always in _section_dict (pre-seeded), so required=True
+        would silently return {} instead of raising. Now it must raise.
+        """
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        with pytest.raises(ValueError, match="Cloud_Settings"):
+            sheet.parse_custom_section("Cloud_Settings", required=True)
+
     def test_raises_before_parse_or_read(self, v2_minimal):
         """Calling parse_custom_section before parse()/read() raises RuntimeError."""
         sheet = SampleSheetV2(v2_minimal, clean=False)
@@ -397,6 +409,18 @@ class TestSampleSheetV2RequiredSections:
         sheet = SampleSheetV2(v2_minimal, clean=False)
         with pytest.raises(ValueError, match="Pipeline_Settings"):
             sheet.parse(do_clean=False, required_sections=["Pipeline_Settings"])
+
+    def test_required_default_section_missing_raises(self, v2_minimal):
+        """parse() raises when a required DEFAULT_SECTIONS member is absent.
+
+        v2_minimal has no [Cloud_Settings] section. Before the self.sections
+        fix, the required check used _section_dict.keys() which is pre-seeded
+        with all DEFAULT_SECTIONS — so this would silently pass. Now it must
+        raise because self.sections only contains sections actually in the file.
+        """
+        sheet = SampleSheetV2(v2_minimal, clean=False)
+        with pytest.raises(ValueError, match="Cloud_Settings"):
+            sheet.parse(do_clean=False, required_sections=["Cloud_Settings"])
 
     def test_multiple_required_sections_all_present(
         self, v2_with_multiple_custom_sections

@@ -35,7 +35,7 @@ EXAMPLE_FILES: list[tuple[str, list[str]]] = [
     ("v2_with_read_umi.csv",         []),
     ("v2_nextseq_single_index.csv",  []),
     ("v2_with_cloud_settings.csv",   ["Cloud_Settings"]),
-    ("v2_with_pipeline_settings.csv",["Pipeline_Settings"]),
+    ("v2_with_pipeline_settings.csv", ["Pipeline_Settings"]),
 ]
 
 
@@ -78,7 +78,7 @@ def parse_sheet(path: Path, custom_sections: list[str]) -> None:
 
     # Custom sections
     if custom_sections:
-        print("\n  Custom sections:")
+        print(f"\n  Custom sections:")
         for section_name in custom_sections:
             data = sheet.parse_custom_section(section_name)
             if data:
