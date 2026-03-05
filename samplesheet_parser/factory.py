@@ -37,6 +37,7 @@ Examples
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -121,7 +122,7 @@ class SampleSheetFactory:
         detected = self._detect_version(path)
 
         self.version = detected
-        kwargs: dict = dict(clean=clean, experiment_id=experiment_id, parse=parse)
+        kwargs: dict[str, Any] = dict(clean=clean, experiment_id=experiment_id, parse=parse)
 
         if detected == SampleSheetVersion.V2:
             logger.info("Detected BCLConvert V2 format — using SampleSheetV2")
