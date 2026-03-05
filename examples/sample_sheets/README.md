@@ -126,18 +126,21 @@ MinMappingQuality,30
 ```python
 from samplesheet_parser import SampleSheetFactory
 
-sheet = SampleSheetFactory().create_parser(
+sheet_with_manifests = SampleSheetFactory().create_parser(
     "examples/sample_sheets/v1_with_manifests.csv", parse=True
 )
 
 # Returns {} if section is absent (default)
-manifests = sheet.parse_custom_section("Manifests")
+manifests = sheet_with_manifests.parse_custom_section("Manifests")
 print(manifests)
 # {'MFGmanifest': 'HyperCapture_ExomeV2_manifest.txt',
 #  'PoolingManifest': 'pooling_batch3_v1.txt'}
 
 # Raise if a section your pipeline depends on is missing
-qc = sheet.parse_custom_section("Lab_QC_Settings", required=True)
+sheet_with_lab_qc_settings = SampleSheetFactory().create_parser(
+    "examples/sample_sheets/v1_with_lab_qc_settings.csv", parse=True
+)
+qc = sheet_with_lab_qc_settings.parse_custom_section("Lab_QC_Settings", required=True)
 
 # Works identically on V2 sheets
 sheet_v2 = SampleSheetFactory().create_parser(
