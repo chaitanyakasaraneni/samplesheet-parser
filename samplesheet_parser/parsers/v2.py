@@ -96,6 +96,15 @@ STANDARD_DATA_COLUMNS: frozenset[str] = frozenset({
 _RX_STRIP = re.compile(r"""['"\r\n\t]""")
 _RX_NO_WS = re.compile(r"[\s\t\r]+")
 
+# Canonical section names that clean() normalises to [BCLConvert_Settings] / [BCLConvert_Data].
+# Only exact matches (case-insensitive) are renamed; arbitrary custom sections are left untouched.
+_BCL_SETTINGS: frozenset[str] = frozenset({
+    "[settings]", "[bclconvert_settings]", "[bclconvertsettings]",
+})
+_BCL_DATA: frozenset[str] = frozenset({
+    "[data]", "[bclconvert_data]", "[bclconvertdata]",
+})
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -386,8 +395,6 @@ class SampleSheetV2:
                     # Normalise only the two standard BCLConvert section names.
                     # Match exact canonical names (case-insensitive) so arbitrary
                     # custom sections like [Pipeline_Settings] are left untouched.
-                    _BCL_SETTINGS = {"[settings]", "[bclconvert_settings]", "[bclconvertsettings]"}
-                    _BCL_DATA     = {"[data]", "[bclconvert_data]", "[bclconvertdata]"}
                     if section_lower in _BCL_SETTINGS:
                         line = "[BCLConvert_Settings]"
                     elif section_lower in _BCL_DATA:

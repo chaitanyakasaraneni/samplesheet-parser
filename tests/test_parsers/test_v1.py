@@ -207,19 +207,26 @@ class TestSampleSheetV1Samples:
         assert len(samples) == 2
 
     def test_sample_fields_present(self, v1_minimal):
-        """Core normalized keys are always present; I7/I5 index IDs are
-        preserved under their original column-name casing from [Data]."""
+        """Core normalized keys are always present.
+
+        I7_Index_ID / I5_Index_ID are in STANDARD_DATA_COLUMNS so they are
+        excluded from the non-standard column loop in samples(). They are
+        therefore not present in the output dict under any casing — this is
+        the documented post-refactor behaviour.
+        """
         sheet = SampleSheetV1(v1_minimal)
         sheet.parse()
         s = sheet.samples()[0]
         # Normalized keys always emitted by samples()
         for key in ("sample_id", "sample_name", "index", "index2", "sample_project"):
             assert key in s, f"Missing normalized key: {key}"
-        # I7/I5 index ID columns pass through under their original casing
-        # because they are in STANDARD_DATA_COLUMNS and not re-keyed
-        assert "I7_Index_ID" in s or "i7_index_id" not in s, (
-            "I7_Index_ID must appear under its original column name"
+        # I7/I5 index ID columns are in STANDARD_DATA_COLUMNS and are not
+        # re-keyed into the normalized output — assert neither form appears.
+        assert "I7_Index_ID" not in s, (
+            "I7_Index_ID should not appear in samples() output "
+            "(it is in STANDARD_DATA_COLUMNS but not re-keyed by samples())"
         )
+        assert "i7_index_id" not in s, "Lowercase i7_index_id should not appear either"
 
     def test_custom_columns_preserved(self, tmp_path):
         p = tmp_path / "custom_cols.csv"
