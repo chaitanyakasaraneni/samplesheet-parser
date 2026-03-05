@@ -357,7 +357,7 @@ class TestSampleSheetV1ParseCustomSection:
     def test_raises_before_parse_or_read(self, v1_minimal):
         """Calling parse_custom_section before parse()/read() raises RuntimeError."""
         sheet = SampleSheetV1(v1_minimal, clean=False)
-        with pytest.raises(RuntimeError, match="parse()"):
+        with pytest.raises(RuntimeError, match=r"parse\(\)"):
             sheet.parse_custom_section("Manifests")
 
     def test_malformed_lines_are_skipped(self, v1_with_malformed_custom_section):

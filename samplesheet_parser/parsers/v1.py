@@ -161,6 +161,7 @@ class SampleSheetV1:
         # Parsed attributes — populated by parse()
         self.raw: SheetInfo = SheetInfo()
         self._section_dict: dict[str, list[str]] = {}
+        self.sections: list[str] = []  # populated by read(); sections actually in the file
         self.header: dict[str, str] | None = None
         self.columns: list[str] | None = None
         self.records: list[dict[str, str]] | None = None
@@ -269,10 +270,10 @@ class SampleSheetV1:
         ``[Manifests]``, ``[Cloud_Settings]``, or any lab-specific section
         added by downstream tools.
 
-        Each line is expected to be a CSV row of the form ``Key,Value,...``.
-        Only the first two comma-separated fields are used; trailing fields
-        are silently ignored. Lines that cannot be split into at least two
-        non-empty fields are skipped with a warning.
+        Each line is split on the first comma only: the key is the text
+        before it, and the value is everything after it (including any
+        additional commas). Lines that cannot be split into a non-empty key
+        and a value are skipped with a debug warning.
 
         Parameters
         ----------
@@ -344,8 +345,9 @@ class SampleSheetV1:
         -------
         list[dict]
             Each dict contains at minimum: ``sample_id``, ``index``,
-            ``index2``, ``lane``, ``sample_name``, ``sample_project``.
-            Any non-standard columns from ``[Data]`` are also included.
+            ``index2``, ``lane``, ``sample_name``, ``sample_project``,
+            ``description``. Any non-standard columns from ``[Data]``
+            are also included.
 
         Raises
         ------
@@ -365,13 +367,20 @@ class SampleSheetV1:
             seen.add(sid)
 
             sample: dict[str, str | None] = {
-                "sample_id":      sid,
-                "sample_name":    record.get("Sample_Name"),
-                "lane":           record.get("Lane"),
-                "index":          record.get("index"),
-                "index2":         record.get("index2"),
-                "sample_project": record.get("Sample_Project"),
-                "description":    record.get("Description"),
+                "sample_id":        sid,
+                "sample_name":      record.get("Sample_Name"),
+                "lane":             record.get("Lane"),
+                "index":            record.get("index"),
+                "index2":           record.get("index2"),
+                "sample_project":   record.get("Sample_Project"),
+                "description":      record.get("Description"),
+                # Preserve fields present in many real-world V1 sheets.
+                # Callers that previously relied on these keys would
+                # receive KeyError if they were dropped.
+                "sample_plate":     record.get("Sample_Plate"),
+                "sample_well":      record.get("Sample_Well"),
+                "flowcell_id":      record.get("flowcell_id"),
+                "experiment_name":  record.get("Experiment_Name"),
             }
             # Include any non-standard columns from [Data]
             for col in (self.columns or []):

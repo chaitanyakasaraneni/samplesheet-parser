@@ -332,7 +332,7 @@ class TestSampleSheetV2ParseCustomSection:
     def test_raises_before_parse_or_read(self, v2_minimal):
         """Calling parse_custom_section before parse()/read() raises RuntimeError."""
         sheet = SampleSheetV2(v2_minimal, clean=False)
-        with pytest.raises(RuntimeError, match="parse()"):
+        with pytest.raises(RuntimeError, match=r"parse\(\)"):
             sheet.parse_custom_section("Cloud_Settings")
 
     def test_multiple_custom_sections_accessible(self, v2_with_multiple_custom_sections):

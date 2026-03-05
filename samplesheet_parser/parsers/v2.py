@@ -583,10 +583,10 @@ class SampleSheetV2:
         ``[Cloud_Settings]``, ``[Cloud_Data]``, or any lab-specific section
         added by downstream tools.
 
-        Each line is expected to be a CSV row of the form ``Key,Value,...``.
-        Only the first two comma-separated fields are used; trailing fields
-        are silently ignored. Lines that cannot be split into at least two
-        non-empty fields are skipped with a warning.
+        Each line is split on the first comma only: the key is the text
+        before it, and the value is everything after it (including any
+        additional commas). Lines that cannot be split into a non-empty key
+        and a value are skipped with a debug warning.
 
         Parameters
         ----------
