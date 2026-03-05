@@ -586,7 +586,7 @@ class SampleSheetV2:
         Each line is split on the first comma only: the key is the text
         before it, and the value is everything after it (including any
         additional commas). Lines that cannot be split into a non-empty key
-        and a value are skipped with a debug warning.
+        and a value are skipped with a warning.
 
         Parameters
         ----------
