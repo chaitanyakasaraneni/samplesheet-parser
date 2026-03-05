@@ -64,7 +64,11 @@ DEFAULT_SECTIONS = [
     "cloud_settings",
     "cloud_data",
 ]
-SheetInfo = namedtuple("SheetInfo", DEFAULT_SECTIONS, defaults=([], [], [], [], [], []))
+SheetInfo = namedtuple(
+    "SheetInfo",
+    ("header", "reads", "bclconvert_settings", "bclconvert_data", "cloud_settings", "cloud_data"),
+    defaults=([], [], [], [], [], []),
+)
 
 REQUIRED_HEADER_FIELDS: frozenset[str] = frozenset({
     "FileFormatVersion",

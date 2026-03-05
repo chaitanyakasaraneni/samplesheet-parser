@@ -2,10 +2,10 @@
 Enumerations for samplesheet-parser.
 """
 
-from enum import Enum
+from enum import StrEnum
 
 
-class SampleSheetVersion(str, Enum):
+class SampleSheetVersion(StrEnum):
     """Illumina sample sheet format version.
 
     V1 — Illumina Experiment Manager (IEM) format, used with bcl2fastq.
@@ -21,7 +21,7 @@ class SampleSheetVersion(str, Enum):
     V2 = "V2"
 
 
-class IndexType(str, Enum):
+class IndexType(StrEnum):
     """Sequencing index configuration.
 
     SINGLE — I7 index only (single-index libraries).
@@ -33,7 +33,7 @@ class IndexType(str, Enum):
     NONE   = "none"
 
 
-class InstrumentPlatform(str, Enum):
+class InstrumentPlatform(StrEnum):
     """Standard Illumina instrument platform identifiers used in V2 sample sheets."""
     NOVASEQ_6000       = "NovaSeq6000"
     NOVASEQ_X_SERIES   = "NovaSeqXSeries"
@@ -43,7 +43,7 @@ class InstrumentPlatform(str, Enum):
     HISEQ_X            = "HiSeqX"
 
 
-class UMILocation(str, Enum):
+class UMILocation(StrEnum):
     """Where the UMI is encoded in the read structure (OverrideCycles string)."""
     READ1  = "read1"
     READ2  = "read2"

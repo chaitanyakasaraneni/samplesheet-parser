@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 from loguru import logger
 
@@ -80,7 +81,7 @@ class ValidationIssue:
     level:   str
     code:    str
     message: str
-    context: dict = field(default_factory=dict)
+    context: dict[str, Any] = field(default_factory=dict)
 
     def __str__(self) -> str:
         ctx = f" | {self.context}" if self.context else ""
@@ -105,16 +106,16 @@ class ValidationResult:
     errors:   list[ValidationIssue] = field(default_factory=list)
     warnings: list[ValidationIssue] = field(default_factory=list)
 
-    def add_error(self, code: str, message: str, **context) -> None:
+    def add_error(self, code: str, message: str, **context: Any) -> None:
         self.is_valid = False
         self.errors.append(ValidationIssue("error", code, message, dict(context)))
         logger.error(f"{code}: {message}")
 
-    def add_warning(self, code: str, message: str, **context) -> None:
+    def add_warning(self, code: str, message: str, **context: Any) -> None:
         self.warnings.append(ValidationIssue("warning", code, message, dict(context)))
         logger.warning(f"{code}: {message}")
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "is_valid": self.is_valid,
             "errors":   [{"code": e.code, "message": e.message, "context": e.context}
@@ -231,7 +232,7 @@ class SampleSheetValidator:
 
     def _check_empty(
         self,
-        samples: list[dict],
+        samples: list[dict[str, Any]],
         result: ValidationResult,
     ) -> None:
         if not samples:
@@ -242,7 +243,7 @@ class SampleSheetValidator:
 
     def _check_index_sequences(
         self,
-        samples: list[dict],
+        samples: list[dict[str, Any]],
         result: ValidationResult,
     ) -> None:
         """Validate each index sequence for character set and length."""
@@ -286,7 +287,7 @@ class SampleSheetValidator:
 
     def _check_duplicate_indices(
         self,
-        samples: list[dict],
+        samples: list[dict[str, Any]],
         result: ValidationResult,
     ) -> None:
         """Detect samples that share an index (or index pair) within a lane."""
@@ -316,7 +317,7 @@ class SampleSheetValidator:
 
     def _check_index_distances(
         self,
-        samples: list[dict],
+        samples: list[dict[str, Any]],
         result: ValidationResult,
         min_distance: int = MIN_HAMMING_DISTANCE,
     ) -> None:
@@ -387,7 +388,7 @@ class SampleSheetValidator:
 
     def _check_duplicate_sample_ids(
         self,
-        samples: list[dict],
+        samples: list[dict[str, Any]],
         result: ValidationResult,
     ) -> None:
         """Detect duplicate Sample_IDs within the same lane."""

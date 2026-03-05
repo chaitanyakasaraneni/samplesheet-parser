@@ -95,7 +95,11 @@ STANDARD_SETTINGS_KEYS = {
 DEFAULT_SECTIONS = ["header", "reads", "settings", "manifests", "data"]
 
 #: Named tuple used to hold raw section content for standard sections.
-SheetInfo = namedtuple("SheetInfo", DEFAULT_SECTIONS, defaults=([], [], [], [], []))
+SheetInfo = namedtuple(
+    "SheetInfo",
+    ("header", "reads", "settings", "manifests", "data"),
+    defaults=([], [], [], [], []),
+)
 
 #: Characters to strip during cleaning (quotes, carriage returns, tabs).
 _RX_STRIP = re.compile(r"['\"\r\t]")
