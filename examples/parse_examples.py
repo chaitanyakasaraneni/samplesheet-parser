@@ -78,7 +78,7 @@ def parse_sheet(path: Path, custom_sections: list[str]) -> None:
 
     # Custom sections
     if custom_sections:
-        print(f"\n  Custom sections:")
+        print("\n  Custom sections:")
         for section_name in custom_sections:
             data = sheet.parse_custom_section(section_name)
             if data:
