@@ -96,6 +96,15 @@ STANDARD_DATA_COLUMNS: frozenset[str] = frozenset({
 _RX_STRIP = re.compile(r"""['"\r\n\t]""")
 _RX_NO_WS = re.compile(r"[\s\t\r]+")
 
+# Canonical section names that clean() normalises to [BCLConvert_Settings] / [BCLConvert_Data].
+# Only exact matches (case-insensitive) are renamed; arbitrary custom sections are left untouched.
+_BCL_SETTINGS: frozenset[str] = frozenset({
+    "[settings]", "[bclconvert_settings]", "[bclconvertsettings]",
+})
+_BCL_DATA: frozenset[str] = frozenset({
+    "[data]", "[bclconvert_data]", "[bclconvertdata]",
+})
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -192,6 +201,9 @@ class SampleSheetV2:
         self.instrument_platform: str | None = None
         self.software_version:   str | None = None
 
+        # Full section dict — includes custom sections — used by parse_custom_section
+        self._section_dict: dict[str, list[str]] = {}
+
         # Custom field tracking
         self.custom_fields: dict[str, set[str]] = {
             "header": set(), "settings": set(), "data": set()
@@ -204,22 +216,44 @@ class SampleSheetV2:
     # Public interface
     # ------------------------------------------------------------------
 
-    def parse(self, do_clean: bool = True) -> None:
+    def parse(self, do_clean: bool = True, required_sections: list[str] | None = None) -> None:
         """Parse all sections of the sample sheet.
 
         Parameters
         ----------
         do_clean:
             Run :meth:`clean` before parsing (default ``True``).
+        required_sections:
+            An optional list of custom section names that must be present
+            in the sample sheet. If any are missing a ``ValueError`` is
+            raised before any other parsing takes place. Section names are
+            case-insensitive.
+
+            Example::
+
+                sheet.parse(required_sections=["Cloud_Settings", "Cloud_Data"])
 
         Raises
         ------
         ValueError
-            If ``[Header]`` or ``[BCLConvert_Data]`` cannot be parsed.
+            If ``[Header]``, ``[BCLConvert_Data]``, or any section listed
+            in ``required_sections`` cannot be parsed.
         """
         if do_clean:
             self.clean()
         self.read()
+
+        # Validate caller-specified required sections up front.
+        # Use self.sections (sections actually encountered in the file) rather than
+        # self._section_dict.keys(), which is pre-populated with DEFAULT_SECTIONS keys
+        # and would mask absent DEFAULT_SECTIONS members (e.g. a missing [Cloud_Settings]).
+        if required_sections:
+            present = set(self.sections)  # lowercased names seen during read()
+            for section in required_sections:
+                if section.lower() not in present:
+                    raise ValueError(
+                        f"Required section [{section}] is missing from the sample sheet."
+                    )
 
         for name, method in [("Header", self.parse_header), ("BCLConvert_Data", self.parse_data)]:
             try:
@@ -359,12 +393,15 @@ class SampleSheetV2:
 
                 if line.startswith("["):
                     section_lower = line.lower()
-                    in_data = "data" in section_lower and "cloud" not in section_lower
+                    # Use exact matching so custom sections like [Pipeline_Data] are not mangled.
+                    in_data = section_lower in _BCL_DATA
 
-                    # Standardise section names
-                    if "settings" in section_lower and "cloud" not in section_lower:
+                    # Normalise only the two standard BCLConvert section names.
+                    # Match exact canonical names (case-insensitive) so arbitrary
+                    # custom sections like [Pipeline_Settings] are left untouched.
+                    if section_lower in _BCL_SETTINGS:
                         line = "[BCLConvert_Settings]"
-                    elif "data" in section_lower and "cloud" not in section_lower:
+                    elif section_lower in _BCL_DATA:
                         line = "[BCLConvert_Data]"
 
                     oh.write(line + "\n")
@@ -417,6 +454,9 @@ class SampleSheetV2:
                     continue
 
                 section_dict[curr].append(stripped)
+
+        # Full dict — includes custom sections — used by parse_custom_section
+        self._section_dict = section_dict
 
         self.raw      = SheetInfo(**{s: section_dict.get(s, []) for s in DEFAULT_SECTIONS})
         self.sections = section_list
@@ -530,6 +570,85 @@ class SampleSheetV2:
             records.append({h: v.strip() for h, v in zip(headers, values, strict=False)})
 
         self.cloud_data = records
+
+    def parse_custom_section(
+        self,
+        section_name: str,
+        *,
+        required: bool = False,
+    ) -> dict[str, str]:
+        """Parse a non-standard section as a key-value dict.
+
+        Handles any section not covered by the built-in parsers — e.g.
+        ``[Cloud_Settings]``, ``[Cloud_Data]``, or any lab-specific section
+        added by downstream tools.
+
+        Each line is split on the first comma only: the key is the text
+        before it, and the value is everything after it (including any
+        additional commas). Lines that cannot be split into a non-empty key
+        and a value are skipped with a warning.
+
+        Parameters
+        ----------
+        section_name:
+            Name of the section to parse, e.g. ``"Cloud_Settings"``.
+            Case-insensitive.
+        required:
+            If ``True``, raise ``ValueError`` when the section is absent.
+            If ``False`` (default), return an empty dict when absent.
+
+        Returns
+        -------
+        dict[str, str]
+            Mapping of ``key → value`` for each line in the section.
+            Returns ``{}`` if the section is absent and ``required=False``.
+
+        Raises
+        ------
+        ValueError
+            If ``required=True`` and the section is not present.
+        RuntimeError
+            If :meth:`parse` / :meth:`read` has not been called yet.
+
+        Examples
+        --------
+        >>> sheet.parse_custom_section("Cloud_Settings")
+        {'GeneratedVersion': '3.9.14', 'UploadToBaseSpace': '1'}
+
+        >>> sheet.parse_custom_section("Cloud_Settings", required=True)
+        # raises ValueError if [Cloud_Settings] is absent
+        """
+        if not self._section_dict:
+            raise RuntimeError(
+                "Sample sheet has not been read yet — call parse() or read() first."
+            )
+
+        key = section_name.lower()
+
+        # Check self.sections (sections actually seen in the file) so that a DEFAULT_SECTIONS
+        # member that is absent from the file (e.g. [Cloud_Settings] on a minimal sheet)
+        # is correctly detected as missing, rather than being masked by the pre-populated
+        # empty-list entry in _section_dict.
+        section_present = key in self.sections
+        if not section_present:
+            if required:
+                raise ValueError(
+                    f"Required section [{section_name}] is missing from the sample sheet."
+                )
+            logger.debug(f"Section [{section_name}] not found — returning empty dict.")
+            return {}
+
+        result: dict[str, str] = {}
+        for line in self._section_dict[key]:
+            parts = line.split(",", 1)
+            if len(parts) < 2 or not parts[0].strip():
+                logger.warning(
+                    f"Skipping malformed line in [{section_name}]: {line!r}"
+                )
+                continue
+            result[parts[0].strip()] = parts[1].strip()
+
+        return result
 
     # ------------------------------------------------------------------
     # OverrideCycles decoder

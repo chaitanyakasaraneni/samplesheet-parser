@@ -94,7 +94,7 @@ STANDARD_SETTINGS_KEYS = {
 #: Default IEM section names (lowercase, as stored internally).
 DEFAULT_SECTIONS = ["header", "reads", "settings", "manifests", "data"]
 
-#: Named tuple used to hold raw section content.
+#: Named tuple used to hold raw section content for standard sections.
 SheetInfo = namedtuple("SheetInfo", DEFAULT_SECTIONS, defaults=([], [], [], [], []))
 
 #: Characters to strip during cleaning (quotes, carriage returns, tabs).
@@ -138,6 +138,10 @@ class SampleSheetV1:
     The ``[Manifests]`` section is read and preserved but not
     interpreted — it is instrument-specific metadata rarely needed
     downstream.
+
+    Custom sections (any section not in the standard list) are stored
+    in ``self._section_dict`` and can be accessed via
+    :meth:`parse_custom_section`.
     """
 
     #: Set to ``True`` in subclasses to parse on instantiation.
@@ -156,6 +160,8 @@ class SampleSheetV1:
 
         # Parsed attributes — populated by parse()
         self.raw: SheetInfo = SheetInfo()
+        self._section_dict: dict[str, list[str]] = {}
+        self.sections: list[str] = []  # populated by read(); sections actually in the file
         self.header: dict[str, str] | None = None
         self.columns: list[str] | None = None
         self.records: list[dict[str, str]] | None = None
@@ -179,7 +185,7 @@ class SampleSheetV1:
         # Settings-derived attributes
         self.reverse_complement: int = 0
 
-        # Experiment ID breakdown (parsed by parse_experiment_id)
+        # Experiment ID breakdown (parsed by _parse_experiment_id)
         self.seq_date: str | None = None
         self.instrument_id: str | None = None
         self.flowcell_id: str | None = None
@@ -192,23 +198,45 @@ class SampleSheetV1:
     # Public interface
     # ------------------------------------------------------------------
 
-    def parse(self, do_clean: bool = True) -> None:
+    def parse(self, do_clean: bool = True, required_sections: list[str] | None = None) -> None:
         """Read and parse all sections.
 
         Parameters
         ----------
         do_clean:
             Apply cleaning before reading (default ``True``).
+        required_sections:
+            An optional list of custom section names that must be present
+            in the sample sheet. If any are missing a ``ValueError`` is
+            raised before any other parsing takes place. Section names are
+            case-insensitive.
+
+            Example::
+
+                sheet.parse(required_sections=["Manifests", "Cloud_Settings"])
 
         Raises
         ------
         ValueError
-            If required sections (``[Header]``, ``[Data]``) cannot be parsed.
+            If required sections (``[Header]``, ``[Data]``, or any section
+            listed in ``required_sections``) cannot be parsed.
         """
         if do_clean:
             self.clean()
 
         self.read()
+
+        # Validate caller-specified required sections up front, before any
+        # other parsing, so the error is clean and actionable.
+        # Use self.sections (sections actually encountered in the file) — not
+        # _section_dict.keys() which is pre-populated with DEFAULT_SECTIONS.
+        if required_sections:
+            present = set(self.sections)
+            for section in required_sections:
+                if section.lower() not in present:
+                    raise ValueError(
+                        f"Required section [{section}] is missing from the sample sheet."
+                    )
 
         # Required sections — raise on failure
         for name, method in [("Header", self.parse_header), ("Data", self.parse_data)]:
@@ -221,70 +249,147 @@ class SampleSheetV1:
 
         # Optional sections — warn on failure
         for name, method in [
-            ("Reads",    self.parse_reads),
-            ("Settings", self.parse_settings),
+            ("Reads",         self.parse_reads),
+            ("Settings",      self.parse_settings),
+            ("Experiment ID", self._parse_experiment_id),
         ]:
             try:
                 method()
             except Exception as exc:
                 logger.warning(f'Error parsing "{name}": {exc}')
 
-        # Best-effort experiment ID parsing
-        if self.experiment_id:
-            try:
-                self._parse_experiment_id()
-            except ValueError as exc:
-                logger.warning(f"Could not parse experiment ID: {exc}")
+    def parse_custom_section(
+        self,
+        section_name: str,
+        *,
+        required: bool = False,
+    ) -> dict[str, str]:
+        """Parse a non-standard section as a key-value dict.
+
+        Handles any section not covered by the built-in parsers — e.g.
+        ``[Manifests]``, ``[Cloud_Settings]``, or any lab-specific section
+        added by downstream tools.
+
+        Each line is split on the first comma only: the key is the text
+        before it, and the value is everything after it (including any
+        additional commas). Lines that cannot be split into a non-empty key
+        and a value are skipped with a warning.
+
+        Parameters
+        ----------
+        section_name:
+            Name of the section to parse, e.g. ``"Manifests"``.
+            Case-insensitive.
+        required:
+            If ``True``, raise ``ValueError`` when the section is absent.
+            If ``False`` (default), return an empty dict when absent.
+
+        Returns
+        -------
+        dict[str, str]
+            Mapping of ``key → value`` for each line in the section.
+            Returns ``{}`` if the section is absent and ``required=False``.
+
+        Raises
+        ------
+        ValueError
+            If ``required=True`` and the section is not present.
+        RuntimeError
+            If :meth:`parse` / :meth:`read` has not been called yet.
+
+        Examples
+        --------
+        >>> sheet.parse_custom_section("Manifests")
+        {'MFGmanifest': 'HyperCapture_manifest_v2.0.txt'}
+
+        >>> sheet.parse_custom_section("Cloud_Settings")
+        {'GeneratedVersion': '3.9.14', 'UploadToBaseSpace': '1'}
+
+        >>> sheet.parse_custom_section("Missing_Section", required=True)
+        # raises ValueError
+        """
+        if not self._section_dict:
+            raise RuntimeError(
+                "Sample sheet has not been read yet — call parse() or read() first."
+            )
+
+        key = section_name.lower()
+
+        # Use self.sections (sections actually seen) not _section_dict key presence,
+        # since _section_dict is pre-seeded with DEFAULT_SECTIONS empty lists.
+        section_present = key in self.sections
+        if not section_present:
+            if required:
+                raise ValueError(
+                    f"Required section [{section_name}] is missing from the sample sheet."
+                )
+            logger.debug(f"Section [{section_name}] not found — returning empty dict.")
+            return {}
+
+        result: dict[str, str] = {}
+        for line in self._section_dict[key]:
+            parts = line.split(",", 1)
+            if len(parts) < 2 or not parts[0].strip():
+                logger.warning(
+                    f"Skipping malformed line in [{section_name}]: {line!r}"
+                )
+                continue
+            result[parts[0].strip()] = parts[1].strip()
+
+        return result
 
     def samples(self) -> list[dict[str, str | None]]:
-        """Return one record per unique sample.
-
-        Returns a list of dicts with normalised, lowercase keys. All
-        standard IEM columns are included; custom columns from the
-        ``[Data]`` section are preserved as-is.
+        """Return one record per unique ``Sample_ID``.
 
         Returns
         -------
         list[dict]
-            Each dict contains at minimum:
-            ``sample_id``, ``sample_name``, ``lane``, ``index``,
-            ``index2``, ``i7_index_id``, ``i5_index_id``,
-            ``sample_project``, ``description``.
+            Each dict contains at minimum: ``sample_id``, ``index``,
+            ``index2``, ``lane``, ``sample_name``, ``sample_project``,
+            ``description``. Any non-standard columns from ``[Data]``
+            are also included.
+
+        Raises
+        ------
+        RuntimeError
+            If :meth:`parse` has not been called.
         """
         if self.records is None:
-            raise RuntimeError("Call parse() before accessing samples().")
+            raise RuntimeError("Call parse() before calling samples().")
 
         seen: set[str] = set()
-        sample_list: list[dict[str, str | None]] = []
+        result: list[dict[str, str | None]] = []
 
         for record in self.records:
-            sample_id = record.get("Sample_ID", "")
-            if sample_id in seen:
+            sid = record.get("Sample_ID", "")
+            if sid in seen:
                 continue
-            seen.add(sample_id)
+            seen.add(sid)
 
-            sample_list.append({
-                "sample_id":       sample_id,
-                "sample_name":     record.get("Sample_Name"),
-                "lane":            record.get("Lane"),
-                "i7_index_id":     record.get("I7_Index_ID"),
-                "index":           record.get("index"),
-                "i5_index_id":     record.get("I5_Index_ID"),
-                "index2":          record.get("index2"),
-                "sample_plate":    record.get("Sample_Plate"),
-                "sample_well":     record.get("Sample_Well"),
-                "sample_project":  record.get("Sample_Project"),
-                "description":     record.get("Description"),
-                "flowcell_id":     self.flowcell_id,
-                "experiment_name": self.experiment_name,
-                # pass through any custom columns
-                **{
-                    k: v for k, v in record.items()
-                    if k not in STANDARD_DATA_COLUMNS
-                },
-            })
+            sample: dict[str, str | None] = {
+                "sample_id":        sid,
+                "sample_name":      record.get("Sample_Name"),
+                "lane":             record.get("Lane"),
+                "index":            record.get("index"),
+                "index2":           record.get("index2"),
+                "sample_project":   record.get("Sample_Project"),
+                "description":      record.get("Description"),
+                # Preserve fields present in many real-world V1 sheets.
+                # Callers that previously relied on these keys would
+                # receive KeyError if they were dropped.
+                "sample_plate":     record.get("Sample_Plate"),
+                "sample_well":      record.get("Sample_Well"),
+                "flowcell_id":      record.get("flowcell_id"),
+                "experiment_name":  record.get("Experiment_Name"),
+            }
+            # Include any non-standard columns from [Data]
+            for col in (self.columns or []):
+                if col not in STANDARD_DATA_COLUMNS and col not in sample:
+                    sample[col] = record.get(col)
 
-        return sample_list
+            result.append(sample)
+
+        return result
 
     def index_type(self) -> str:
         """Return ``"dual"``, ``"single"``, or ``"none"`` based on [Data] columns.
@@ -292,14 +397,20 @@ class SampleSheetV1:
         Returns
         -------
         str
-            Index type string. See :class:`~samplesheet_parser.enums.IndexType`.
+            ``"dual"`` if both ``index`` and ``index2`` are present,
+            ``"single"`` if only ``index`` is present, otherwise ``"none"``.
+
+        Raises
+        ------
+        RuntimeError
+            If :meth:`parse` has not been called.
         """
         if self.columns is None:
             raise RuntimeError("Call parse() before calling index_type().")
         cols = set(self.columns)
-        if "index2" in cols or "I5_Index_ID" in cols:
+        if "index2" in cols:
             return "dual"
-        if "index" in cols or "I7_Index_ID" in cols:
+        if "index" in cols:
             return "single"
         return "none"
 
@@ -361,8 +472,15 @@ class SampleSheetV1:
         return self.path
 
     def read(self) -> None:
-        """Read the file and bucket lines by section into ``self.raw``."""
+        """Read the file and bucket lines by section.
+
+        Populates both ``self.raw`` (standard sections via ``SheetInfo``)
+        and ``self._section_dict`` (all sections, including any custom
+        ones not in ``DEFAULT_SECTIONS``). The latter is what
+        :meth:`parse_custom_section` reads from.
+        """
         section_dict: dict[str, list[str]] = {s: [] for s in DEFAULT_SECTIONS}
+        section_list: list[str] = []  # lowercased names actually seen in the file
         curr_section: str | None = None
 
         with open(self.path, newline="\n", encoding="utf-8-sig") as fh:
@@ -374,8 +492,10 @@ class SampleSheetV1:
                         curr_section = line[1 : line.index("]")].lower()
                     except ValueError:
                         continue
-                    if curr_section not in section_dict:
-                        section_dict[curr_section] = []
+                    if curr_section:
+                        section_list.append(curr_section)
+                        if curr_section not in section_dict:
+                            section_dict[curr_section] = []
                     continue
 
                 if not curr_section:
@@ -387,6 +507,14 @@ class SampleSheetV1:
 
                 section_dict.setdefault(curr_section, []).append(stripped)
 
+        # Full dict — includes custom sections — used by parse_custom_section
+        self._section_dict = section_dict
+
+        # Track sections actually present in the file (used by required_sections checks).
+        # _section_dict is pre-seeded with DEFAULT_SECTIONS so its keys() cannot be used.
+        self.sections = section_list
+
+        # SheetInfo only covers the well-known standard sections
         self.raw = SheetInfo(**{k: section_dict.get(k, []) for k in DEFAULT_SECTIONS})
 
     def parse_header(self) -> None:

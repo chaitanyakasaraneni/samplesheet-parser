@@ -268,3 +268,194 @@ class TestSampleSheetV2Equality:
         sheet = SampleSheetV2(v2_minimal)
         sheet.parse()
         assert sheet.__eq__("not a sheet") == NotImplemented
+
+
+# ---------------------------------------------------------------------------
+# Custom section tests
+# ---------------------------------------------------------------------------
+
+class TestSampleSheetV2ParseCustomSection:
+    """Tests for parse_custom_section() on V2 sheets."""
+
+    def test_cloud_settings_parsed(self, v2_with_cloud_settings):
+        """[Cloud_Settings] section returns key-value dict."""
+        sheet = SampleSheetV2(v2_with_cloud_settings)
+        sheet.parse()
+        result = sheet.parse_custom_section("Cloud_Settings")
+        assert result["GeneratedVersion"] == "3.9.14"
+        assert result["UploadToBaseSpace"] == "1"
+
+    def test_custom_pipeline_section_parsed(self, v2_with_custom_section):
+        """[Pipeline_Settings] is stored in _section_dict and accessible via
+        parse_custom_section. clean() only normalises the exact canonical names
+        [Settings] and [BCLConvert_Settings] → [BCLConvert_Settings], so custom
+        sections like [Pipeline_Settings] pass through cleaning untouched."""
+        sheet = SampleSheetV2(v2_with_custom_section)
+        sheet.parse()
+        result = sheet.parse_custom_section("Pipeline_Settings")
+        assert result["PipelineVersion"] == "2.1.0"
+        assert result["OutputFormat"] == "CRAM"
+        assert result["ReferenceGenome"] == "hg38"
+
+    def test_section_lookup_is_case_insensitive(self, v2_with_cloud_settings):
+        """Section name is matched case-insensitively."""
+        sheet = SampleSheetV2(v2_with_cloud_settings)
+        sheet.parse()
+        assert sheet.parse_custom_section("cloud_settings") == \
+               sheet.parse_custom_section("CLOUD_SETTINGS")
+
+    def test_missing_section_returns_empty_dict(self, v2_minimal):
+        """Absent section with required=False (default) returns {}."""
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        assert sheet.parse_custom_section("NonExistent_Section") == {}
+
+    def test_missing_section_required_raises(self, v2_minimal):
+        """Absent section with required=True raises ValueError."""
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        with pytest.raises(ValueError, match="NonExistent_Section"):
+            sheet.parse_custom_section("NonExistent_Section", required=True)
+
+    def test_cloud_settings_missing_required_raises(self, v2_minimal):
+        """parse_custom_section raises when a DEFAULT_SECTIONS member is absent.
+
+        v2_minimal has no [Cloud_Settings]. Before the self.sections fix,
+        cloud_settings was always in _section_dict (pre-seeded), so required=True
+        would silently return {} instead of raising. Now it must raise.
+        """
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        with pytest.raises(ValueError, match="Cloud_Settings"):
+            sheet.parse_custom_section("Cloud_Settings", required=True)
+
+    def test_raises_before_parse_or_read(self, v2_minimal):
+        """Calling parse_custom_section before parse()/read() raises RuntimeError."""
+        sheet = SampleSheetV2(v2_minimal, clean=False)
+        with pytest.raises(RuntimeError, match=r"parse\(\)"):
+            sheet.parse_custom_section("Cloud_Settings")
+
+    def test_multiple_custom_sections_accessible(self, v2_with_multiple_custom_sections):
+        """Multiple non-standard sections are all independently accessible.
+        Both [Cloud_Settings] and [Pipeline_Settings] survive clean() because
+        clean() now only normalises exact canonical BCLConvert section names."""
+        sheet = SampleSheetV2(v2_with_multiple_custom_sections)
+        sheet.parse()
+        cloud = sheet.parse_custom_section("Cloud_Settings")
+        pipeline = sheet.parse_custom_section("Pipeline_Settings")
+        assert cloud["GeneratedVersion"] == "3.9.14"
+        assert pipeline["OutputFormat"] == "FASTQ"
+
+    def test_custom_section_does_not_break_standard_parsing(self, v2_with_custom_section):
+        """Standard BCLConvert sections parse correctly alongside custom sections."""
+        sheet = SampleSheetV2(v2_with_custom_section)
+        sheet.parse()
+        assert sheet.header["RunName"] == "CustomSectionRun"
+        assert len(sheet.records) == 1
+        assert sheet.records[0]["Sample_ID"] == "Sample1"
+        assert sheet.software_version == "3.9.3"
+
+    def test_bclconvert_settings_accessible_via_parse_custom_section(self, v2_minimal):
+        """[BCLConvert_Settings] itself is accessible via parse_custom_section."""
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        result = sheet.parse_custom_section("BCLConvert_Settings")
+        assert "AdapterRead1" in result or "SoftwareVersion" in result
+
+    def test_empty_custom_section_returns_empty_dict(self, tmp_path):
+        """A section present in the file but with no content lines returns {}."""
+        p = tmp_path / "empty_section.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n\n"
+            "[Pipeline_Settings]\n\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert sheet.parse_custom_section("Pipeline_Settings") == {}
+
+    def test_malformed_lines_in_custom_section_are_skipped(self, tmp_path):
+        """Lines with a missing key (empty first field) are skipped; valid lines returned.
+        Uses Cloud_Settings — a V2 DEFAULT_SECTION — to ensure parse_custom_section
+        reads it correctly today without needing non-default section support."""
+        p = tmp_path / "malformed_custom.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n\n"
+            "[Cloud_Settings]\n"
+            "ValidKey,ValidValue\n"
+            ",MissingKey\n"
+            "AnotherKey,AnotherValue\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        result = sheet.parse_custom_section("Cloud_Settings")
+        assert result["ValidKey"] == "ValidValue"
+        assert result["AnotherKey"] == "AnotherValue"
+        assert "" not in result
+
+
+class TestSampleSheetV2RequiredSections:
+    """Tests for parse(required_sections=[...]) on V2 sheets."""
+
+    def test_required_section_present_does_not_raise(self, v2_with_cloud_settings):
+        """parse() with a required section that exists completes normally."""
+        sheet = SampleSheetV2(v2_with_cloud_settings, clean=False)
+        sheet.parse(do_clean=False, required_sections=["Cloud_Settings"])
+        assert sheet.records is not None
+
+    def test_required_section_missing_raises(self, v2_minimal):
+        """parse() raises ValueError when a required section is absent."""
+        sheet = SampleSheetV2(v2_minimal, clean=False)
+        with pytest.raises(ValueError, match="Pipeline_Settings"):
+            sheet.parse(do_clean=False, required_sections=["Pipeline_Settings"])
+
+    def test_required_default_section_missing_raises(self, v2_minimal):
+        """parse() raises when a required DEFAULT_SECTIONS member is absent.
+
+        v2_minimal has no [Cloud_Settings] section. Before the self.sections
+        fix, the required check used _section_dict.keys() which is pre-seeded
+        with all DEFAULT_SECTIONS — so this would silently pass. Now it must
+        raise because self.sections only contains sections actually in the file.
+        """
+        sheet = SampleSheetV2(v2_minimal, clean=False)
+        with pytest.raises(ValueError, match="Cloud_Settings"):
+            sheet.parse(do_clean=False, required_sections=["Cloud_Settings"])
+
+    def test_multiple_required_sections_all_present(
+        self, v2_with_multiple_custom_sections
+    ):
+        """All required sections present — no error raised."""
+        sheet = SampleSheetV2(v2_with_multiple_custom_sections, clean=False)
+        sheet.parse(
+            do_clean=False,
+            required_sections=["Cloud_Settings", "Pipeline_Settings"],
+        )
+        assert sheet.records is not None
+
+    def test_multiple_required_sections_one_missing_raises(self, v2_with_cloud_settings):
+        """One of several required sections missing — ValueError raised."""
+        sheet = SampleSheetV2(v2_with_cloud_settings, clean=False)
+        with pytest.raises(ValueError, match="Pipeline_Settings"):
+            sheet.parse(
+                do_clean=False,
+                required_sections=["Cloud_Settings", "Pipeline_Settings"],
+            )
+
+    def test_required_sections_check_is_case_insensitive(self, v2_with_cloud_settings):
+        """required_sections matching is case-insensitive."""
+        sheet = SampleSheetV2(v2_with_cloud_settings, clean=False)
+        sheet.parse(do_clean=False, required_sections=["cloud_settings"])
+        assert sheet.records is not None
+
+    def test_none_required_sections_is_no_op(self, v2_minimal):
+        """required_sections=None (default) behaves identically to not passing it."""
+        sheet = SampleSheetV2(v2_minimal, clean=False)
+        sheet.parse(do_clean=False, required_sections=None)
+        assert sheet.records is not None
+
+    def test_required_standard_section_bcl_data_present(self, v2_minimal):
+        """Standard BCLConvert_Data can itself be named in required_sections."""
+        sheet = SampleSheetV2(v2_minimal, clean=False)
+        sheet.parse(do_clean=False, required_sections=["BCLConvert_Data"])
+        assert sheet.records is not None

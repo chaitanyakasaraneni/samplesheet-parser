@@ -112,6 +112,108 @@ Lane,Sample_ID,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 1,Sample1,D701,ATTACTCG,D501,TATAGCCT,Project1
 """
 
+# V1 sheet with a [Manifests] custom section
+V1_WITH_MANIFESTS = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,ManifestRun
+Date,2024-01-15
+Workflow,GenerateFASTQ
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,CTGTCTCTTATACACATCT
+
+[Manifests]
+MFGmanifest,HyperCapture_manifest_v2.0.txt
+PoolingManifest,pooling_v1.txt
+
+[Data]
+Lane,Sample_ID,index,index2,Sample_Project
+1,Sample1,ATTACTCG,TATAGCCT,Project1
+1,Sample2,TCCGGAGA,ATAGAGGC,Project1
+"""
+
+# V1 sheet with a fully custom lab-specific section
+V1_WITH_CUSTOM_SECTION = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,CustomSectionRun
+Date,2024-01-15
+Workflow,GenerateFASTQ
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,CTGTCTCTTATACACATCT
+
+[Lab_QC_Settings]
+MinQ30,85
+TargetCoverage,100x
+LibraryKit,TruSeq_Nano
+
+[Data]
+Lane,Sample_ID,index,index2,Sample_Project
+1,Sample1,ATTACTCG,TATAGCCT,Project1
+"""
+
+# V1 sheet with multiple custom sections
+V1_WITH_MULTIPLE_CUSTOM_SECTIONS = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,MultiCustomRun
+Date,2024-04-01
+Workflow,GenerateFASTQ
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,CTGTCTCTTATACACATCT
+
+[Manifests]
+MFGmanifest,HyperCapture_manifest_v2.0.txt
+
+[Cloud_Settings]
+GeneratedVersion,3.9.14
+UploadToBaseSpace,1
+
+[Data]
+Lane,Sample_ID,index,index2,Sample_Project
+1,Sample1,ATTACTCG,TATAGCCT,Project1
+"""
+
+# V1 sheet with a custom section that has malformed lines
+V1_WITH_MALFORMED_CUSTOM_SECTION = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,MalformedCustomRun
+Date,2024-01-15
+Workflow,GenerateFASTQ
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,CTGTCTCTTATACACATCT
+
+[Lab_QC_Settings]
+MinQ30,85
+,MissingKey
+ValidKey,ValidValue
+
+[Data]
+Lane,Sample_ID,index,index2,Sample_Project
+1,Sample1,ATTACTCG,TATAGCCT,Project1
+"""
+
 # ---------------------------------------------------------------------------
 # V2 BCLConvert sample sheet content
 # ---------------------------------------------------------------------------
@@ -216,8 +318,94 @@ Sample_ID,Index,Index2
 Sample1,ATTACTCG,TATAGCCT
 """
 
+# V2 sheet with a [Cloud_Settings] custom section
+V2_WITH_CLOUD_SETTINGS = """\
+[Header]
+FileFormatVersion,2
+RunName,CloudRun
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+SoftwareVersion,3.9.3
+AdapterRead1,CTGTCTCTTATACACATCT
+OverrideCycles,Y151;I10;I10;Y151
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,Sample1,ATTACTCGAT,TATAGCCTGT,Project1
+
+[Cloud_Settings]
+GeneratedVersion,3.9.14
+UploadToBaseSpace,1
+"""
+
+# V2 sheet with a fully arbitrary custom section
+V2_WITH_CUSTOM_SECTION = """\
+[Header]
+FileFormatVersion,2
+RunName,CustomSectionRun
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+SoftwareVersion,3.9.3
+AdapterRead1,CTGTCTCTTATACACATCT
+OverrideCycles,Y151;I10;I10;Y151
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,Sample1,ATTACTCGAT,TATAGCCTGT,Project1
+
+[Pipeline_Settings]
+PipelineVersion,2.1.0
+OutputFormat,CRAM
+ReferenceGenome,hg38
+"""
+
+# V2 sheet with multiple custom sections
+V2_WITH_MULTIPLE_CUSTOM_SECTIONS = """\
+[Header]
+FileFormatVersion,2
+RunName,MultiCustomRun
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+SoftwareVersion,3.9.3
+AdapterRead1,CTGTCTCTTATACACATCT
+OverrideCycles,Y151;I10;I10;Y151
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,Sample1,ATTACTCGAT,TATAGCCTGT,Project1
+
+[Cloud_Settings]
+GeneratedVersion,3.9.14
+UploadToBaseSpace,1
+
+[Pipeline_Settings]
+PipelineVersion,2.1.0
+OutputFormat,FASTQ
+"""
+
 # ---------------------------------------------------------------------------
-# Fixtures
+# Fixtures — V1
 # ---------------------------------------------------------------------------
 
 
@@ -257,6 +445,39 @@ def v1_with_experiment_id(tmp_path):
 
 
 @pytest.fixture
+def v1_with_manifests(tmp_path):
+    p = tmp_path / "SampleSheet_v1_manifests.csv"
+    p.write_text(V1_WITH_MANIFESTS)
+    return str(p)
+
+
+@pytest.fixture
+def v1_with_custom_section(tmp_path):
+    p = tmp_path / "SampleSheet_v1_custom.csv"
+    p.write_text(V1_WITH_CUSTOM_SECTION)
+    return str(p)
+
+
+@pytest.fixture
+def v1_with_multiple_custom_sections(tmp_path):
+    p = tmp_path / "SampleSheet_v1_multicustom.csv"
+    p.write_text(V1_WITH_MULTIPLE_CUSTOM_SECTIONS)
+    return str(p)
+
+
+@pytest.fixture
+def v1_with_malformed_custom_section(tmp_path):
+    p = tmp_path / "SampleSheet_v1_malformed_custom.csv"
+    p.write_text(V1_WITH_MALFORMED_CUSTOM_SECTION)
+    return str(p)
+
+
+# ---------------------------------------------------------------------------
+# Fixtures — V2
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
 def v2_minimal(tmp_path):
     p = tmp_path / "SampleSheet_v2.csv"
     p.write_text(V2_MINIMAL)
@@ -288,4 +509,25 @@ def v2_no_index2(tmp_path):
 def v2_bclconvert_sections_only(tmp_path):
     p = tmp_path / "SampleSheet_v2_sections.csv"
     p.write_text(V2_BCLCONVERT_SECTIONS_ONLY)
+    return str(p)
+
+
+@pytest.fixture
+def v2_with_cloud_settings(tmp_path):
+    p = tmp_path / "SampleSheet_v2_cloud.csv"
+    p.write_text(V2_WITH_CLOUD_SETTINGS)
+    return str(p)
+
+
+@pytest.fixture
+def v2_with_custom_section(tmp_path):
+    p = tmp_path / "SampleSheet_v2_custom.csv"
+    p.write_text(V2_WITH_CUSTOM_SECTION)
+    return str(p)
+
+
+@pytest.fixture
+def v2_with_multiple_custom_sections(tmp_path):
+    p = tmp_path / "SampleSheet_v2_multicustom.csv"
+    p.write_text(V2_WITH_MULTIPLE_CUSTOM_SECTIONS)
     return str(p)
