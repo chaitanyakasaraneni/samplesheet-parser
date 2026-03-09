@@ -882,6 +882,8 @@ class TestMergerValidateMergedExceptionHandling:
             def create_parser(self, *a: object, **kw: object) -> None:
                 raise ValueError("simulated parse failure")
 
+        # SampleSheetFactory is now a module-level name in merger.py, so
+        # patching merger_module.SampleSheetFactory intercepts all usages.
         monkeypatch.setattr(merger_module, "SampleSheetFactory", _BrokenFactory)
 
         a = _write(tmp_path, "a.csv", _V1_A)

@@ -40,6 +40,7 @@ from typing import Any
 from loguru import logger
 
 from samplesheet_parser.enums import SampleSheetVersion
+from samplesheet_parser.factory import SampleSheetFactory
 from samplesheet_parser.validators import (
     MIN_HAMMING_DISTANCE,
     SampleSheetValidator,
@@ -286,8 +287,6 @@ class SampleSheetMerger:
         result: MergeResult,
     ) -> list[tuple[Path, Any]]:
         """Parse each registered path; return list of (path, sheet) tuples."""
-        from samplesheet_parser.factory import SampleSheetFactory
-
         parsed: list[tuple[Path, Any]] = []
         versions_seen: set[SampleSheetVersion] = set()
 
@@ -562,6 +561,9 @@ class SampleSheetMerger:
             # capitalised variants returned by some parser versions
             "Index", "Index2", "Sample_Project",
             "I7_Index_ID", "I5_Index_ID",
+            # raw CSV column-name variants in sheet.records (Title-case / V1 headers)
+            "Lane", "Sample_ID", "Sample_Name", "Description",
+            "Sample_Plate", "Sample_Well",
             # run-level metadata that sheet.samples() may include for V2
             "flowcell_id", "experiment_name",
             "run_name", "instrument_platform", "instrument_type",
@@ -576,10 +578,10 @@ class SampleSheetMerger:
             logger.debug(f"Adding samples from {p.name}")
             sheet_records = getattr(sheet, "records", None) or sheet.samples()
             for sample in sheet_records:
-                sid  = sample.get("sample_id", "")
+                sid  = sample.get("sample_id") or sample.get("Sample_ID") or ""
                 idx  = sample.get("index") or sample.get("Index") or ""
                 idx2 = sample.get("index2") or sample.get("Index2") or ""
-                lane = sample.get("lane") or "1"
+                lane = sample.get("lane") or sample.get("Lane") or "1"
                 # Fix: fall back to capitalised key for V2 sheets
                 proj = sample.get("sample_project") or sample.get("Sample_Project") or ""
                 i7   = sample.get("i7_index_id") or sample.get("I7_Index_ID") or ""
@@ -630,8 +632,6 @@ class SampleSheetMerger:
     ) -> None:
         """Run SampleSheetValidator on the merged writer content."""
         import tempfile
-
-        from samplesheet_parser.factory import SampleSheetFactory
 
         content = writer.to_string()
         with tempfile.NamedTemporaryFile(
