@@ -135,6 +135,28 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 1,SampleB1,SampleB1,D703,GCATGCTA,D503,CCTATCCT,ProjectB
 """
 
+# Indexes differing by only 1 bp from _V1_A SampleA1 (ATTACTCG+TATAGCCT)
+# → Hamming distance 1 cross-sheet → triggers INDEX_DISTANCE_TOO_LOW warning
+_V1_B_CLOSE_INDEX = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleB1,SampleB1,D703,ATTACTCA,D503,TATAGCCA,ProjectB
+"""
+
 _V2_C = """\
 [Header]
 FileFormatVersion,2
@@ -432,3 +454,50 @@ class TestMergerUsageErrors:
         a = _write(tmp_path, "a.csv", _V1_A)
         merger = SampleSheetMerger()
         assert merger.add(a) is merger
+
+
+# ---------------------------------------------------------------------------
+# Warning detection — INDEX_DISTANCE_TOO_LOW (cross-sheet Hamming)
+# ---------------------------------------------------------------------------
+
+class TestMergerIndexDistance:
+
+    def test_close_indexes_across_sheets_produce_distance_warning(
+        self, tmp_path: Path
+    ) -> None:
+        """Indexes within Hamming distance < 3 across sheets → warning."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B_CLOSE_INDEX)
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [w.code for w in result.warnings]
+        assert "INDEX_DISTANCE_TOO_LOW" in codes
+
+    def test_distance_warning_is_not_a_hard_error(self, tmp_path: Path) -> None:
+        """INDEX_DISTANCE_TOO_LOW is a warning — merge should still succeed."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B_CLOSE_INDEX)
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        assert not result.has_conflicts
+        assert result.output_path is not None
+
+    def test_distance_warning_context_contains_distance(self, tmp_path: Path) -> None:
+        """Warning context should expose the actual Hamming distance value."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B_CLOSE_INDEX)
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        dist_warnings = [w for w in result.warnings if w.code == "INDEX_DISTANCE_TOO_LOW"]
+        assert dist_warnings, "Expected at least one INDEX_DISTANCE_TOO_LOW warning"
+        assert "distance" in dist_warnings[0].context
+        assert dist_warnings[0].context["distance"] < 3
+
+    def test_well_separated_indexes_no_distance_warning(self, tmp_path: Path) -> None:
+        """Sheets with well-separated indexes should not trigger the warning."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)   # indexes are far apart
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [w.code for w in result.warnings]
+        assert "INDEX_DISTANCE_TOO_LOW" not in codes

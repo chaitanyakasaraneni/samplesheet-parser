@@ -8,7 +8,7 @@ bcl2fastq.
 
 Examples
 --------
->>> from samplesheet_parser import SampleSheetMerger
+>>> from samplesheet_parser.merger import SampleSheetMerger
 >>>
 >>> merger = SampleSheetMerger()
 >>> merger.add("ProjectA/SampleSheet.csv")
@@ -40,9 +40,11 @@ from typing import Any
 from loguru import logger
 
 from samplesheet_parser.enums import SampleSheetVersion
-from samplesheet_parser.validators import SampleSheetValidator, _hamming_distance
-
-MIN_HAMMING_DISTANCE: int = 3
+from samplesheet_parser.validators import (
+    MIN_HAMMING_DISTANCE,
+    SampleSheetValidator,
+    _hamming_distance,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -404,6 +406,20 @@ class SampleSheetMerger:
                 sid   = sample.get("sample_id", "?")
                 key   = f"{idx1}+{idx2}" if idx2 else idx1
 
+                # Samples with no index are already skipped by _build_writer.
+                # An empty key would create spurious collisions between all
+                # index-less records — warn and skip instead.
+                if not idx1:
+                    result.add_warning(
+                        "MISSING_INDEX",
+                        f"Sample '{sid}' in lane {lane!r} from '{p.name}' has "
+                        "no index and will be skipped in the merged output.",
+                        lane=lane,
+                        sheet=str(p),
+                        sample_id=sid,
+                    )
+                    continue
+
                 bucket = seen.setdefault(lane, {})
                 if key in bucket:
                     existing_sid, existing_path = bucket[key]
@@ -491,6 +507,23 @@ class SampleSheetMerger:
         _, primary = parsed[0]
         writer = SampleSheetWriter.from_sheet(primary, version=self.target_version)
 
+        # Keys that belong in [Header]/[BCLConvert_Settings] or are handled
+        # explicitly below — must not leak into [Data]/[BCLConvert_Data] as
+        # extra per-sample columns.
+        _STANDARD_SAMPLE_KEYS: frozenset[str] = frozenset({
+            # core sample fields (lowercase — V1/V2 shared interface)
+            "sample_id", "sample_name", "lane", "index", "index2",
+            "sample_project", "description", "sample_plate", "sample_well",
+            "i7_index_id", "i5_index_id",
+            # capitalised variants returned by some parser versions
+            "Index", "Index2", "Sample_Project",
+            "I7_Index_ID", "I5_Index_ID",
+            # run-level metadata that sheet.samples() may include for V2
+            "flowcell_id", "experiment_name",
+            "run_name", "instrument_platform", "instrument_type",
+            "run_description", "file_format_version",
+        })
+
         # Add samples from all other sheets
         for p, sheet in parsed[1:]:
             logger.debug(f"Adding samples from {p.name}")
@@ -499,23 +532,20 @@ class SampleSheetMerger:
                 idx  = sample.get("index") or sample.get("Index") or ""
                 idx2 = sample.get("index2") or sample.get("Index2") or ""
                 lane = sample.get("lane") or "1"
-                proj = sample.get("sample_project") or sample.get("sample_project") or ""
-
-                # Collect non-standard extra fields
-                standard = {
-                    "sample_id", "sample_name", "lane", "index", "index2",
-                    "sample_project", "description", "sample_plate",
-                    "sample_well", "flowcell_id", "experiment_name",
-                    "Index", "Index2", "Sample_Project",
-                }
-                extra = {
-                    k: v for k, v in sample.items()
-                    if k not in standard and v is not None
-                }
+                # Fix: fall back to capitalised key for V2 sheets
+                proj = sample.get("sample_project") or sample.get("Sample_Project") or ""
+                i7   = sample.get("i7_index_id") or sample.get("I7_Index_ID") or ""
+                i5   = sample.get("i5_index_id") or sample.get("I5_Index_ID") or ""
 
                 if not sid or not idx:
                     logger.warning(f"Skipping incomplete sample record from {p.name}: {sample}")
                     continue
+
+                # Only pass through genuine per-sample extra columns
+                extra = {
+                    k: v for k, v in sample.items()
+                    if k not in _STANDARD_SAMPLE_KEYS and v is not None
+                }
 
                 writer.add_sample(
                     sid,
@@ -523,6 +553,8 @@ class SampleSheetMerger:
                     index2=idx2 or "",
                     lane=str(lane),
                     sample_name=sample.get("sample_name") or "",
+                    i7_index_id=i7,
+                    i5_index_id=i5,
                     project=proj or "",
                     description=sample.get("description") or "",
                     **{k: str(v) for k, v in extra.items()},
