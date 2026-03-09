@@ -331,7 +331,6 @@ class SampleSheetMerger:
     ) -> None:
         """Error if read lengths differ across sheets."""
         from samplesheet_parser.parsers.v1 import SampleSheetV1
-        from samplesheet_parser.parsers.v2 import SampleSheetV2
 
         length_map: dict[str, tuple[list[int], Path]] = {}
 
