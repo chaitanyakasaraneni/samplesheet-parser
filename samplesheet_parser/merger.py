@@ -339,10 +339,14 @@ class SampleSheetMerger:
                 lengths = sheet.read_lengths or []
             else:
                 r = sheet.reads or {}
-                lengths = [
-                    v for k, v in r.items()
-                    if k in ("Read1Cycles", "Read2Cycles") and v
-                ]
+                # Use a fixed key order so [Read1Cycles=151, Read2Cycles=101]
+                # and [Read2Cycles=101, Read1Cycles=151] produce the same key
+                # and don't spuriously trigger READ_LENGTH_CONFLICT.
+                lengths: list[int] = []
+                for read_key in ("Read1Cycles", "Read2Cycles"):
+                    v = r.get(read_key)
+                    if v:
+                        lengths.append(v)
             key = ",".join(str(rl) for rl in lengths)
             if key and key not in length_map:
                 length_map[key] = (lengths, p)
@@ -522,8 +526,11 @@ class SampleSheetMerger:
         # SampleSheetWriter.from_sheet() silently drops rows missing Sample_ID
         # or Index; emit INCOMPLETE_SAMPLE_RECORD here so warnings are
         # consistent with the treatment of all subsequent sheets below.
-        for sample in primary.samples():
-            sid = sample.get("sample_id", "")
+        # Use per-row records (not samples()) to catch multi-lane sheets where
+        # the same Sample_ID appears in multiple lanes.
+        primary_records = getattr(primary, "records", None) or primary.samples()
+        for sample in primary_records:
+            sid = sample.get("sample_id") or sample.get("Sample_ID") or ""
             idx = sample.get("index") or sample.get("Index") or ""
             if sid and idx:
                 continue
@@ -561,10 +568,14 @@ class SampleSheetMerger:
             "run_description", "file_format_version",
         })
 
-        # Add samples from all other sheets
+        # Add samples from all other sheets.
+        # Use per-row records (not samples()) so multi-lane sheets — where the
+        # same Sample_ID appears in multiple lanes — are not de-duplicated
+        # before being written to the merged output.
         for p, sheet in parsed[1:]:
             logger.debug(f"Adding samples from {p.name}")
-            for sample in sheet.samples():
+            sheet_records = getattr(sheet, "records", None) or sheet.samples()
+            for sample in sheet_records:
                 sid  = sample.get("sample_id", "")
                 idx  = sample.get("index") or sample.get("Index") or ""
                 idx2 = sample.get("index2") or sample.get("Index2") or ""
@@ -634,6 +645,16 @@ class SampleSheetMerger:
                 tmp_path, parse=True, clean=False
             )
             vresult = SampleSheetValidator().validate(sheet)
+        except (ValueError, FileNotFoundError, Exception) as exc:
+            # Convert any parse/validation failure into a structured conflict
+            # so merge() always returns a MergeResult rather than raising.
+            logger.error(f"Failed to parse or validate merged SampleSheet: {exc}")
+            result.add_conflict(
+                "MERGE_VALIDATION_ERROR",
+                f"Post-merge validation failed: {exc}",
+                origin="merged_sheet",
+            )
+            return
         finally:
             Path(tmp_path).unlink(missing_ok=True)
 

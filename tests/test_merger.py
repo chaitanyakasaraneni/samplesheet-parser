@@ -807,3 +807,128 @@ class TestMergerPrimaryPreScan:
 
         assert not result.has_conflicts
         assert result.output_path is not None
+
+
+# ---------------------------------------------------------------------------
+# Multi-lane secondary sheets — _build_writer must preserve all lane rows
+# ---------------------------------------------------------------------------
+
+# Sheet where SampleC appears in both lane 1 and lane 2 with different indexes
+_V1_MULTILANE_SECONDARY = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunS
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleC,SampleC,D705,TAGGCATG,D505,TAGATCGC,ProjectC
+2,SampleC,SampleC,D706,CTCTCTAC,D506,CTATTAAG,ProjectC
+"""
+
+
+class TestMergerSecondaryMultiLane:
+
+    def test_both_lane_rows_appear_in_merged_output(self, tmp_path: Path) -> None:
+        """Secondary sheet with SampleC in lanes 1 and 2 — both rows must be
+        written.  If _build_writer uses sheet.samples() the second lane entry
+        is de-duplicated and lost."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_MULTILANE_SECONDARY)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+        content = (result.output_path or tmp_path / "out.csv").read_text()
+
+        # Both index values must appear — if only one lane was written, one
+        # of these assertions will fail.
+        assert "TAGGCATG" in content   # lane 1 index
+        assert "CTCTCTAC" in content   # lane 2 index
+
+    def test_sample_count_reflects_all_lane_rows(self, tmp_path: Path) -> None:
+        result = SampleSheetMerger().add(
+            _write(tmp_path, "a.csv", _V1_A)
+        ).add(
+            _write(tmp_path, "b.csv", _V1_MULTILANE_SECONDARY)
+        ).merge(tmp_path / "out.csv")
+
+        # _V1_A has 2 samples; _V1_MULTILANE_SECONDARY contributes 2 rows
+        # (same Sample_ID, different lanes). Total > 2 confirms no de-dup.
+        assert result.sample_count > 2
+
+
+# ---------------------------------------------------------------------------
+# _validate_merged — parse/validation exceptions become structured conflicts
+# ---------------------------------------------------------------------------
+
+class TestMergerValidateMergedExceptionHandling:
+
+    def test_validate_merged_exception_produces_conflict_not_raise(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """If post-merge validation raises, merge() must return a MergeResult
+        with MERGE_VALIDATION_ERROR rather than propagating the exception."""
+        import samplesheet_parser.merger as merger_module
+
+        class _BrokenFactory:
+            def create_parser(self, *a: object, **kw: object) -> None:
+                raise ValueError("simulated parse failure")
+
+        monkeypatch.setattr(merger_module, "SampleSheetFactory", _BrokenFactory)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv", validate=True
+        )
+
+        codes = [c.code for c in result.conflicts]
+        assert "MERGE_VALIDATION_ERROR" in codes
+
+    def test_validate_merged_exception_result_has_conflicts(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import samplesheet_parser.merger as merger_module
+
+        class _BrokenFactory:
+            def create_parser(self, *a: object, **kw: object) -> None:
+                raise FileNotFoundError("simulated missing file")
+
+        monkeypatch.setattr(merger_module, "SampleSheetFactory", _BrokenFactory)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv", validate=True
+        )
+
+        assert result.has_conflicts
+
+
+# ---------------------------------------------------------------------------
+# _check_read_lengths — fixed key order prevents false READ_LENGTH_CONFLICT
+# ---------------------------------------------------------------------------
+
+class TestMergerReadLengthKeyOrder:
+
+    def test_no_false_conflict_when_key_order_differs(self, tmp_path: Path) -> None:
+        """Two sheets with identical read lengths (151/151) must not trigger
+        READ_LENGTH_CONFLICT even if one parser returned Read2Cycles before
+        Read1Cycles in its .reads dict."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [c.code for c in result.conflicts]
+        assert "READ_LENGTH_CONFLICT" not in codes
