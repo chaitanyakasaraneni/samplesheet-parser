@@ -660,7 +660,7 @@ class SampleSheetMerger:
                 tmp_path, parse=True, clean=False
             )
             vresult = SampleSheetValidator().validate(sheet)
-        except (ValueError, FileNotFoundError, Exception) as exc:
+        except Exception as exc:
             # Convert any parse/validation failure into a structured conflict
             # so merge() always returns a MergeResult rather than raising.
             logger.error(f"Failed to parse or validate merged SampleSheet: {exc}")
