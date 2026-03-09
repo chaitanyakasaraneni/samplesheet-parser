@@ -875,16 +875,18 @@ class TestMergerValidateMergedExceptionHandling:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """If post-merge validation raises, merge() must return a MergeResult
-        with MERGE_VALIDATION_ERROR rather than propagating the exception."""
+        with MERGE_VALIDATION_ERROR rather than propagating the exception.
+
+        SampleSheetValidator.validate() is only ever called from inside
+        _validate_merged's try/except block, so patching it to raise is
+        precise and immune to changes in _parse_all's factory usage.
+        """
         import samplesheet_parser.merger as merger_module
 
-        class _BrokenFactory:
-            def create_parser(self, *a: object, **kw: object) -> None:
-                raise ValueError("simulated parse failure")
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise ValueError("simulated validation-phase failure")
 
-        # SampleSheetFactory is now a module-level name in merger.py, so
-        # patching merger_module.SampleSheetFactory intercepts all usages.
-        monkeypatch.setattr(merger_module, "SampleSheetFactory", _BrokenFactory)
+        monkeypatch.setattr(merger_module.SampleSheetValidator, "validate", _explode)
 
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
@@ -899,13 +901,13 @@ class TestMergerValidateMergedExceptionHandling:
     def test_validate_merged_exception_result_has_conflicts(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """has_conflicts is True when _validate_merged raises."""
         import samplesheet_parser.merger as merger_module
 
-        class _BrokenFactory:
-            def create_parser(self, *a: object, **kw: object) -> None:
-                raise FileNotFoundError("simulated missing file")
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise FileNotFoundError("simulated missing file in validate")
 
-        monkeypatch.setattr(merger_module, "SampleSheetFactory", _BrokenFactory)
+        monkeypatch.setattr(merger_module.SampleSheetValidator, "validate", _explode)
 
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
@@ -929,6 +931,169 @@ class TestMergerReadLengthKeyOrder:
         Read1Cycles in its .reads dict."""
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [c.code for c in result.conflicts]
+        assert "READ_LENGTH_CONFLICT" not in codes
+
+
+# ---------------------------------------------------------------------------
+# Sample metadata preservation — Sample_Name/Description/Plate/Well from records
+# ---------------------------------------------------------------------------
+
+_V1_WITH_METADATA = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunM
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,Sample_Plate,Sample_Well,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project,Description
+1,SampleM1,AliasMeta,PlateX,A01,D703,GCATGCTA,D503,CCTATCCT,ProjectM,DescriptionText
+"""
+
+
+class TestMergerMetadataPreservation:
+    """V2 [BCLConvert_Data] omits Sample_Name/Description/Plate/Well columns.
+    Force target_version=V1 so the [Data] section preserves all per-sample
+    metadata from secondary sheet.records (raw capitalised keys)."""
+
+    def test_sample_name_preserved_from_records(self, tmp_path: Path) -> None:
+        """Sample_Name from sheet.records must appear in V1 merged output."""
+        from samplesheet_parser.enums import SampleSheetVersion
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_WITH_METADATA)
+
+        result = (
+            SampleSheetMerger(target_version=SampleSheetVersion.V1)
+            .add(a).add(b).merge(tmp_path / "out.csv")
+        )
+        content = (result.output_path or tmp_path / "out.csv").read_text()
+
+        assert "AliasMeta" in content
+
+    def test_description_preserved_from_records(self, tmp_path: Path) -> None:
+        from samplesheet_parser.enums import SampleSheetVersion
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_WITH_METADATA)
+
+        result = (
+            SampleSheetMerger(target_version=SampleSheetVersion.V1)
+            .add(a).add(b).merge(tmp_path / "out.csv")
+        )
+        content = (result.output_path or tmp_path / "out.csv").read_text()
+
+        assert "DescriptionText" in content
+
+    def test_sample_plate_preserved_from_records(self, tmp_path: Path) -> None:
+        from samplesheet_parser.enums import SampleSheetVersion
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_WITH_METADATA)
+
+        result = (
+            SampleSheetMerger(target_version=SampleSheetVersion.V1)
+            .add(a).add(b).merge(tmp_path / "out.csv")
+        )
+        content = (result.output_path or tmp_path / "out.csv").read_text()
+
+        assert "PlateX" in content
+
+
+# ---------------------------------------------------------------------------
+# _check_adapters — both-sheets guard (primary has no adapters → no warning)
+# ---------------------------------------------------------------------------
+
+_V1_NO_ADAPTER = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunNA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleNA,SampleNA,D701,ATCACGTT,D501,AACGTGAT,ProjectNA
+"""
+
+
+class TestMergerAdapterBothGuard:
+
+    def test_no_conflict_when_primary_has_no_adapters(self, tmp_path: Path) -> None:
+        """Primary sheet has no adapters; secondary has adapters.
+        Should NOT produce ADAPTER_CONFLICT — nothing to conflict against."""
+        a = _write(tmp_path, "a.csv", _V1_NO_ADAPTER)   # primary — no adapter
+        b = _write(tmp_path, "b.csv", _V1_B)             # secondary — has adapter
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [w.code for w in result.warnings]
+        assert "ADAPTER_CONFLICT" not in codes
+
+    def test_conflict_when_both_have_different_adapters(self, tmp_path: Path) -> None:
+        """Both primary and secondary have adapters and they differ → warn."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B_DIFF_ADAPTER)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [w.code for w in result.warnings]
+        assert "ADAPTER_CONFLICT" in codes
+
+
+# ---------------------------------------------------------------------------
+# _check_read_lengths — sentinel catches missing-reads vs present-reads
+# ---------------------------------------------------------------------------
+
+_V1_NO_READS_SECTION = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunNR
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleNR,SampleNR,D701,ATCACGTT,D501,AACGTGAT,ProjectNR
+"""
+
+
+class TestMergerReadLengthSentinel:
+
+    def test_missing_reads_vs_present_reads_is_conflict(self, tmp_path: Path) -> None:
+        """One sheet has [Reads] (151/151), other has none → READ_LENGTH_CONFLICT."""
+        a = _write(tmp_path, "a.csv", _V1_A)             # has [Reads] 151/151
+        b = _write(tmp_path, "b.csv", _V1_NO_READS_SECTION)  # no [Reads]
+
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv", abort_on_conflicts=False
+        )
+
+        codes = [c.code for c in result.conflicts]
+        assert "READ_LENGTH_CONFLICT" in codes
+
+    def test_both_missing_reads_is_not_conflict(self, tmp_path: Path) -> None:
+        """Both sheets have no [Reads] → same sentinel key → no conflict."""
+        a = _write(tmp_path, "a.csv", _V1_NO_READS_SECTION)
+        b_content = _V1_NO_READS_SECTION.replace("SampleNR", "SampleNR2").replace(
+            "ATCACGTT", "CGATGTTT"
+        )
+        b = _write(tmp_path, "b.csv", b_content)
 
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
 

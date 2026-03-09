@@ -47,6 +47,7 @@ from samplesheet_parser.validators import (
     _hamming_distance,
 )
 
+
 # ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
@@ -330,6 +331,7 @@ class SampleSheetMerger:
     ) -> None:
         """Error if read lengths differ across sheets."""
         from samplesheet_parser.parsers.v1 import SampleSheetV1
+        from samplesheet_parser.parsers.v2 import SampleSheetV2
 
         length_map: dict[str, tuple[list[int], Path]] = {}
 
@@ -346,15 +348,19 @@ class SampleSheetMerger:
                     v = r.get(read_key)
                     if v:
                         lengths.append(v)
-            key = ",".join(str(rl) for rl in lengths)
-            if key and key not in length_map:
+            # Use an explicit sentinel for sheets with no [Reads] / empty
+            # read_lengths so that "missing reads" vs "present reads" is
+            # treated as a meaningful structural difference rather than
+            # being silently skipped.
+            key = ",".join(str(rl) for rl in lengths) if lengths else "<NO_READS>"
+            if key not in length_map:
                 length_map[key] = (lengths, p)
-            elif key and key in length_map:
-                pass  # same — no conflict
+            # else: same key — no conflict, do nothing
 
         if len(length_map) > 1:
             detail = "; ".join(
-                f"{p.name}: {lens}" for lens, p in length_map.values()
+                f"{p.name}: {lens if lens else '(none)'}"
+                for lens, p in length_map.values()
             )
             result.add_conflict(
                 "READ_LENGTH_CONFLICT",
@@ -386,9 +392,9 @@ class SampleSheetMerger:
             adapters = frozenset(
                 a.upper() for a in (getattr(sheet, "adapters", []) or []) if a
             )
-            # Only warn when both sheets have adapters and they differ; if the
-            # secondary sheet has no adapters, there is nothing to conflict.
-            if adapters and adapters != primary_adapters:
+            # Only warn when both sheets have adapters and they differ; if
+            # either sheet has no adapters, there is nothing to conflict.
+            if adapters and primary_adapters and adapters != primary_adapters:
                 result.add_warning(
                     "ADAPTER_CONFLICT",
                     f"Adapter sequences differ between {primary_path.name} and "
@@ -610,16 +616,25 @@ class SampleSheetMerger:
                     if k not in _STANDARD_SAMPLE_KEYS and v is not None
                 }
 
+                # Preserve per-sample metadata across all inputs by mapping
+                # both normalised and raw (capitalised) keys from sheet.records.
+                sample_name  = sample.get("sample_name") or sample.get("Sample_Name") or ""
+                description  = sample.get("description") or sample.get("Description") or ""
+                sample_plate = sample.get("sample_plate") or sample.get("Sample_Plate") or ""
+                sample_well  = sample.get("sample_well") or sample.get("Sample_Well") or ""
+
                 writer.add_sample(
                     sid,
                     index=idx,
                     index2=idx2 or "",
                     lane=str(lane),
-                    sample_name=sample.get("sample_name") or "",
+                    sample_name=sample_name,
                     i7_index_id=i7,
                     i5_index_id=i5,
                     project=proj or "",
-                    description=sample.get("description") or "",
+                    description=description,
+                    sample_plate=sample_plate,
+                    sample_well=sample_well,
                     **{k: str(v) for k, v in extra.items()},
                 )
 
