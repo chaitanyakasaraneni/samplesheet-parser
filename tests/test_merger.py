@@ -645,3 +645,165 @@ class TestMergerAdapterConflictMessage:
         w = next(w for w in result.warnings if w.code == "ADAPTER_CONFLICT")
         assert "sheet_a" in w.context
         assert "sheet_b" in w.context
+
+
+# ---------------------------------------------------------------------------
+# Multi-lane collision detection — uses sheet.records not sheet.samples()
+# ---------------------------------------------------------------------------
+
+# Two sheets where the SAME Sample_ID appears in multiple lanes with
+# different indexes — sheet.samples() would de-duplicate these to one row
+# and miss the cross-sheet collision in lane 2.
+_V1_MULTILANE_A = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunML
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleA,SampleA,D701,ATCACGTT,D501,AACGTGAT,ProjectA
+2,SampleA,SampleA,D702,CGATGTTT,D502,AAACATCG,ProjectA
+"""
+
+# Sheet B uses the same index as sheet A lane-2 in lane 2 — collision
+_V1_MULTILANE_B = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunML
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleB,SampleB,D703,GCATGCTA,D503,CCTATCCT,ProjectB
+2,SampleB,SampleB,D702,CGATGTTT,D502,AAACATCG,ProjectB
+"""
+
+
+class TestMergerMultiLaneRecords:
+
+    def test_collision_detected_in_non_primary_lane(self, tmp_path: Path) -> None:
+        """INDEX_COLLISION must fire for lane 2 even when Sample_ID is the
+        same across lanes (which sheet.samples() would de-duplicate)."""
+        a = _write(tmp_path, "a.csv", _V1_MULTILANE_A)
+        b = _write(tmp_path, "b.csv", _V1_MULTILANE_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv",
+            abort_on_conflicts=False,
+        )
+
+        codes = [c.code for c in result.conflicts]
+        assert "INDEX_COLLISION" in codes
+
+    def test_non_colliding_lane_does_not_error(self, tmp_path: Path) -> None:
+        """Lane 1 has distinct indexes — only lane 2 should collide."""
+        a = _write(tmp_path, "a.csv", _V1_MULTILANE_A)
+        b = _write(tmp_path, "b.csv", _V1_MULTILANE_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv",
+            abort_on_conflicts=False,
+        )
+        # Exactly one collision (lane 2) — lane 1 is fine
+        collisions = [c for c in result.conflicts if c.code == "INDEX_COLLISION"]
+        assert len(collisions) == 1
+        assert collisions[0].context.get("lane") in (2, "2")
+
+
+# ---------------------------------------------------------------------------
+# Primary sheet pre-scan — INCOMPLETE_SAMPLE_RECORD for primary records
+# ---------------------------------------------------------------------------
+
+_V1_PRIMARY_MISSING_INDEX = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunP
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleP1,SampleP1,D701,ATCACGTT,D501,AACGTGAT,ProjectP
+1,SampleP2,SampleP2,D702,,D502,,ProjectP
+"""
+
+
+class TestMergerPrimaryPreScan:
+
+    def test_incomplete_record_in_primary_sheet_emits_warning(
+        self, tmp_path: Path
+    ) -> None:
+        """A row in parsed[0] that is missing Index must produce
+        INCOMPLETE_SAMPLE_RECORD, not be silently dropped."""
+        a = _write(tmp_path, "a.csv", _V1_PRIMARY_MISSING_INDEX)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [w.code for w in result.warnings]
+        assert "INCOMPLETE_SAMPLE_RECORD" in codes
+
+    def test_incomplete_primary_record_warning_references_primary_sheet(
+        self, tmp_path: Path
+    ) -> None:
+        a = _write(tmp_path, "a.csv", _V1_PRIMARY_MISSING_INDEX)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        w = next(
+            w for w in result.warnings if w.code == "INCOMPLETE_SAMPLE_RECORD"
+        )
+        assert w.context["sheet"] == str(a)
+
+    def test_valid_primary_records_still_appear_in_output(
+        self, tmp_path: Path
+    ) -> None:
+        """SampleP1 (valid) must be in output; SampleP2 (no index) must not."""
+        a = _write(tmp_path, "a.csv", _V1_PRIMARY_MISSING_INDEX)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+        content = (result.output_path or tmp_path / "out.csv").read_text()
+
+        assert "SampleP1" in content
+        assert "SampleP2" not in content
+
+    def test_merge_does_not_abort_due_to_incomplete_primary_record(
+        self, tmp_path: Path
+    ) -> None:
+        """An incomplete primary record is a warning, not a hard conflict."""
+        a = _write(tmp_path, "a.csv", _V1_PRIMARY_MISSING_INDEX)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        assert not result.has_conflicts
+        assert result.output_path is not None

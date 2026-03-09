@@ -46,7 +46,6 @@ from samplesheet_parser.validators import (
     _hamming_distance,
 )
 
-
 # ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
@@ -332,7 +331,6 @@ class SampleSheetMerger:
     ) -> None:
         """Error if read lengths differ across sheets."""
         from samplesheet_parser.parsers.v1 import SampleSheetV1
-        from samplesheet_parser.parsers.v2 import SampleSheetV2
 
         length_map: dict[str, tuple[list[int], Path]] = {}
 
@@ -345,7 +343,7 @@ class SampleSheetMerger:
                     v for k, v in r.items()
                     if k in ("Read1Cycles", "Read2Cycles") and v
                 ]
-            key = ",".join(str(l) for l in lengths)
+            key = ",".join(str(rl) for rl in lengths)
             if key and key not in length_map:
                 length_map[key] = (lengths, p)
             elif key and key in length_map:
@@ -402,30 +400,30 @@ class SampleSheetMerger:
         parsed: list[tuple[Path, Any]],
         result: MergeResult,
     ) -> None:
-        """Error if two sheets place the same index in the same lane."""
+        """Error if two sheets place the same index in the same lane.
+
+        Uses ``sheet.records`` (raw per-row dicts) rather than
+        ``sheet.samples()`` so that multi-lane sheets — where the same
+        ``Sample_ID`` appears in multiple lanes — are not silently
+        de-duplicated before the collision check.  Falls back to
+        ``sheet.samples()`` for any parser that doesn't expose ``.records``.
+        """
         # lane → index_key → (sample_id, source_path)
         seen: dict[str | None, dict[str, tuple[str, Path]]] = {}
 
         for p, sheet in parsed:
-            for sample in sheet.samples():
-                lane  = sample.get("lane")
-                idx1  = (sample.get("index") or sample.get("Index") or "").upper()
-                idx2  = (sample.get("index2") or sample.get("Index2") or "").upper()
-                sid   = sample.get("sample_id", "?")
+            # Prefer per-row records; fall back to samples() if unavailable.
+            records = getattr(sheet, "records", None) or sheet.samples()
+            for record in records:
+                lane  = record.get("lane") or record.get("Lane")
+                idx1  = (record.get("index") or record.get("Index") or "").upper()
+                idx2  = (record.get("index2") or record.get("Index2") or "").upper()
+                sid   = record.get("sample_id") or record.get("Sample_ID") or "?"
                 key   = f"{idx1}+{idx2}" if idx2 else idx1
 
-                # Samples with no index are already skipped by _build_writer.
-                # An empty key would create spurious collisions between all
-                # index-less records — warn and skip instead.
+                # Silently skip incomplete rows — _build_writer will emit
+                # INCOMPLETE_SAMPLE_RECORD for them; no duplicate warning here.
                 if not idx1:
-                    result.add_warning(
-                        "MISSING_INDEX",
-                        f"Sample '{sid}' in lane {lane!r} from '{p.name}' has "
-                        "no index and will be skipped in the merged output.",
-                        lane=lane,
-                        sheet=str(p),
-                        sample_id=sid,
-                    )
                     continue
 
                 bucket = seen.setdefault(lane, {})
@@ -453,16 +451,22 @@ class SampleSheetMerger:
         result: MergeResult,
         min_distance: int = MIN_HAMMING_DISTANCE,
     ) -> None:
-        """Warn if indexes from different sheets are too similar (Hamming)."""
+        """Warn if indexes from different sheets are too similar (Hamming).
+
+        Uses ``sheet.records`` (raw per-row dicts) for the same reason as
+        :meth:`_check_index_collisions` — to avoid losing multi-lane rows
+        that ``sheet.samples()`` de-duplicates by ``Sample_ID``.
+        """
         # Build per-lane list of (sample_id, combined_index, source_path)
         lane_entries: dict[str | None, list[tuple[str, str, Path]]] = {}
 
         for p, sheet in parsed:
-            for sample in sheet.samples():
-                lane = sample.get("lane")
-                idx1 = (sample.get("index") or sample.get("Index") or "").upper()
-                idx2 = (sample.get("index2") or sample.get("Index2") or "").upper()
-                sid  = sample.get("sample_id", "?")
+            records = getattr(sheet, "records", None) or sheet.samples()
+            for record in records:
+                lane = record.get("lane") or record.get("Lane")
+                idx1 = (record.get("index") or record.get("Index") or "").upper()
+                idx2 = (record.get("index2") or record.get("Index2") or "").upper()
+                sid  = record.get("sample_id") or record.get("Sample_ID") or "?"
                 if not idx1:
                     continue
                 combined = idx1 + idx2 if idx2 else idx1
@@ -512,7 +516,32 @@ class SampleSheetMerger:
         from samplesheet_parser.writer import SampleSheetWriter
 
         # Use the first successfully-parsed sheet as the header/reads source
-        _, primary = parsed[0]
+        primary_path, primary = parsed[0]
+
+        # Pre-scan the primary sheet for incomplete records.
+        # SampleSheetWriter.from_sheet() silently drops rows missing Sample_ID
+        # or Index; emit INCOMPLETE_SAMPLE_RECORD here so warnings are
+        # consistent with the treatment of all subsequent sheets below.
+        for sample in primary.samples():
+            sid = sample.get("sample_id", "")
+            idx = sample.get("index") or sample.get("Index") or ""
+            if sid and idx:
+                continue
+            missing = []
+            if not sid:
+                missing.append("Sample_ID")
+            if not idx:
+                missing.append("Index")
+            result.add_warning(
+                "INCOMPLETE_SAMPLE_RECORD",
+                f"Sample record from '{primary_path.name}' (primary sheet) is "
+                f"missing required field(s) {missing} and will be skipped in "
+                "the merged output.",
+                sheet=str(primary_path),
+                missing_fields=missing,
+                record=dict(sample),
+            )
+
         writer = SampleSheetWriter.from_sheet(primary, version=self.target_version)
 
         # Keys that belong in [Header]/[BCLConvert_Settings] or are handled
@@ -590,6 +619,7 @@ class SampleSheetMerger:
     ) -> None:
         """Run SampleSheetValidator on the merged writer content."""
         import tempfile
+
         from samplesheet_parser.factory import SampleSheetFactory
 
         content = writer.to_string()
