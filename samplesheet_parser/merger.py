@@ -295,7 +295,9 @@ class SampleSheetMerger:
         for p in self._paths:
             try:
                 factory = SampleSheetFactory()
-                sheet = factory.create_parser(str(p), parse=True)
+                # clean=False keeps the merge read-only on source files;
+                # cleaning could modify input sheets or create .backup files.
+                sheet = factory.create_parser(str(p), parse=True, clean=False)
                 parsed.append((p, sheet))
                 versions_seen.add(factory.version)
                 result.source_versions[str(p)] = factory.version.value
@@ -364,28 +366,34 @@ class SampleSheetMerger:
         parsed: list[tuple[Path, Any]],
         result: MergeResult,
     ) -> None:
-        """Warn if adapter sequences differ across sheets."""
-        adapter_sets: list[tuple[frozenset[str], Path]] = []
+        """Warn if adapter sequences differ across sheets.
 
-        for p, sheet in parsed:
+        The primary sheet (``parsed[0]``) is used as the adapter reference
+        because :meth:`_build_writer` calls ``SampleSheetWriter.from_sheet``
+        on that sheet, which copies its adapter settings into the merged
+        output.  The warning reflects this actual behaviour.
+        """
+        # Adapters always come from the primary (first) sheet in the merged
+        # output.  Collect adapters from all sheets and warn if any differ
+        # from the primary.
+        primary_path, primary_sheet = parsed[0]
+        primary_adapters = frozenset(
+            a.upper() for a in (getattr(primary_sheet, "adapters", []) or []) if a
+        )
+
+        for p, sheet in parsed[1:]:
             adapters = frozenset(
                 a.upper() for a in (getattr(sheet, "adapters", []) or []) if a
             )
-            if adapters:
-                adapter_sets.append((adapters, p))
-
-        if not adapter_sets:
-            return
-
-        reference, ref_path = adapter_sets[0]
-        for adapters, p in adapter_sets[1:]:
-            if adapters != reference:
+            # Only warn when both sheets have adapters and they differ; if the
+            # secondary sheet has no adapters, there is nothing to conflict.
+            if adapters and adapters != primary_adapters:
                 result.add_warning(
                     "ADAPTER_CONFLICT",
-                    f"Adapter sequences differ between {ref_path.name} and "
-                    f"{p.name}. The adapters from the first sheet will be used "
-                    "in the merged output.",
-                    sheet_a=str(ref_path),
+                    f"Adapter sequences differ between {primary_path.name} and "
+                    f"{p.name}. The adapters from {primary_path.name} (the "
+                    "primary sheet) will be used in the merged output.",
+                    sheet_a=str(primary_path),
                     sheet_b=str(p),
                 )
 
@@ -538,7 +546,20 @@ class SampleSheetMerger:
                 i5   = sample.get("i5_index_id") or sample.get("I5_Index_ID") or ""
 
                 if not sid or not idx:
-                    logger.warning(f"Skipping incomplete sample record from {p.name}: {sample}")
+                    missing = []
+                    if not sid:
+                        missing.append("Sample_ID")
+                    if not idx:
+                        missing.append("Index")
+                    result.add_warning(
+                        "INCOMPLETE_SAMPLE_RECORD",
+                        f"Sample record from '{p.name}' is missing required "
+                        f"field(s) {missing} and will be skipped in the merged "
+                        "output.",
+                        sheet=str(p),
+                        missing_fields=missing,
+                        record=dict(sample),
+                    )
                     continue
 
                 # Only pass through genuine per-sample extra columns

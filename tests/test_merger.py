@@ -501,3 +501,147 @@ class TestMergerIndexDistance:
 
         codes = [w.code for w in result.warnings]
         assert "INDEX_DISTANCE_TOO_LOW" not in codes
+
+
+# ---------------------------------------------------------------------------
+# Read-only parsing — clean=False on source files
+# ---------------------------------------------------------------------------
+
+class TestMergerReadOnlyParsing:
+
+    def test_source_files_are_not_modified(self, tmp_path: Path) -> None:
+        """Merger must not mutate source sheet files (clean=False)."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        mtime_a_before = a.stat().st_mtime
+        mtime_b_before = b.stat().st_mtime
+
+        SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        assert a.stat().st_mtime == mtime_a_before, "Source file 'a.csv' was modified"
+        assert b.stat().st_mtime == mtime_b_before, "Source file 'b.csv' was modified"
+
+    def test_no_backup_files_created(self, tmp_path: Path) -> None:
+        """clean=False should not produce .backup files alongside inputs."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        backup_files = list(tmp_path.glob("*.backup"))
+        assert backup_files == [], f"Unexpected backup files: {backup_files}"
+
+
+# ---------------------------------------------------------------------------
+# INCOMPLETE_SAMPLE_RECORD — structured warning for skipped samples
+# ---------------------------------------------------------------------------
+
+# A V1 sheet where one sample row is missing its Index column value
+_V1_MISSING_INDEX_ROW = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleB1,SampleB1,D703,GCATGCTA,D503,CCTATCCT,ProjectB
+1,SampleB2,SampleB2,D704,,D504,,ProjectB
+"""
+
+
+class TestMergerIncompleteRecord:
+
+    def test_missing_index_produces_structured_warning(self, tmp_path: Path) -> None:
+        """A sample row with no Index should produce INCOMPLETE_SAMPLE_RECORD warning."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_MISSING_INDEX_ROW)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        codes = [w.code for w in result.warnings]
+        assert "INCOMPLETE_SAMPLE_RECORD" in codes
+
+    def test_incomplete_record_warning_is_not_a_hard_error(self, tmp_path: Path) -> None:
+        """Skipped incomplete rows should warn, not abort the merge."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_MISSING_INDEX_ROW)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        assert not result.has_conflicts
+        assert result.output_path is not None
+
+    def test_incomplete_record_warning_context_has_sheet_path(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_MISSING_INDEX_ROW)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        w = next(w for w in result.warnings if w.code == "INCOMPLETE_SAMPLE_RECORD")
+        assert "sheet" in w.context
+        assert str(b) in w.context["sheet"]
+
+    def test_incomplete_record_warning_context_has_missing_fields(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_MISSING_INDEX_ROW)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        w = next(w for w in result.warnings if w.code == "INCOMPLETE_SAMPLE_RECORD")
+        assert "missing_fields" in w.context
+        assert "Index" in w.context["missing_fields"]
+
+    def test_complete_samples_still_merged_when_one_row_incomplete(
+        self, tmp_path: Path
+    ) -> None:
+        """Valid samples from the same sheet must still appear in merged output."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_MISSING_INDEX_ROW)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+        content = (result.output_path or tmp_path / "out.csv").read_text()
+
+        # SampleB1 has a valid index → should be in output
+        assert "SampleB1" in content
+        # SampleB2 has no index → should be skipped
+        assert "SampleB2" not in content
+
+
+# ---------------------------------------------------------------------------
+# ADAPTER_CONFLICT — warning references primary sheet as the actual source
+# ---------------------------------------------------------------------------
+
+class TestMergerAdapterConflictMessage:
+
+    def test_adapter_conflict_warning_names_primary_sheet(self, tmp_path: Path) -> None:
+        """Warning message must reference parsed[0] (the sheet whose adapters are used)."""
+        a = _write(tmp_path, "a.csv", _V1_A)             # primary — adapters kept
+        b = _write(tmp_path, "b.csv", _V1_B_DIFF_ADAPTER)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        w = next((w for w in result.warnings if w.code == "ADAPTER_CONFLICT"), None)
+        assert w is not None
+        # sheet_a in context must be the primary (first) sheet
+        assert w.context["sheet_a"] == str(a)
+
+    def test_adapter_conflict_context_has_both_sheet_paths(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B_DIFF_ADAPTER)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        w = next(w for w in result.warnings if w.code == "ADAPTER_CONFLICT")
+        assert "sheet_a" in w.context
+        assert "sheet_b" in w.context
