@@ -220,6 +220,12 @@ class TestCLIValidate:
         data = json.loads(result.output)
         assert data["version"] == "V2"
 
+    def test_validate_does_not_create_backup_file(self, tmp_path: Path) -> None:
+        """validate must be read-only — clean=False ensures no .backup is created."""
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        runner.invoke(app, ["validate", str(p)])
+        assert not (tmp_path / "sheet.csv.backup").exists()
+
 
 # ---------------------------------------------------------------------------
 # convert

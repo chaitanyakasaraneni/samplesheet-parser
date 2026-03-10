@@ -145,7 +145,7 @@ def validate(
 
     try:
         factory = SampleSheetFactory()
-        sheet = factory.create_parser(str(path), parse=True)
+        sheet = factory.create_parser(str(path), parse=True, clean=False)
     except Exception as exc:
         typer.echo(f"Error: could not parse {path}: {exc}", err=True)
         raise typer.Exit(code=2) from exc

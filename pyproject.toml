@@ -36,6 +36,7 @@ dev = [
     "black>=24.0",
     "ruff>=0.3",
     "mypy>=1.8",
+    "typer>=0.9",
 ]
 
 [project.scripts]
