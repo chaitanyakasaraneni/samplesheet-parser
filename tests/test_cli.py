@@ -1,0 +1,478 @@
+"""
+Tests for samplesheet_parser.cli (the ``samplesheet`` CLI command).
+
+Covers:
+- validate: exit 0 on valid sheet, exit 1 on errors, exit 2 on missing file
+- validate: text output contains format version
+- validate: --format json produces parseable output with expected keys
+- convert: V1→V2 writes FileFormatVersion, V2→V1 writes IEMFileVersion
+- convert: exit 2 on missing input, exit 2 on unknown --to version
+- diff: exit 0 on identical sheets, exit 1 on differences, exit 2 on missing file
+- diff: --format json produces parseable output with has_changes key
+- merge: exit 0 on clean merge, exit 1 on conflicts/warnings
+- merge: exit 2 on single file or missing file
+- merge: --force flag writes output despite conflicts
+- merge: --to v1 produces a V1 sheet
+- merge: --format json produces parseable output
+"""
+
+from __future__ import annotations
+
+import json
+import textwrap
+from pathlib import Path
+
+from typer.testing import CliRunner
+
+from samplesheet_parser.cli import app
+
+runner = CliRunner()
+
+# ---------------------------------------------------------------------------
+# Sheet content helpers
+# ---------------------------------------------------------------------------
+
+_V1_A = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleA1,SampleA1,D701,ATTACTCG,D501,TATAGCCT,ProjectA
+1,SampleA2,SampleA2,D702,TCCGGAGA,D502,ATAGAGGC,ProjectA
+"""
+
+_V1_B = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleB1,SampleB1,D703,GCATGCTA,D503,CCTATCCT,ProjectB
+1,SampleB2,SampleB2,D704,TGCATGGT,D504,GGCTCTGA,ProjectB
+"""
+
+# Same index as SampleA1 → INDEX_COLLISION
+_V1_B_COLLISION = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleB1,SampleB1,D701,ATTACTCG,D501,TATAGCCT,ProjectB
+"""
+
+# V1 sheet with a duplicate index → will fail SampleSheetValidator
+_V1_INVALID = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,InvalidRun
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleX,SampleX,D701,ATTACTCG,D501,TATAGCCT,ProjectX
+1,SampleY,SampleY,D701,ATTACTCG,D501,TATAGCCT,ProjectX
+"""
+
+_V2_C = """\
+[Header]
+FileFormatVersion,2
+RunName,RunC
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+AdapterRead1,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,SampleC1,CTTGTAATGT,AACCGCCGTA,ProjectC
+1,SampleC2,TAAGTTGGGT,TGGAACGCTA,ProjectC
+"""
+
+
+def _write(tmp_path: Path, name: str, content: str) -> Path:
+    p = tmp_path / name
+    p.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
+    return p
+
+
+# ---------------------------------------------------------------------------
+# validate
+# ---------------------------------------------------------------------------
+
+class TestCLIValidate:
+
+    def test_valid_sheet_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 0
+
+    def test_invalid_sheet_exits_1(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_INVALID)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 1
+
+    def test_missing_file_exits_2(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["validate", str(tmp_path / "nope.csv")])
+        assert result.exit_code == 2
+
+    def test_text_output_contains_format_version(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert "V1" in result.output
+
+    def test_text_output_contains_result_line(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert "Result" in result.output
+
+    def test_json_output_is_valid_json(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--format", "json"])
+        data = json.loads(result.output)  # raises if invalid JSON
+        assert data is not None
+
+    def test_json_output_is_valid_on_valid_sheet(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["is_valid"] is True
+
+    def test_json_output_version_field(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["version"] == "V1"
+
+    def test_json_output_contains_errors_and_warnings_lists(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert "errors" in data
+        assert "warnings" in data
+        assert isinstance(data["errors"], list)
+        assert isinstance(data["warnings"], list)
+
+    def test_json_output_invalid_sheet_has_errors(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_INVALID)
+        result = runner.invoke(app, ["validate", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["is_valid"] is False
+        assert len(data["errors"]) > 0
+
+    def test_v2_sheet_validate_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 0
+
+    def test_v2_json_version_field(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["version"] == "V2"
+
+    def test_validate_does_not_create_backup_file(self, tmp_path: Path) -> None:
+        """validate must be read-only — clean=False ensures no .backup is created."""
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 0
+        assert not (tmp_path / "sheet.csv.backup").exists()
+
+
+# ---------------------------------------------------------------------------
+# convert
+# ---------------------------------------------------------------------------
+
+class TestCLIConvert:
+
+    def test_v1_to_v2_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V1_A)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(app, ["convert", str(p), "--to", "v2", "--output", str(out)])
+        assert result.exit_code == 0
+
+    def test_v1_to_v2_output_contains_file_format_version(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V1_A)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(app, ["convert", str(p), "--to", "v2", "--output", str(out)])
+        assert result.exit_code == 0
+        assert "FileFormatVersion" in out.read_text()
+
+    def test_v2_to_v1_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V2_C)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(app, ["convert", str(p), "--to", "v1", "--output", str(out)])
+        assert result.exit_code == 0
+
+    def test_v2_to_v1_output_contains_iem_file_version(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V2_C)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(app, ["convert", str(p), "--to", "v1", "--output", str(out)])
+        assert result.exit_code == 0
+        assert "IEMFileVersion" in out.read_text()
+
+    def test_missing_input_exits_2(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["convert", str(tmp_path / "nope.csv"), "--to", "v2"])
+        assert result.exit_code == 2
+
+    def test_bad_version_string_exits_2(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V1_A)
+        result = runner.invoke(app, ["convert", str(p), "--to", "v99"])
+        assert result.exit_code == 2
+
+    def test_convert_output_file_is_written(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V1_A)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(app, ["convert", str(p), "--to", "v2", "--output", str(out)])
+        assert result.exit_code == 0
+        assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# diff
+# ---------------------------------------------------------------------------
+
+class TestCLIDiff:
+
+    def test_identical_sheets_exit_0(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_A)   # identical content
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+        assert result.exit_code == 0
+
+    def test_different_sheets_exit_1(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+        assert result.exit_code == 1
+
+    def test_missing_old_file_exits_2(self, tmp_path: Path) -> None:
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, ["diff", str(tmp_path / "nope.csv"), str(b)])
+        assert result.exit_code == 2
+
+    def test_missing_new_file_exits_2(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        result = runner.invoke(app, ["diff", str(a), str(tmp_path / "nope.csv")])
+        assert result.exit_code == 2
+
+    def test_json_output_is_valid_json(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, ["diff", str(a), str(b), "--format", "json"])
+        data = json.loads(result.output)
+        assert data is not None
+
+    def test_json_output_has_changes_true(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, ["diff", str(a), str(b), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["has_changes"] is True
+
+    def test_json_output_has_changes_false_on_identical(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_A)
+        result = runner.invoke(app, ["diff", str(a), str(b), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["has_changes"] is False
+
+    def test_json_output_contains_required_keys(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, ["diff", str(a), str(b), "--format", "json"])
+        data = json.loads(result.output)
+        for key in ("has_changes", "source_version", "target_version",
+                    "header_changes", "samples_added", "samples_removed",
+                    "sample_changes"):
+            assert key in data
+
+    def test_cross_format_v1_v2_exits_1_on_differences(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        c = _write(tmp_path, "c.csv", _V2_C)
+        result = runner.invoke(app, ["diff", str(a), str(c)])
+        assert result.exit_code == 1
+
+
+# ---------------------------------------------------------------------------
+# merge
+# ---------------------------------------------------------------------------
+
+class TestCLIMerge:
+
+    def test_clean_merge_exits_0(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out)])
+        assert result.exit_code == 0
+
+    def test_clean_merge_writes_output_file(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out)])
+        assert result.exit_code == 0
+        assert out.exists()
+
+    def test_index_collision_exits_1(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B_COLLISION)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out)])
+        assert result.exit_code == 1
+
+    def test_single_file_exits_2(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        result = runner.invoke(app, ["merge", str(a), "--output", str(tmp_path / "out.csv")])
+        assert result.exit_code == 2
+
+    def test_missing_file_exits_2(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        result = runner.invoke(app, [
+            "merge", str(a), str(tmp_path / "nope.csv"),
+            "--output", str(tmp_path / "out.csv"),
+        ])
+        assert result.exit_code == 2
+
+    def test_force_flag_writes_despite_collision(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B_COLLISION)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--force"])
+        assert result.exit_code == 1  # conflict present but --force allows write
+        assert out.exists()
+
+    def test_to_v1_produces_iem_sheet(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--to", "v1"])
+        assert result.exit_code == 0
+        assert "IEMFileVersion" in out.read_text()
+
+    def test_to_v2_produces_bcl_sheet(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--to", "v2"])
+        assert result.exit_code == 0
+        assert "FileFormatVersion" in out.read_text()
+
+    def test_json_output_is_valid_json(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, [
+            "merge", str(a), str(b), "--output", str(out), "--format", "json",
+        ])
+        data = json.loads(result.output)
+        assert data is not None
+
+    def test_json_output_contains_required_keys(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, [
+            "merge", str(a), str(b), "--output", str(out), "--format", "json",
+        ])
+        data = json.loads(result.output)
+        for key in ("has_conflicts", "sample_count", "output_path",
+                    "source_versions", "conflicts", "warnings"):
+            assert key in data
+
+    def test_json_sample_count_is_correct(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)   # 2 samples
+        b = _write(tmp_path, "b.csv", _V1_B)   # 2 samples
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, [
+            "merge", str(a), str(b), "--output", str(out), "--format", "json",
+        ])
+        data = json.loads(result.output)
+        assert data["sample_count"] == 4
+
+    def test_three_files_merged(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        c = _write(tmp_path, "c.csv", _V2_C)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, ["merge", str(a), str(b), str(c), "--output", str(out)])
+        # Mixed format warning → exit 1 (has_issues=True), but file still written
+        assert result.exit_code == 1
+        assert out.exists()
+
+
+# ---------------------------------------------------------------------------
+# _validate_fmt — unknown format exits 2 on all commands that accept --format
+# ---------------------------------------------------------------------------
+
+class TestCLIUnknownFormat:
+
+    def test_validate_unknown_format_exits_2(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--format", "xml"])
+        assert result.exit_code == 2
+
+    def test_diff_unknown_format_exits_2(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, ["diff", str(a), str(b), "--format", "xml"])
+        assert result.exit_code == 2
+
+    def test_merge_unknown_format_exits_2(self, tmp_path: Path) -> None:
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "combined.csv"
+        result = runner.invoke(app, [
+            "merge", str(a), str(b), "--output", str(out), "--format", "xml",
+        ])
+        assert result.exit_code == 2
