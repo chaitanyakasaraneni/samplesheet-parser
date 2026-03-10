@@ -45,20 +45,19 @@ from typing import Annotated
 
 try:
     import typer
-except ImportError as exc:  # pragma: no cover
-    raise ImportError(
-        "The samplesheet-parser CLI requires 'typer'. "
-        "Install it with: pip install 'samplesheet-parser[cli]'"
-    ) from exc
+    _TYPER_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _TYPER_AVAILABLE = False
 
 from samplesheet_parser.enums import SampleSheetVersion
 
-app = typer.Typer(
-    name="samplesheet",
-    help="Format-agnostic parser and toolkit for Illumina SampleSheet.csv files.",
-    no_args_is_help=True,
-    pretty_exceptions_enable=False,
-)
+if _TYPER_AVAILABLE:
+    app = typer.Typer(
+        name="samplesheet",
+        help="Format-agnostic parser and toolkit for Illumina SampleSheet.csv files.",
+        no_args_is_help=True,
+        pretty_exceptions_enable=False,
+    )
 
 # ---------------------------------------------------------------------------
 # Shared option types
@@ -414,6 +413,13 @@ def merge(
 
 def main() -> None:  # pragma: no cover
     """Entry point for the ``samplesheet`` CLI command."""
+    if not _TYPER_AVAILABLE:
+        import sys
+        sys.stderr.write(
+            "Error: the samplesheet-parser CLI requires 'typer'.\n"
+            "Install it with: pip install 'samplesheet-parser[cli]'\n"
+        )
+        raise SystemExit(2)
     app()
 
 
