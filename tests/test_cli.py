@@ -223,7 +223,8 @@ class TestCLIValidate:
     def test_validate_does_not_create_backup_file(self, tmp_path: Path) -> None:
         """validate must be read-only — clean=False ensures no .backup is created."""
         p = _write(tmp_path, "sheet.csv", _V1_A)
-        runner.invoke(app, ["validate", str(p)])
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 0
         assert not (tmp_path / "sheet.csv.backup").exists()
 
 
@@ -242,7 +243,8 @@ class TestCLIConvert:
     def test_v1_to_v2_output_contains_file_format_version(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "in.csv", _V1_A)
         out = tmp_path / "out.csv"
-        runner.invoke(app, ["convert", str(p), "--to", "v2", "--output", str(out)])
+        result = runner.invoke(app, ["convert", str(p), "--to", "v2", "--output", str(out)])
+        assert result.exit_code == 0
         assert "FileFormatVersion" in out.read_text()
 
     def test_v2_to_v1_exits_0(self, tmp_path: Path) -> None:
@@ -254,7 +256,8 @@ class TestCLIConvert:
     def test_v2_to_v1_output_contains_iem_file_version(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "in.csv", _V2_C)
         out = tmp_path / "out.csv"
-        runner.invoke(app, ["convert", str(p), "--to", "v1", "--output", str(out)])
+        result = runner.invoke(app, ["convert", str(p), "--to", "v1", "--output", str(out)])
+        assert result.exit_code == 0
         assert "IEMFileVersion" in out.read_text()
 
     def test_missing_input_exits_2(self, tmp_path: Path) -> None:
@@ -269,7 +272,8 @@ class TestCLIConvert:
     def test_convert_output_file_is_written(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "in.csv", _V1_A)
         out = tmp_path / "out.csv"
-        runner.invoke(app, ["convert", str(p), "--to", "v2", "--output", str(out)])
+        result = runner.invoke(app, ["convert", str(p), "--to", "v2", "--output", str(out)])
+        assert result.exit_code == 0
         assert out.exists()
 
 
@@ -356,7 +360,8 @@ class TestCLIMerge:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "combined.csv"
-        runner.invoke(app, ["merge", str(a), str(b), "--output", str(out)])
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out)])
+        assert result.exit_code == 0
         assert out.exists()
 
     def test_index_collision_exits_1(self, tmp_path: Path) -> None:
@@ -383,21 +388,24 @@ class TestCLIMerge:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B_COLLISION)
         out = tmp_path / "combined.csv"
-        runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--force"])
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--force"])
+        assert result.exit_code == 1  # conflict present but --force allows write
         assert out.exists()
 
     def test_to_v1_produces_iem_sheet(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "combined.csv"
-        runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--to", "v1"])
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--to", "v1"])
+        assert result.exit_code == 0
         assert "IEMFileVersion" in out.read_text()
 
     def test_to_v2_produces_bcl_sheet(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "combined.csv"
-        runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--to", "v2"])
+        result = runner.invoke(app, ["merge", str(a), str(b), "--output", str(out), "--to", "v2"])
+        assert result.exit_code == 0
         assert "FileFormatVersion" in out.read_text()
 
     def test_json_output_is_valid_json(self, tmp_path: Path) -> None:
@@ -437,8 +445,9 @@ class TestCLIMerge:
         b = _write(tmp_path, "b.csv", _V1_B)
         c = _write(tmp_path, "c.csv", _V2_C)
         out = tmp_path / "combined.csv"
-        runner.invoke(app, ["merge", str(a), str(b), str(c), "--output", str(out)])
-        # Mixed format warning → exit 1, but file written
+        result = runner.invoke(app, ["merge", str(a), str(b), str(c), "--output", str(out)])
+        # Mixed format warning → exit 1 (has_issues=True), but file still written
+        assert result.exit_code == 1
         assert out.exists()
 
 

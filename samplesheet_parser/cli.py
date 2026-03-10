@@ -127,7 +127,7 @@ def _validate_fmt(fmt: str) -> None:
 @app.command()
 def validate(
     path: Annotated[Path, typer.Argument(help="Path to SampleSheet.csv.", metavar="FILE")],
-    fmt:  _FormatOption = "text",
+    fmt: _FormatOption = "text",
 ) -> None:
     """Validate a sample sheet for index, adapter, and structural issues.
 
@@ -150,14 +150,18 @@ def validate(
         typer.echo(f"Error: could not parse {path}: {exc}", err=True)
         raise typer.Exit(code=2) from exc
 
+    if factory.version is None:  # pragma: no cover
+        raise RuntimeError("SampleSheetFactory.version must be set after create_parser")
+    version = factory.version
+
     result = SampleSheetValidator().validate(sheet)
 
     if fmt == "json":
         _print_json({
-            "file":     str(path),
-            "version":  factory.version.value,
+            "file": str(path),
+            "version": version.value,
             "is_valid": result.is_valid,
-            "errors":   [
+            "errors": [
                 {"code": e.code, "message": e.message, "context": e.context}
                 for e in result.errors
             ],
@@ -165,17 +169,17 @@ def validate(
                 {"code": w.code, "message": w.message, "context": w.context}
                 for w in result.warnings
             ],
-            "summary":  result.summary(),
+            "summary": result.summary(),
         })
     else:
         typer.echo(f"File:    {path}")
-        typer.echo(f"Format:  {factory.version.value}")
+        typer.echo(f"Format:  {version.value}")
         typer.echo(f"Result:  {result.summary()}")
 
         if result.warnings:
             typer.echo("\nWarnings:")
             for w in result.warnings:
-                typer.echo(f"  {w}", err=False)
+                typer.echo(f"  {w}")
 
         if result.errors:
             typer.echo("\nErrors:", err=True)
@@ -191,8 +195,8 @@ def validate(
 
 @app.command()
 def convert(
-    path:   Annotated[Path, typer.Argument(help="Input SampleSheet.csv.", metavar="FILE")],
-    to:     _VersionOption = "v2",
+    path: Annotated[Path, typer.Argument(help="Input SampleSheet.csv.", metavar="FILE")],
+    to: _VersionOption = "v2",
     output: _OutputOption = Path("SampleSheet_converted.csv"),
 ) -> None:
     """Convert a sample sheet between V1 (IEM/bcl2fastq) and V2 (BCLConvert) formats.
@@ -216,13 +220,16 @@ def convert(
             out = converter.to_v2(str(output))
         else:
             out = converter.to_v1(str(output))
-        typer.echo(
-            f"Converted {path.name} ({converter.source_version.value})"
-            f" → {out} ({target.value})"
-        )
     except Exception as exc:
         typer.echo(f"Error: conversion failed: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+
+    if converter.source_version is None:  # pragma: no cover
+        raise RuntimeError("SampleSheetConverter.source_version must be set after conversion")
+    typer.echo(
+        f"Converted {path.name} ({converter.source_version.value})"
+        f" → {out} ({target.value})"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +239,7 @@ def convert(
 @app.command()
 def diff(
     old: Annotated[Path, typer.Argument(help="Original SampleSheet.csv.", metavar="OLD")],
-    new: Annotated[Path, typer.Argument(help="Updated SampleSheet.csv.",  metavar="NEW")],
+    new: Annotated[Path, typer.Argument(help="Updated SampleSheet.csv.", metavar="NEW")],
     fmt: _FormatOption = "text",
 ) -> None:
     """Compare two sample sheets across any combination of V1 and V2.
@@ -257,21 +264,21 @@ def diff(
 
     if fmt == "json":
         _print_json({
-            "has_changes":    result.has_changes,
+            "has_changes": result.has_changes,
             "source_version": result.source_version.value,
             "target_version": result.target_version.value,
-            "summary":        result.summary(),
+            "summary": result.summary(),
             "header_changes": [
                 {"field": c.field, "old": c.old_value, "new": c.new_value}
                 for c in result.header_changes
             ],
-            "samples_added":   result.samples_added,
+            "samples_added": result.samples_added,
             "samples_removed": result.samples_removed,
             "sample_changes": [
                 {
                     "sample_id": sc.sample_id,
-                    "lane":      sc.lane,
-                    "changes":   {
+                    "lane": sc.lane,
+                    "changes": {
                         f: {"old": o, "new": n}
                         for f, (o, n) in sc.changes.items()
                     },
@@ -313,7 +320,7 @@ def diff(
 
 @app.command()
 def merge(
-    files:  Annotated[
+    files: Annotated[
         list[Path],
         typer.Argument(
             help="Input SampleSheet.csv files to merge.",
@@ -321,9 +328,9 @@ def merge(
         ),
     ],
     output: _OutputOption = Path("SampleSheet_combined.csv"),
-    to:     _VersionOption = "v2",
-    fmt:    _FormatOption = "text",
-    force:  Annotated[bool, typer.Option(
+    to: _VersionOption = "v2",
+    fmt: _FormatOption = "text",
+    force: Annotated[bool, typer.Option(
         "--force",
         help="Write output even if conflicts are found.",
     )] = False,
@@ -367,11 +374,11 @@ def merge(
 
     if fmt == "json":
         _print_json({
-            "has_conflicts":   result.has_conflicts,
-            "sample_count":    result.sample_count,
-            "output_path":     str(result.output_path) if result.output_path else None,
+            "has_conflicts": result.has_conflicts,
+            "sample_count": result.sample_count,
+            "output_path": str(result.output_path) if result.output_path else None,
             "source_versions": result.source_versions,
-            "summary":         result.summary(),
+            "summary": result.summary(),
             "conflicts": [
                 {"code": c.code, "message": c.message, "context": c.context}
                 for c in result.conflicts
