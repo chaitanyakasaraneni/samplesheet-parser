@@ -36,6 +36,7 @@ from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.diff import DiffResult, SampleSheetDiff
 from samplesheet_parser.enums import IndexType, SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
+from samplesheet_parser.merger import MergeResult, SampleSheetMerger
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
@@ -53,5 +54,7 @@ __all__ = [
     "SampleSheetDiff",
     "DiffResult",
     "SampleSheetWriter",
+    "SampleSheetMerger",
+    "MergeResult",
     "__version__",
 ]

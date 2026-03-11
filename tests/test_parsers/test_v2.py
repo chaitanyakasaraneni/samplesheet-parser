@@ -271,6 +271,123 @@ class TestSampleSheetV2Equality:
 
 
 # ---------------------------------------------------------------------------
+# Edge-case parsing coverage
+# ---------------------------------------------------------------------------
+
+class TestSampleSheetV2EdgeCases:
+
+    def test_index_type_returns_none_when_no_index_column(self, tmp_path):
+        """Line 339: index_type() returns 'none' when columns has no Index."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        sheet.columns = ["Sample_ID"]  # override to remove Index
+        assert sheet.index_type() == "none"
+
+    def test_get_read_structure_returns_empty_when_no_settings(self, tmp_path):
+        """Line 365: get_read_structure() returns ReadStructure() when settings is None."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        sheet.settings = None  # override to simulate missing settings
+        rs = sheet.get_read_structure()
+        assert rs.umi_length == 0
+        assert rs.umi_location is None
+
+    def test_malformed_section_header_is_skipped(self, tmp_path):
+        """Lines 446-447: section header without closing ']' is silently skipped."""
+        p = tmp_path / "malformed.csv"
+        p.write_text(
+            "[unclosed\nsome content\n"
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert sheet.experiment_name == "T"
+
+    def test_content_before_first_section_is_skipped(self, tmp_path):
+        """Line 454: lines before the first section header are silently ignored."""
+        p = tmp_path / "preamble.csv"
+        p.write_text(
+            "preamble\n"
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert sheet.experiment_name == "T"
+
+    def test_custom_header_field_detected(self, tmp_path):
+        """Line 480: non-standard header key added to custom_fields['header']."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\nCustom_Lab,MyLab\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert "Custom_Lab" in sheet.custom_fields.get("header", set())
+
+    def test_experiment_id_overrides_run_name(self, tmp_path):
+        """Line 492: experiment_id replaces experiment_name derived from RunName."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,OriginalName\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV2(str(p), experiment_id="OverrideName")
+        sheet.parse()
+        assert sheet.experiment_name == "OverrideName"
+
+    def test_empty_bclconvert_data_raises(self, tmp_path):
+        """Line 535: parse() raises when [BCLConvert_Data] section is completely empty."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        with pytest.raises(ValueError, match=r"BCLConvert_Data"):
+            sheet.parse()
+
+    def test_malformed_data_line_is_skipped(self, tmp_path):
+        """Lines 551-552: BCLConvert_Data line with wrong column count is skipped."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\n"
+            "S1,ATTACTCG\n"
+            "S2,TCCGGAGA,EXTRA_COL\n"  # wrong column count
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert len(sheet.records) == 1
+        assert sheet.records[0]["Sample_ID"] == "S1"
+
+    def test_override_cycles_with_n_code(self, tmp_path):
+        """Lines 724-725: 'N' (masked) code in OverrideCycles parsed correctly."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Settings]\nOverrideCycles,Y151;I8;N8;Y151\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        rs = sheet.get_read_structure()
+        assert "read3_masked" in rs.read_structure
+
+
+# ---------------------------------------------------------------------------
 # Custom section tests
 # ---------------------------------------------------------------------------
 

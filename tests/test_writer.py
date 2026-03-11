@@ -696,3 +696,113 @@ class TestCrossFormatWrite:
         parsed = _parse(out)
         from samplesheet_parser.parsers.v1 import SampleSheetV1
         assert isinstance(parsed, SampleSheetV1)
+
+
+# ---------------------------------------------------------------------------
+# Coverage gap tests
+# ---------------------------------------------------------------------------
+
+class TestWriterV2OptionalHeaderFields:
+
+    def test_run_description_appears_in_output(self, tmp_path):
+        """Line 688: RunDescription written when set."""
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        w.set_header(run_name="R", run_desc="My description", platform="NovaSeqXSeries")
+        w.add_sample("S1", index="ATTACTCG")
+        out = tmp_path / "out.csv"
+        w.write(out, validate=False)
+        assert "RunDescription,My description" in out.read_text()
+
+    def test_instrument_type_appears_in_output(self, tmp_path):
+        """Line 692: InstrumentType written when set."""
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        w.set_header(run_name="R", platform="NovaSeqXSeries", instrument="NovaSeqX")
+        w.add_sample("S1", index="ATTACTCG")
+        out = tmp_path / "out.csv"
+        w.write(out, validate=False)
+        assert "InstrumentType,NovaSeqX" in out.read_text()
+
+    def test_extra_header_fields_appear_in_v2_output(self, tmp_path):
+        """Line 694: extra **kwargs in set_header written to V2 output."""
+        w = SampleSheetWriter(version=SampleSheetVersion.V2)
+        w.set_header(run_name="R", platform="NovaSeqXSeries", Custom_Lab="MyLab")
+        w.add_sample("S1", index="ATTACTCG")
+        out = tmp_path / "out.csv"
+        w.write(out, validate=False)
+        assert "Custom_Lab,MyLab" in out.read_text()
+
+
+class TestWriterV1ExtraFields:
+
+    def test_extra_header_fields_appear_in_v1_output(self, tmp_path):
+        """Line 769: extra **kwargs in set_header written to V1 output."""
+        w = SampleSheetWriter(version=SampleSheetVersion.V1)
+        w.set_header(run_name="R", Custom_Key="Custom_Val")
+        w.add_sample("S1", index="ATTACTCG")
+        out = tmp_path / "out.csv"
+        w.write(out, validate=False)
+        assert "Custom_Key,Custom_Val" in out.read_text()
+
+    def test_extra_settings_appear_in_v1_output(self, tmp_path):
+        """Line 787: extra settings written to V1 [Settings] section."""
+        w = SampleSheetWriter(version=SampleSheetVersion.V1)
+        w.set_header(run_name="R")
+        w._extra_settings["Custom_Setting"] = "ExtraVal"
+        w.add_sample("S1", index="ATTACTCG")
+        out = tmp_path / "out.csv"
+        w.write(out, validate=False)
+        assert "Custom_Setting,ExtraVal" in out.read_text()
+
+    def test_extra_sample_columns_appear_in_v1_output(self, tmp_path):
+        """Line 838: extra sample fields written as extra columns in V1 [Data]."""
+        w = SampleSheetWriter(version=SampleSheetVersion.V1)
+        w.set_header(run_name="R")
+        w.add_sample("S1", index="ATTACTCG", Custom_Col="custom_val")
+        out = tmp_path / "out.csv"
+        w.write(out, validate=False)
+        assert "custom_val" in out.read_text()
+
+
+class TestWriterFromV2SheetEdgeCases:
+
+    def test_extra_settings_loaded_from_v2_sheet(self, tmp_path):
+        """Line 959: non-standard V2 settings end up in _extra_settings."""
+        src = tmp_path / "v2.csv"
+        src.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Settings]\nAdapterRead1,CTGT\nCustom_Setting,foo\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        sheet = _parse(src)
+        w = SampleSheetWriter.from_sheet(sheet, version=SampleSheetVersion.V2)
+        out = tmp_path / "out.csv"
+        w.write(out, validate=False)
+        assert "Custom_Setting,foo" in out.read_text()
+
+    def test_incomplete_v2_record_skipped(self, tmp_path):
+        """Line 966: record missing Sample_ID or Index is skipped in from_sheet."""
+        src = tmp_path / "v2.csv"
+        src.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\n"
+            "S1,ATTACTCG\n"
+            ",\n"  # empty Sample_ID and Index
+        )
+        sheet = _parse(src)
+        w = SampleSheetWriter.from_sheet(sheet, version=SampleSheetVersion.V2)
+        assert len(w._samples) == 1
+        assert w._samples[0].sample_id == "S1"
+
+
+class TestUpdateSampleLaneFilter:
+
+    def test_update_sample_skips_non_matching_lane(self, tmp_path):
+        """Line 582: update_sample with lane= skips samples in other lanes."""
+        w = SampleSheetWriter(version=SampleSheetVersion.V1)
+        w.set_header(run_name="R")
+        w.add_sample("S1", index="ATTACTCG", lane="1")
+        w.add_sample("S1", index="TCCGGAGA", lane="2")
+        # Update only lane 1
+        w.update_sample("S1", lane="1", index="GGGGGGGG")
+        assert w._samples[0].index == "GGGGGGGG"
+        assert w._samples[1].index == "TCCGGAGA"  # lane 2 unchanged

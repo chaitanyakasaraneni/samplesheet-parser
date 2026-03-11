@@ -144,6 +144,21 @@ class TestDuplicateSampleId:
         # The duplicate index should still be caught.
         assert result is not None   # just confirm it doesn't crash
 
+    def test_duplicate_sample_id_in_same_lane_raises_error(self):
+        """Line 402: duplicate Sample_ID in same lane produces DUPLICATE_SAMPLE_ID error."""
+        from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
+        validator = SampleSheetValidator()
+        result = ValidationResult()
+        # Provide samples with duplicate (lane, sample_id) — samples() always deduplicates
+        # so we call the private method directly with crafted input
+        samples = [
+            {"lane": "1", "sample_id": "S1"},
+            {"lane": "1", "sample_id": "S1"},  # duplicate in same lane
+        ]
+        validator._check_duplicate_sample_ids(samples, result)
+        codes = [e.code for e in result.errors]
+        assert "DUPLICATE_SAMPLE_ID" in codes
+
 
 class TestAdapterValidation:
 
@@ -203,3 +218,22 @@ class TestValidationResult:
         assert "[ERROR]" in s
         assert "TEST_CODE" in s
         assert "lane" in s
+
+
+class TestHammingSkipsNoIndex:
+
+    def test_sample_without_index_skipped_in_hamming_check(self, tmp_path):
+        """Line 360: sample with no index is skipped without error during distance check."""
+        p = tmp_path / "no_idx.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n1,S2,\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        result = SampleSheetValidator().validate(sheet)
+        # S2 has no index so it is skipped — no INDEX_DISTANCE_TOO_LOW error
+        codes = [e.code for e in result.errors]
+        assert "INDEX_DISTANCE_TOO_LOW" not in codes
+
+

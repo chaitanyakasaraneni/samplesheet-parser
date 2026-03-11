@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "samplesheet-parser"
-version = "0.2.1"
+version = "0.3.0"
 description = "Format-agnostic parser for Illumina SampleSheet.csv files — supports IEM V1 and BCLConvert V2"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -29,13 +29,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+cli = ["typer>=0.9"]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
     "black>=24.0",
     "ruff>=0.3",
     "mypy>=1.8",
+    "typer>=0.9",
 ]
+
+[project.scripts]
+samplesheet = "samplesheet_parser.cli:main"
 
 [project.urls]
 Homepage      = "https://github.com/chaitanyakasaraneni/samplesheet-parser"
