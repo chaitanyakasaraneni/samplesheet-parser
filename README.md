@@ -2,7 +2,7 @@
 
 **Format-agnostic parser for Illumina SampleSheet.csv files.**
 
-Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, diff comparison, and programmatic sheet creation.
+Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
 
 [![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -12,7 +12,7 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 ![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_overview.png)
 
-*`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — `SampleSheetConverter` handles bidirectional conversion, `SampleSheetValidator` catches index and adapter issues, `SampleSheetDiff` compares two sheets across any combination of V1/V2 formats, and `SampleSheetWriter` builds or edits sheets programmatically.*
+*`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — `SampleSheetConverter` handles bidirectional conversion, `SampleSheetValidator` catches index and adapter issues, `SampleSheetDiff` compares two sheets across any combination of V1/V2 formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
 
 ---
 
@@ -27,10 +27,14 @@ Existing tools either hard-code one format or require the caller to know which f
 ## Installation
 
 ```bash
+# Core library only
 pip install samplesheet-parser
+
+# With the CLI (adds typer)
+pip install "samplesheet-parser[cli]"
 ```
 
-Requires Python 3.10+. No mandatory dependencies beyond `loguru`.
+Requires Python 3.10+. No mandatory runtime dependencies beyond `loguru`.
 
 ---
 
@@ -177,6 +181,106 @@ converts format while editing.
 
 ---
 
+
+### Merge multiple sheets
+
+Combine per-project sheets from a single run into one merged sheet.
+Conflicts (index collisions, read-length mismatches, adapter disagreements)
+are surfaced as structured results rather than silent failures.
+
+```python
+from samplesheet_parser import SampleSheetMerger
+from samplesheet_parser.enums import SampleSheetVersion
+
+result = (
+    SampleSheetMerger(target_version=SampleSheetVersion.V2)
+    .add("ProjectA.csv")
+    .add("ProjectB.csv")
+    .add("ProjectC.csv")
+    .merge("SampleSheet_combined.csv")
+)
+
+print(result.summary())
+# Merged 3 sheet(s) → SampleSheet_combined.csv (12 samples) — 0 conflict(s), 0 warning(s)
+
+if result.has_conflicts:
+    for c in result.conflicts:
+        print(c)
+    # [CONFLICT] INDEX_COLLISION: Index 'ATTACTCG+TATAGCCT' in lane 1
+    #   appears in both ProjectA.csv and ProjectB.csv
+
+for w in result.warnings:
+    print(w)
+    # [WARNING] MIXED_FORMAT: Input sheets are a mix of V1 and V2 formats.
+    #   All will be converted to V2 for output.
+```
+
+Mixed V1/V2 inputs are automatically converted to the target format.
+Pass `abort_on_conflicts=False` to write output even when conflicts exist.
+
+---
+
+## CLI
+
+Install the CLI extra and use the `samplesheet` command directly from the shell:
+
+```bash
+pip install "samplesheet-parser[cli]"
+```
+
+### validate
+
+```bash
+# Text output — exit 0 if clean, exit 1 if errors
+samplesheet validate SampleSheet.csv
+
+# JSON output for CI pipelines
+samplesheet validate SampleSheet.csv --format json
+```
+
+### convert
+
+```bash
+samplesheet convert SampleSheet_v1.csv --to v2 --output SampleSheet_v2.csv
+samplesheet convert SampleSheet_v2.csv --to v1 --output SampleSheet_v1.csv
+```
+
+### diff
+
+```bash
+# Exit 0 if identical, exit 1 if any differences detected
+samplesheet diff old/SampleSheet.csv new/SampleSheet.csv
+
+# JSON output for scripting
+samplesheet diff old/SampleSheet.csv new/SampleSheet.csv --format json
+```
+
+### merge
+
+```bash
+# Clean merge — exit 0
+samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv
+
+# Merge three sheets to V1 format
+samplesheet merge ProjectA.csv ProjectB.csv ProjectC.csv --to v1 --output combined.csv
+
+# Write output even if conflicts are found
+samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv --force
+
+# JSON output
+samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv --format json
+```
+
+**Exit codes** (all commands):
+
+| Code | Meaning |
+|---|---|
+| `0` | Success / no issues |
+| `1` | Errors found (invalid sheet, conflicts, differences detected) |
+| `2` | Usage error (missing file, bad argument) |
+
+---
+
 ## Format detection logic
 
 The factory uses a three-step detection strategy — no format hints required from the caller:
@@ -223,6 +327,22 @@ samples = sheet.samples()
 result = ValidationResult()
 SampleSheetValidator()._check_index_distances(samples, result, min_distance=4)
 ```
+
+---
+
+## Merger conflict and warning codes
+
+| Code | Level | Description |
+|---|---|---|
+| `PARSE_ERROR` | conflict | An input sheet could not be parsed |
+| `INDEX_COLLISION` | conflict | The same index appears in the same lane across two sheets |
+| `READ_LENGTH_CONFLICT` | conflict | Sheets specify different read lengths or cycle counts |
+| `MERGE_VALIDATION_ERROR` | conflict | Post-merge validation of the combined sheet failed |
+| `MIXED_FORMAT` | warning | Input sheets are a mix of V1 and V2 formats |
+| `INDEX_DISTANCE_TOO_LOW` | warning | Cross-sheet index pair has Hamming distance below threshold |
+| `ADAPTER_CONFLICT` | warning | Adapter sequences differ between sheets (primary sheet adapters are used) |
+| `INCOMPLETE_SAMPLE_RECORD` | warning | A sample row is missing `Sample_ID` or index and was skipped |
+
 
 ---
 
@@ -361,12 +481,36 @@ sheet.get_read_structure()   # → ReadStructure dataclass
 
 ---
 
+---
+
+### `SampleSheetMerger`
+
+| Method / attribute | Returns | Description |
+|---|---|---|
+| `SampleSheetMerger(target_version=)` | — | Instantiate; default target is `SampleSheetVersion.V2` |
+| `add(path)` | `self` | Register an input sheet path (fluent) |
+| `merge(output_path, *, validate=True, abort_on_conflicts=True)` | `MergeResult` | Run the merge and write output |
+
+### `MergeResult`
+
+| Attribute / method | Type | Description |
+|---|---|---|
+| `has_conflicts` | `bool` | `True` if any conflict was recorded |
+| `sample_count` | `int` | Number of samples in the merged output |
+| `output_path` | `Path \| None` | Path written; `None` if write was aborted |
+| `source_versions` | `dict[str, str]` | Per-input-file detected format version |
+| `conflicts` | `list[MergeConflict]` | Structured conflict records |
+| `warnings` | `list[MergeConflict]` | Structured warning records |
+| `summary()` | `str` | Human-readable one-line summary |
+
+---
+
 ## Contributing
 
 ```bash
 git clone https://github.com/chaitanyakasaraneni/samplesheet-parser
 cd samplesheet-parser
-pip install -e ".[dev]"
+pip install -e ".[dev,cli]"
 
 # Run tests
 pytest tests/ -v
@@ -389,7 +533,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR c
   title   = {samplesheet-parser: Format-agnostic parser for Illumina SampleSheet.csv},
   year    = {2026},
   url     = {https://github.com/chaitanyakasaraneni/samplesheet-parser},
-  version = {0.2.0}
+  version = {0.3.0}
 }
 ```
 
