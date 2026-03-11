@@ -1099,3 +1099,103 @@ class TestMergerReadLengthSentinel:
 
         codes = [c.code for c in result.conflicts]
         assert "READ_LENGTH_CONFLICT" not in codes
+
+
+# ---------------------------------------------------------------------------
+# Coverage — branches missing from codecov report
+# ---------------------------------------------------------------------------
+
+class TestMergerAllFilesFail:
+    """Line 247: if not parsed: return result — all inputs fail to parse."""
+
+    def test_all_parse_failures_returns_empty_result(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When every input sheet raises during parsing, merge() must return
+        a MergeResult with PARSE_ERROR conflicts and no output file."""
+        import samplesheet_parser.merger as merger_module
+
+        def _explode(self: object, *a: object, **kw: object) -> object:
+            raise ValueError("simulated parse failure")
+
+        monkeypatch.setattr(merger_module.SampleSheetFactory, "create_parser", _explode)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "out.csv"
+
+        result = SampleSheetMerger().add(a).add(b).merge(out)
+
+        assert result.output_path is None
+        assert not out.exists()
+        codes = [c.code for c in result.conflicts]
+        assert all(c == "PARSE_ERROR" for c in codes)
+
+    def test_all_parse_failures_has_conflicts(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import samplesheet_parser.merger as merger_module
+
+        def _explode(self: object, *a: object, **kw: object) -> object:
+            raise RuntimeError("cannot read file")
+
+        monkeypatch.setattr(merger_module.SampleSheetFactory, "create_parser", _explode)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
+
+        assert result.has_conflicts
+
+
+class TestMergerAbortAfterPostMergeValidation:
+    """Line 271: abort after _validate_merged produces conflicts."""
+
+    def test_abort_after_post_merge_validation_conflict(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """When _validate_merged adds a conflict and abort_on_conflicts=True,
+        merge() must return without writing the output file."""
+        import samplesheet_parser.merger as merger_module
+
+        # Patch SampleSheetValidator.validate to inject a conflict-level error.
+        # We do this by making the validator raise so _validate_merged catches it
+        # and adds a MERGE_VALIDATION_ERROR conflict.
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise ValueError("injected post-merge validation failure")
+
+        monkeypatch.setattr(merger_module.SampleSheetValidator, "validate", _explode)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        out = tmp_path / "out.csv"
+
+        result = SampleSheetMerger().add(a).add(b).merge(
+            out, validate=True, abort_on_conflicts=True
+        )
+
+        # Output must not be written because abort_on_conflicts=True
+        assert not out.exists()
+        assert result.output_path is None
+        assert result.has_conflicts
+
+    def test_abort_after_post_merge_validation_conflict_code(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import samplesheet_parser.merger as merger_module
+
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise FileNotFoundError("injected missing file in post-merge")
+
+        monkeypatch.setattr(merger_module.SampleSheetValidator, "validate", _explode)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv", validate=True, abort_on_conflicts=True
+        )
+
+        codes = [c.code for c in result.conflicts]
+        assert "MERGE_VALIDATION_ERROR" in codes

@@ -14,6 +14,8 @@ Covers:
 - merge: --force flag writes output despite conflicts
 - merge: --to v1 produces a V1 sheet
 - merge: --format json produces parseable output
+- error branches: exception paths in validate/convert/diff/merge → correct exit codes
+- diff text branches: samples added, removed, changed in text output
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ import json
 import textwrap
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from samplesheet_parser.cli import app
@@ -138,6 +141,29 @@ Lane,Sample_ID,Index,Index2,Sample_Project
 1,SampleC2,TAAGTTGGGT,TGGAACGCTA,ProjectC
 """
 
+# V1 sheet with different samples/indexes from _V1_A — used to trigger
+# samples_added / samples_removed / sample_changes in diff text output
+_V1_A_MODIFIED = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleA1,SampleA1,D701,ATTACTCG,D501,TATAGCCT,ProjectA
+1,SampleA3,SampleA3,D705,TAGGCATG,D505,CTCTCTAC,ProjectA
+"""
+
 
 def _write(tmp_path: Path, name: str, content: str) -> Path:
     p = tmp_path / name
@@ -178,7 +204,7 @@ class TestCLIValidate:
     def test_json_output_is_valid_json(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V1_A)
         result = runner.invoke(app, ["validate", str(p), "--format", "json"])
-        data = json.loads(result.output)  # raises if invalid JSON
+        data = json.loads(result.output)
         assert data is not None
 
     def test_json_output_is_valid_on_valid_sheet(self, tmp_path: Path) -> None:
@@ -226,6 +252,22 @@ class TestCLIValidate:
         result = runner.invoke(app, ["validate", str(p)])
         assert result.exit_code == 0
         assert not (tmp_path / "sheet.csv.backup").exists()
+
+    def test_parse_error_exits_2(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Lines 148-150: create_parser raises → exit 2 with error message."""
+        from samplesheet_parser import factory as factory_module
+
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise ValueError("simulated parse failure")
+
+        monkeypatch.setattr(factory_module.SampleSheetFactory, "create_parser", _explode)
+
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 2
+        assert "Error" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -276,6 +318,22 @@ class TestCLIConvert:
         assert result.exit_code == 0
         assert out.exists()
 
+    def test_conversion_exception_exits_1(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Lines 222-224: to_v2 raises → exit 1 with error message."""
+        from samplesheet_parser import converter as conv_module
+
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise RuntimeError("simulated conversion failure")
+
+        monkeypatch.setattr(conv_module.SampleSheetConverter, "to_v2", _explode)
+
+        p = _write(tmp_path, "in.csv", _V1_A)
+        result = runner.invoke(app, ["convert", str(p), "--to", "v2"])
+        assert result.exit_code == 1
+        assert "Error" in result.output
+
 
 # ---------------------------------------------------------------------------
 # diff
@@ -285,7 +343,7 @@ class TestCLIDiff:
 
     def test_identical_sheets_exit_0(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
-        b = _write(tmp_path, "b.csv", _V1_A)   # identical content
+        b = _write(tmp_path, "b.csv", _V1_A)
         result = runner.invoke(app, ["diff", str(a), str(b)])
         assert result.exit_code == 0
 
@@ -341,6 +399,39 @@ class TestCLIDiff:
         c = _write(tmp_path, "c.csv", _V2_C)
         result = runner.invoke(app, ["diff", str(a), str(c)])
         assert result.exit_code == 1
+
+    def test_diff_exception_exits_2(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Lines 260-262: compare() raises → exit 2 with error message."""
+        from samplesheet_parser import diff as diff_module
+
+        def _explode(self: object) -> None:
+            raise ValueError("simulated diff failure")
+
+        monkeypatch.setattr(diff_module.SampleSheetDiff, "compare", _explode)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+        assert result.exit_code == 2
+        assert "Error" in result.output
+
+    def test_text_output_samples_added(self, tmp_path: Path) -> None:
+        """Lines 307-309: samples_added branch in text output."""
+        a = _write(tmp_path, "a.csv", _V1_A)           # has SampleA1, SampleA2
+        b = _write(tmp_path, "b.csv", _V1_A_MODIFIED)  # has SampleA1, SampleA3
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+        assert result.exit_code == 1
+        assert "added" in result.output.lower() or "removed" in result.output.lower()
+
+    def test_text_output_samples_removed(self, tmp_path: Path) -> None:
+        """Lines 310-311: samples_removed branch in text output."""
+        a = _write(tmp_path, "a.csv", _V1_A_MODIFIED)  # has SampleA1, SampleA3
+        b = _write(tmp_path, "b.csv", _V1_A)           # has SampleA1, SampleA2
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+        assert result.exit_code == 1
+        assert "added" in result.output.lower() or "removed" in result.output.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -449,6 +540,25 @@ class TestCLIMerge:
         # Mixed format warning → exit 1 (has_issues=True), but file still written
         assert result.exit_code == 1
         assert out.exists()
+
+    def test_merge_exception_exits_2(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Lines 370-372: merger.merge() raises → exit 2 with error message."""
+        from samplesheet_parser import merger as merger_module
+
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise RuntimeError("simulated merge failure")
+
+        monkeypatch.setattr(merger_module.SampleSheetMerger, "merge", _explode)
+
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = runner.invoke(app, [
+            "merge", str(a), str(b), "--output", str(tmp_path / "out.csv"),
+        ])
+        assert result.exit_code == 2
+        assert "Error" in result.output
 
 
 # ---------------------------------------------------------------------------
