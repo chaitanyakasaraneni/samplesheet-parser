@@ -144,6 +144,21 @@ class TestDuplicateSampleId:
         # The duplicate index should still be caught.
         assert result is not None   # just confirm it doesn't crash
 
+    def test_duplicate_sample_id_in_same_lane_raises_error(self):
+        """Line 402: duplicate Sample_ID in same lane produces DUPLICATE_SAMPLE_ID error."""
+        from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
+        validator = SampleSheetValidator()
+        result = ValidationResult()
+        # Provide samples with duplicate (lane, sample_id) — samples() always deduplicates
+        # so we call the private method directly with crafted input
+        samples = [
+            {"lane": "1", "sample_id": "S1"},
+            {"lane": "1", "sample_id": "S1"},  # duplicate in same lane
+        ]
+        validator._check_duplicate_sample_ids(samples, result)
+        codes = [e.code for e in result.errors]
+        assert "DUPLICATE_SAMPLE_ID" in codes
+
 
 class TestAdapterValidation:
 
@@ -222,19 +237,3 @@ class TestHammingSkipsNoIndex:
         assert "INDEX_DISTANCE_TOO_LOW" not in codes
 
 
-class TestDuplicateSampleId:
-
-    def test_duplicate_sample_id_in_same_lane_raises_error(self):
-        """Line 402: duplicate Sample_ID in same lane produces DUPLICATE_SAMPLE_ID error."""
-        from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
-        validator = SampleSheetValidator()
-        result = ValidationResult()
-        # Provide samples with duplicate (lane, sample_id) — samples() always deduplicates
-        # so we call the private method directly with crafted input
-        samples = [
-            {"lane": "1", "sample_id": "S1"},
-            {"lane": "1", "sample_id": "S1"},  # duplicate in same lane
-        ]
-        validator._check_duplicate_sample_ids(samples, result)
-        codes = [e.code for e in result.errors]
-        assert "DUPLICATE_SAMPLE_ID" in codes

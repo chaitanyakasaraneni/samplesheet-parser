@@ -422,15 +422,17 @@ class SampleSheetMerger:
             # Prefer per-row records; fall back to samples() if unavailable.
             records = getattr(sheet, "records", None) or sheet.samples()
             for record in records:
-                lane  = record.get("lane") or record.get("Lane")
-                idx1  = (record.get("index") or record.get("Index") or "").upper()
-                idx2  = (record.get("index2") or record.get("Index2") or "").upper()
-                sid   = record.get("sample_id") or record.get("Sample_ID") or "?"
-                key   = f"{idx1}+{idx2}" if idx2 else idx1
+                lane    = record.get("lane") or record.get("Lane")
+                idx1    = (record.get("index") or record.get("Index") or "").upper()
+                idx2    = (record.get("index2") or record.get("Index2") or "").upper()
+                raw_sid = record.get("sample_id") or record.get("Sample_ID")
+                sid     = raw_sid or "?"
+                key     = f"{idx1}+{idx2}" if idx2 else idx1
 
                 # Silently skip incomplete rows — _build_writer will emit
-                # INCOMPLETE_SAMPLE_RECORD for them; no duplicate warning here.
-                if not idx1:
+                # INCOMPLETE_SAMPLE_RECORD for them; no collision warning here.
+                # Mirror _build_writer()'s required-field criteria.
+                if not idx1 or not raw_sid:
                     continue
 
                 bucket = seen.setdefault(lane, {})
@@ -470,12 +472,15 @@ class SampleSheetMerger:
         for p, sheet in parsed:
             records = getattr(sheet, "records", None) or sheet.samples()
             for record in records:
-                lane = record.get("lane") or record.get("Lane")
-                idx1 = (record.get("index") or record.get("Index") or "").upper()
-                idx2 = (record.get("index2") or record.get("Index2") or "").upper()
-                sid  = record.get("sample_id") or record.get("Sample_ID") or "?"
-                if not idx1:
+                lane    = record.get("lane") or record.get("Lane")
+                idx1    = (record.get("index") or record.get("Index") or "").upper()
+                idx2    = (record.get("index2") or record.get("Index2") or "").upper()
+                sid_raw = record.get("sample_id") or record.get("Sample_ID")
+                # Skip records lacking a primary index or Sample_ID, to align
+                # with _build_writer(), which does not include such rows.
+                if not idx1 or not sid_raw:
                     continue
+                sid = sid_raw
                 combined = idx1 + idx2 if idx2 else idx1
                 lane_entries.setdefault(lane, []).append((sid, combined, p))
 
