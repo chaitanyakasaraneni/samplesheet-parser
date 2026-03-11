@@ -141,6 +141,29 @@ Lane,Sample_ID,Index,Index2,Sample_Project
 1,SampleC2,TAAGTTGGGT,TGGAACGCTA,ProjectC
 """
 
+# V1 sheet with same samples as _V1_A but SampleA1 has a different index —
+# used to trigger sample_changes in diff text output (lines 301-305)
+_V1_A_FIELD_CHANGED = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
+1,SampleA1,SampleA1,D701,TTTTTTTT,D501,TATAGCCT,ProjectA
+1,SampleA2,SampleA2,D702,TCCGGAGA,D502,ATAGAGGC,ProjectA
+"""
+
 # V1 sheet with different samples/indexes from _V1_A — used to trigger
 # samples_added / samples_removed / sample_changes in diff text output
 _V1_A_MODIFIED = """\
@@ -401,7 +424,7 @@ class TestCLIDiff:
         assert result.exit_code == 1
 
     def test_text_output_shows_samples_removed(self, tmp_path: Path) -> None:
-        """Lines 301-305: removed samples appear in text diff output."""
+        """Lines 295-298: removed samples appear in text diff output."""
         # _V1_A has SampleA1, SampleA2; _V1_A_MODIFIED has SampleA1, SampleA3
         # Diffing _V1_A (old) vs _V1_A_MODIFIED (new) shows SampleA2 removed
         a = _write(tmp_path, "a.csv", _V1_A)
@@ -409,6 +432,16 @@ class TestCLIDiff:
         result = runner.invoke(app, ["diff", str(a), str(b)])
         assert "Samples removed" in result.output
         assert "SampleA2" in result.output
+
+    def test_text_output_shows_sample_field_changes(self, tmp_path: Path) -> None:
+        """Lines 301-305: sample field changes appear in text diff output."""
+        # _V1_A has SampleA1 with index ATTACTCG;
+        # _V1_A_FIELD_CHANGED has SampleA1 with index TTTTTTTT → sample_changes
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_A_FIELD_CHANGED)
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+        assert "Sample field changes" in result.output
+        assert "SampleA1" in result.output
 
     def test_diff_exception_exits_2(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
