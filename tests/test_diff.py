@@ -13,6 +13,7 @@ from pathlib import Path
 import pytest
 
 from samplesheet_parser.diff import DiffResult, HeaderChange, SampleChange, SampleSheetDiff
+from samplesheet_parser.enums import SampleSheetVersion
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -655,3 +656,37 @@ Lane,Sample_ID,Index,Index2,Sample_Project
         real = _write(tmp_path, "real.csv", V2_BASE)
         with pytest.raises(FileNotFoundError):
             SampleSheetDiff(real, tmp_path / "nonexistent.csv").compare()
+
+
+class TestDiffResultStr:
+
+    def test_str_includes_header_changes_section(self):
+        """Lines 207-208: __str__ renders header changes block."""
+        result = DiffResult(
+            source_version=SampleSheetVersion.V1,
+            target_version=SampleSheetVersion.V1,
+            header_changes=[HeaderChange("Read1Cycles", "151", "76", section="reads")],
+        )
+        s = str(result)
+        assert "Header" in s
+        assert "Read1Cycles" in s
+
+    def test_str_includes_added_samples_section(self):
+        """Lines 210-212: __str__ renders samples-added block."""
+        result = DiffResult(
+            source_version=SampleSheetVersion.V1,
+            target_version=SampleSheetVersion.V1,
+            samples_added=[{"Sample_ID": "NewSample", "Lane": "1"}],
+        )
+        s = str(result)
+        assert "Added samples" in s
+        assert "NewSample" in s
+
+    def test_get_reads_returns_empty_for_sheet_with_no_reads_attrs(self):
+        """Line 422: _get_reads returns {} when sheet has neither reads nor read_lengths."""
+        diff = SampleSheetDiff.__new__(SampleSheetDiff)
+
+        class _NoReadsSheet:
+            pass
+
+        assert diff._get_reads(_NoReadsSheet()) == {}

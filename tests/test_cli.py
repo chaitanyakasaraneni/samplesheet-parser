@@ -400,6 +400,16 @@ class TestCLIDiff:
         result = runner.invoke(app, ["diff", str(a), str(c)])
         assert result.exit_code == 1
 
+    def test_text_output_shows_samples_removed(self, tmp_path: Path) -> None:
+        """Lines 301-305: removed samples appear in text diff output."""
+        # _V1_A has SampleA1, SampleA2; _V1_A_MODIFIED has SampleA1, SampleA3
+        # Diffing _V1_A (old) vs _V1_A_MODIFIED (new) shows SampleA2 removed
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_A_MODIFIED)
+        result = runner.invoke(app, ["diff", str(a), str(b)])
+        assert "Samples removed" in result.output
+        assert "SampleA2" in result.output
+
     def test_diff_exception_exits_2(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

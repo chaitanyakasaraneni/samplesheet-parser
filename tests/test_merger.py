@@ -1199,3 +1199,73 @@ class TestMergerAbortAfterPostMergeValidation:
 
         codes = [c.code for c in result.conflicts]
         assert "MERGE_VALIDATION_ERROR" in codes
+
+
+# ---------------------------------------------------------------------------
+# Incomplete sample records
+# ---------------------------------------------------------------------------
+
+_V1_WITH_INCOMPLETE_RECORD = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunA
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,Sample_Project
+1,SampleA1,SampleA1,D701,ATTACTCG,ProjectA
+1,,NoID,,,ProjectA
+"""
+
+_V1_WITH_INCOMPLETE_SECONDARY = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,RunB
+Date,2024-01-15
+Workflow,GenerateFASTQ
+Chemistry,Amplicon
+
+[Reads]
+151
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,Sample_Name,I7_Index_ID,index,Sample_Project
+1,SampleB1,SampleB1,D703,GCATGCTA,ProjectB
+1,,MissingID,,,ProjectB
+"""
+
+
+class TestMergerIncompleteRecords:
+
+    def test_incomplete_record_in_primary_emits_warning(self, tmp_path: Path) -> None:
+        """Lines 541-542: primary sheet record missing Sample_ID/Index gets a warning."""
+        a = _write(tmp_path, "a.csv", _V1_WITH_INCOMPLETE_RECORD)
+        b = _write(tmp_path, "b.csv", _V1_B)
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv", validate=False, abort_on_conflicts=False
+        )
+        codes = [w.code for w in result.warnings]
+        assert "INCOMPLETE_SAMPLE_RECORD" in codes
+
+    def test_incomplete_record_in_secondary_emits_warning(self, tmp_path: Path) -> None:
+        """Lines 596-597: secondary sheet record missing Sample_ID/Index gets a warning."""
+        a = _write(tmp_path, "a.csv", _V1_A)
+        b = _write(tmp_path, "b.csv", _V1_WITH_INCOMPLETE_SECONDARY)
+        result = SampleSheetMerger().add(a).add(b).merge(
+            tmp_path / "out.csv", validate=False, abort_on_conflicts=False
+        )
+        codes = [w.code for w in result.warnings]
+        assert "INCOMPLETE_SAMPLE_RECORD" in codes

@@ -481,3 +481,50 @@ class TestRoundTrip:
         content = out.read_text()
         assert "OverrideCycles," in content
         assert "# OverrideCycles" not in content
+
+
+class TestConverterEdgeCases:
+
+    def test_to_v2_raises_type_error_for_wrong_sheet_type(self, tmp_path):
+        """Line 135: TypeError when internal _sheet is not SampleSheetV1."""
+        p = tmp_path / "v1.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+        )
+        converter = SampleSheetConverter(str(p))
+        # Swap internal sheet to a V2 object so the isinstance check fails
+        v2_p = tmp_path / "v2.csv"
+        v2_p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        converter._sheet = SampleSheetV2(str(v2_p))
+        with pytest.raises(TypeError, match="Expected SampleSheetV1"):
+            converter.to_v2(str(tmp_path / "out.csv"))
+
+    def test_v1_to_v2_includes_run_description(self, tmp_path):
+        """Line 151: RunDescription written when sheet.description is set."""
+        p = tmp_path / "v1.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+        )
+        converter = SampleSheetConverter(str(p))
+        converter._sheet.description = "My run description"
+        out = tmp_path / "out.csv"
+        converter.to_v2(str(out))
+        assert "RunDescription,My run description" in out.read_text()
+
+    def test_v2_to_v1_drops_override_cycles_data_column(self, tmp_path):
+        """Lines 283, 367, 385: OverrideCycles as a BCLConvert_Data column is dropped."""
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,Test\nInstrumentPlatform,NovaSeqXSeries\n\n"
+            "[BCLConvert_Data]\n"
+            "Lane,Sample_ID,Index,Index2,OverrideCycles\n"
+            "1,S1,ATTACTCG,TATAGCCT,Y151;I8;I8;Y151\n"
+        )
+        out = tmp_path / "out.csv"
+        SampleSheetConverter(str(p)).to_v1(str(out))
+        assert "OverrideCycles" not in out.read_text()

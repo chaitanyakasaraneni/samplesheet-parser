@@ -302,6 +302,70 @@ class TestSampleSheetV1Equality:
         sheet.parse()
         assert sheet.__eq__("not a sheet") == NotImplemented
 
+
+# ---------------------------------------------------------------------------
+# Edge-case parsing coverage
+# ---------------------------------------------------------------------------
+
+class TestSampleSheetV1EdgeCases:
+
+    def test_required_section_error_raises_value_error(self, tmp_path):
+        """Lines 249-250, 603: completely empty [Data] section triggers required-section error."""
+        p = tmp_path / "empty_data.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        with pytest.raises(ValueError, match=r"\[Data\]"):
+            sheet.parse(do_clean=False)
+
+    def test_index_type_returns_none_when_no_index_column(self, tmp_path):
+        """Line 419: index_type() returns 'none' when Data has no index/index2 column."""
+        p = tmp_path / "no_index.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,Sample_Name\n1,S1,Sample1\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        assert sheet.index_type() == "none"
+
+    def test_malformed_section_header_is_skipped(self, tmp_path):
+        """Lines 497-498: section header without closing ']' is silently skipped."""
+        p = tmp_path / "malformed.csv"
+        p.write_text(
+            "[Header\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        assert sheet.experiment_name == "Test"
+
+    def test_content_before_first_section_is_skipped(self, tmp_path):
+        """Line 506: lines before the first section header are silently skipped."""
+        p = tmp_path / "preamble.csv"
+        p.write_text(
+            "preamble line\nanother line\n"
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        assert sheet.experiment_name == "Test"
+
+    def test_experiment_id_overrides_experiment_name(self, tmp_path):
+        """Line 548: experiment_id replaces experiment_name when they differ."""
+        p = tmp_path / "exp_id.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV1(str(p), experiment_id="OverrideName")
+        sheet.parse()
+        assert sheet.experiment_name == "OverrideName"
+
     def test_repr(self, v1_minimal):
         sheet = SampleSheetV1(v1_minimal)
         sheet.parse()

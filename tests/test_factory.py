@@ -90,6 +90,17 @@ class TestFactoryGetUmiLength:
         with pytest.raises(RuntimeError, match="create_parser"):
             SampleSheetFactory().get_umi_length()
 
+    def test_v1_invalid_index_umi_length_returns_zero(self, tmp_path):
+        """Lines 163-165: ValueError/TypeError from int() on bad IndexUMILength → returns 0."""
+        p = tmp_path / "umi_bad.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\nIndexUMILength,not_an_int\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+        )
+        factory = SampleSheetFactory()
+        factory.create_parser(str(p), parse=True)
+        assert factory.get_umi_length() == 0
+
 
 class TestFactoryRepr:
 
