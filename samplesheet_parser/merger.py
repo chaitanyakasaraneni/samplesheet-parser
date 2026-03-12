@@ -123,6 +123,24 @@ class MergeResult:
 
 
 # ---------------------------------------------------------------------------
+# Codes emitted by the cross-sheet pre-merge checks.
+# These are deduplicated against post-merge validator output in
+# _validate_merged() so the same issue is never reported twice.
+# ---------------------------------------------------------------------------
+
+# Validator codes that are fully covered by a pre-merge cross-sheet check
+# and must be suppressed in _validate_merged() to avoid duplicate reporting.
+_PRE_MERGE_CONFLICT_CODES: frozenset[str] = frozenset({
+    "INDEX_COLLISION",   # covered by _check_index_collisions
+    "DUPLICATE_INDEX",   # same root cause — validator sees result of collision
+})
+
+_PRE_MERGE_WARNING_CODES: frozenset[str] = frozenset({
+    "INDEX_DISTANCE_TOO_LOW",  # covered by _check_index_distances
+})
+
+
+# ---------------------------------------------------------------------------
 # Merger
 # ---------------------------------------------------------------------------
 
@@ -648,7 +666,15 @@ class SampleSheetMerger:
         writer: Any,
         result: MergeResult,
     ) -> None:
-        """Run SampleSheetValidator on the merged writer content."""
+        """Run SampleSheetValidator on the merged writer content.
+
+        Codes already reported by the pre-merge cross-sheet checks
+        (``_PRE_MERGE_CONFLICT_CODES`` / ``_PRE_MERGE_WARNING_CODES``) are
+        suppressed here to avoid duplicate reporting in the final
+        ``MergeResult``.  The pre-merge messages are more descriptive (they
+        include source file names and sample IDs) so they are always
+        preferred over the generic post-merge validator output.
+        """
         import tempfile
 
         content = writer.to_string()
@@ -677,7 +703,19 @@ class SampleSheetMerger:
             Path(tmp_path).unlink(missing_ok=True)
 
         for w in vresult.warnings:
+            if w.code in _PRE_MERGE_WARNING_CODES:
+                logger.debug(
+                    f"Suppressing duplicate post-merge warning {w.code!r} "
+                    "(already reported by pre-merge cross-sheet check)."
+                )
+                continue
             result.add_warning(w.code, w.message, **w.context)
 
         for e in vresult.errors:
+            if e.code in _PRE_MERGE_CONFLICT_CODES:
+                logger.debug(
+                    f"Suppressing duplicate post-merge conflict {e.code!r} "
+                    "(already reported by pre-merge cross-sheet check)."
+                )
+                continue
             result.add_conflict(e.code, e.message, **e.context)

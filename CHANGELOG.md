@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.1] - 2026-03-11
+
+### Fixed
+
+- **`SampleSheetMerger`** — `INDEX_DISTANCE_TOO_LOW` and `DUPLICATE_INDEX`
+  were reported twice in `--force` merges (once by the pre-merge cross-sheet
+  check, once by the post-merge validator). Duplicate codes are now suppressed
+  in `_validate_merged` — the more descriptive pre-merge message is always
+  preferred.
+
 ## [0.3.0] - 2026-03-10
 
 ### Added
