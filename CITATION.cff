@@ -1,23 +1,36 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please cite it using the metadata below."
 type: software
 title: "samplesheet-parser"
+abstract: >
+  A Python library for parsing, validating, converting, and merging
+  Illumina SampleSheet V1 and V2 files for BCLConvert and bcl2fastq.
+  Provides format auto-detection, bidirectional V1/V2 conversion,
+  structural and index validation, sheet diffing, and cross-project
+  merging with Hamming-distance collision detection.
 version: 0.3.2
 date-released: 2026-03-12
 license: Apache-2.0
 url: "https://github.com/chaitanyakasaraneni/samplesheet-parser"
 repository-code: "https://github.com/chaitanyakasaraneni/samplesheet-parser"
-abstract: >
-  A Python library for parsing, validating, converting, and merging
-  Illumina SampleSheet V1 and V2 files for BCLConvert and bcl2fastq.
+repository-artifact: "https://pypi.org/project/samplesheet-parser/"
 keywords:
   - bioinformatics
   - Illumina
   - SampleSheet
   - BCLConvert
+  - bcl2fastq
   - demultiplexing
   - genomics
+  - sequencing
   - Python
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.18989694
+    description: Concept DOI (all versions)
+  - type: doi
+    value: 10.5281/zenodo.18989695
+    description: Version DOI (v0.3.2)
 authors:
   - family-names: Kasaraneni
     given-names: Chaitanya Krishna
