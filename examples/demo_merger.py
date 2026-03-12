@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from samplesheet_parser import SampleSheetMerger, MergeResult
+from samplesheet_parser import MergeResult, SampleSheetMerger
 from samplesheet_parser.enums import SampleSheetVersion
 
 SHEETS = Path(__file__).parent / "sample_sheets"
