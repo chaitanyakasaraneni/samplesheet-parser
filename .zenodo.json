@@ -1,0 +1,30 @@
+{
+  "title": "samplesheet-parser: A Python library for parsing, validating, converting, and merging Illumina SampleSheet V1 and V2 files",
+  "description": "Open-source Python library providing format auto-detection, bidirectional V1/V2 conversion, structural and index validation, sheet diffing, and cross-project merging for Illumina SampleSheet files.",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "Apache-2.0",
+  "version": "0.3.1",
+  "keywords": [
+    "bioinformatics", "Illumina", "SampleSheet", "BCLConvert",
+    "demultiplexing", "genomics", "sequencing", "Python"
+  ],
+  "creators": [
+    {
+      "name": "Kasaraneni, Chaitanya Krishna",
+      "orcid": "0000-0001-5792-1095"
+    }
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/chaitanyakasaraneni/samplesheet-parser",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://pypi.org/project/samplesheet-parser/",
+      "relation": "isIdenticalTo",
+      "scheme": "url"
+    }
+  ]
+}

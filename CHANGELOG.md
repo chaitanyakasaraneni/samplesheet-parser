@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.2] - 2026-03-12
+
+### Added
+- `.zenodo.json` metadata file for automatic Zenodo archival and DOI
+  minting on GitHub releases
+- `CITATION.cff` file enabling GitHub's "Cite this repository" button
+  and standardized software citation for downstream users
+
 ## [0.3.1] - 2026-03-11
 
 ### Fixed
