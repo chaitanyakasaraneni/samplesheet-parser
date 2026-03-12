@@ -6,6 +6,64 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.0] - 2026-03-10
+
+### Added
+
+- **`SampleSheetMerger`** — combines multiple per-project sample sheets into a
+  single sheet for a flow cell run.
+  - `add(path)` — register an input sheet (V1 or V2); mixed formats are
+    auto-converted to the target version before merging.
+  - `merge(output_path, validate=True, abort_on_conflicts=True)` — merges all
+    registered sheets, writes the combined output, and returns a `MergeResult`.
+  - **Index collision detection** — raises a conflict when two samples share
+    the same lane and index sequence across project boundaries.
+  - **Hamming distance check** — warns when the combined I7+I5 distance between
+    any two samples across sheets falls below 3.
+  - **Read-length conflict detection** — raises a conflict when registered
+    sheets specify incompatible `Read1Cycles`/`Read2Cycles` (V2) or `[Reads]`
+    lengths (V1).
+  - **Adapter conflict detection** — warns when adapter sequences differ across
+    sheets.
+  - **Mixed-format warning** — emits a warning when V1 and V2 sheets are
+    combined, with the auto-conversion strategy logged.
+  - `MergeResult` dataclass — exposes `conflicts`, `warnings`, `sample_count`,
+    `source_versions`, `output_path`, `has_conflicts`, and `summary()`;
+    consistent with `ValidationResult` and `DiffResult`.
+  - `abort_on_conflicts=True` (default) — skips writing the output file when
+    any conflict is present; set `False` (via `--force` in the CLI) to write
+    despite conflicts.
+  - `SampleSheetMerger` and `MergeResult` are exported from the top-level
+    package.
+
+- **`samplesheet` CLI** — command-line interface exposing the four core
+  operations, available as an optional extra (`pip install
+  "samplesheet-parser[cli]"`; adds `typer` as a dependency).
+  - `samplesheet validate <file>` — exits 0 if clean, 1 if errors, 2 on
+    usage/parse errors. Supports `--format json` for machine-readable output.
+  - `samplesheet convert <file> --to <v1|v2> --output <path>` — converts
+    between formats; exits 0 on success, 1 on conversion error, 2 on bad
+    arguments.
+  - `samplesheet diff <old> <new>` — exits 0 if identical, 1 if differences
+    detected (useful in CI pre-run checks). Supports `--format json`.
+  - `samplesheet merge <files...> --output <path>` — merges two or more sheets;
+    exits 0 on clean merge, 1 on conflicts or warnings, 2 on bad arguments.
+    Supports `--force`, `--to <v1|v2>`, and `--format json`.
+  - All commands print errors to stderr and structured data to stdout.
+  - Entry point configured in `pyproject.toml`:
+    `samplesheet = "samplesheet_parser.cli:main"`.
+  - Module imports cleanly without `typer` installed — missing-extra error is
+    surfaced only at invocation time.
+
+### Changed
+
+- README updated to document `SampleSheetMerger`, the `samplesheet` CLI, all
+  new API reference tables, and installation instructions for the `[cli]` extra.
+- `CONTRIBUTING.md` updated with CLI testing instructions and the new
+  `[dev,cli]` install target.
+
+---
+
 ## [0.2.0] - 2026-02-25
 
 ### Added
