@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.3] - 2026-03-13
+
+### Documentation
+- Add architecture diagram showing full library structure including CLI and SampleSheetMerger
+- Update README with architecture overview, solid vs dashed line legend
+- Add `[Custom_Sections*]` to V1 and V2 format descriptions
+
 ## [0.3.2] - 2026-03-12
 
 ### Added

@@ -28,9 +28,6 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.18989694
     description: Concept DOI (all versions)
-  - type: doi
-    value: 10.5281/zenodo.18989695
-    description: Version DOI (v0.3.2)
 authors:
   - family-names: Kasaraneni
     given-names: Chaitanya Krishna
