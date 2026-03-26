@@ -2,6 +2,8 @@
 BLOGPOST.md
 tests/fixtures/outputs/
 demo_output.txt
+**/CSBJ Submission/
+**/.claude/
 
 # Cache and build artifacts
 __pycache__/
