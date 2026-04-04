@@ -36,6 +36,7 @@ from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.diff import DiffResult, SampleSheetDiff
 from samplesheet_parser.enums import IndexType, SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
+from samplesheet_parser.index_utils import normalize_index_lengths
 from samplesheet_parser.merger import MergeResult, SampleSheetMerger
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
@@ -56,5 +57,6 @@ __all__ = [
     "SampleSheetWriter",
     "SampleSheetMerger",
     "MergeResult",
+    "normalize_index_lengths",
     "__version__",
 ]

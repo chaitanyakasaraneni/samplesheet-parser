@@ -191,6 +191,63 @@ class TestAdapterValidation:
         assert adapter_warnings == []
 
 
+class TestMinHammingDistance:
+    """Tests for the min_hamming_distance parameter on validate()."""
+
+    def _sheet_with_distance(self, tmp_path, distance: int):
+        """Build a minimal V1 sheet whose two indexes have the given Hamming distance."""
+        # Base index: ATTACTCG (8 bp)
+        # Modify last `distance` characters to create an index with exactly
+        # `distance` mismatches.
+        base = list("ATTACTCG")
+        other = list("ATTACTCG")
+        replacements = {"A": "T", "T": "A", "C": "G", "G": "C"}
+        changes = 0
+        for i in range(len(base) - 1, -1, -1):
+            if changes >= distance:
+                break
+            other[i] = replacements[base[i]]
+            changes += 1
+        idx2 = "".join(other)
+
+        p = tmp_path / f"dist{distance}.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Settings]\nAdapter,AGATCGGAAGAGC\n\n"
+            "[Data]\nLane,Sample_ID,index\n"
+            f"1,S1,ATTACTCG\n"
+            f"1,S2,{idx2}\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        return sheet
+
+    def test_default_min_3_passes_distance_3(self, tmp_path):
+        sheet = self._sheet_with_distance(tmp_path, 3)
+        result = SampleSheetValidator().validate(sheet)
+        assert not any(w.code == "INDEX_DISTANCE_TOO_LOW" for w in result.warnings)
+
+    def test_default_min_3_warns_distance_2(self, tmp_path):
+        sheet = self._sheet_with_distance(tmp_path, 2)
+        result = SampleSheetValidator().validate(sheet)
+        assert any(w.code == "INDEX_DISTANCE_TOO_LOW" for w in result.warnings)
+
+    def test_custom_min_4_warns_distance_3(self, tmp_path):
+        sheet = self._sheet_with_distance(tmp_path, 3)
+        result = SampleSheetValidator().validate(sheet, min_hamming_distance=4)
+        assert any(w.code == "INDEX_DISTANCE_TOO_LOW" for w in result.warnings)
+
+    def test_custom_min_4_passes_distance_4(self, tmp_path):
+        sheet = self._sheet_with_distance(tmp_path, 4)
+        result = SampleSheetValidator().validate(sheet, min_hamming_distance=4)
+        assert not any(w.code == "INDEX_DISTANCE_TOO_LOW" for w in result.warnings)
+
+    def test_custom_min_2_passes_distance_2(self, tmp_path):
+        sheet = self._sheet_with_distance(tmp_path, 2)
+        result = SampleSheetValidator().validate(sheet, min_hamming_distance=2)
+        assert not any(w.code == "INDEX_DISTANCE_TOO_LOW" for w in result.warnings)
+
+
 class TestValidationResult:
 
     def test_to_dict(self, v1_minimal):

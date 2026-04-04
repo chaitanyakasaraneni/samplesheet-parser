@@ -5,6 +5,7 @@ Entry point: ``samplesheet`` (configured in ``pyproject.toml``).
 
 Commands
 --------
+info        Show a quick summary of a sample sheet.
 validate    Validate a sheet — exit 0 if clean, exit 1 if errors.
 convert     Convert between V1 and V2 formats.
 diff        Diff two sheets — exit 1 if changes detected.
@@ -20,8 +21,12 @@ Usage
 -----
 ::
 
+    samplesheet info SampleSheet.csv
+    samplesheet info SampleSheet.csv --format json
+
     samplesheet validate SampleSheet.csv
     samplesheet validate SampleSheet.csv --format json
+    samplesheet validate SampleSheet.csv --min-hamming 4
 
     samplesheet convert SampleSheet_v1.csv --to v2 --output SampleSheet_v2.csv
     samplesheet convert SampleSheet_v2.csv --to v1 --output SampleSheet_v1.csv
@@ -116,6 +121,85 @@ if _TYPER_AVAILABLE:
             raise typer.Exit(code=2)
 
     # ---------------------------------------------------------------------------
+    # info
+    # ---------------------------------------------------------------------------
+
+    @app.command()
+    def info(
+        path: Annotated[Path, typer.Argument(help="Path to SampleSheet.csv.", metavar="FILE")],
+        fmt: _FormatOption = "text",
+    ) -> None:
+        """Display a quick summary of a sample sheet without full validation.
+
+        Shows format version, sample count, lanes, index type, read lengths,
+        and adapter sequences at a glance.
+
+        Exits 0 on success, 2 on unreadable files.
+        """
+        from samplesheet_parser.factory import SampleSheetFactory
+        from samplesheet_parser.parsers.v1 import SampleSheetV1
+
+        _validate_fmt(fmt)
+        if not path.exists():
+            typer.echo(f"Error: file not found: {path}", err=True)
+            raise typer.Exit(code=2)
+
+        try:
+            factory = SampleSheetFactory()
+            sheet = factory.create_parser(str(path), parse=True, clean=False)
+        except Exception as exc:
+            typer.echo(f"Error: could not parse {path}: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+        if factory.version is None:  # pragma: no cover
+            raise RuntimeError("SampleSheetFactory.version must be set after create_parser")
+
+        samples = sheet.samples()
+        lanes = sorted({str(s.get("lane") or "") for s in samples} - {""}) or ["(none)"]
+        index_type = sheet.index_type()
+        adapters: list[str] = getattr(sheet, "adapters", []) or []
+        experiment_name: str | None = getattr(sheet, "experiment_name", None)
+
+        if isinstance(sheet, SampleSheetV1):
+            read_lengths = [str(r) for r in (sheet.read_lengths or [])]
+            instrument = sheet.instrument_type
+        else:
+            reads_dict = sheet.reads or {}
+            read_lengths = [
+                str(reads_dict[k])
+                for k in ("Read1Cycles", "Read2Cycles")
+                if k in reads_dict
+            ]
+            instrument = sheet.instrument_platform
+
+        if fmt == "json":
+            _print_json({
+                "file": str(path),
+                "format": factory.version.value,
+                "sample_count": len(samples),
+                "lanes": lanes,
+                "index_type": index_type,
+                "read_lengths": read_lengths,
+                "adapters": adapters,
+                "experiment_name": experiment_name,
+                "instrument": instrument,
+            })
+        else:
+            typer.echo(f"File:          {path}")
+            typer.echo(f"Format:        {factory.version.value}")
+            typer.echo(f"Samples:       {len(samples)}")
+            typer.echo(f"Lanes:         {', '.join(lanes)}")
+            typer.echo(f"Index type:    {index_type}")
+            typer.echo(f"Read lengths:  {' + '.join(read_lengths) if read_lengths else '(not set)'}")
+            typer.echo(f"Adapters:      {', '.join(adapters) if adapters else '(none)'}")
+            if experiment_name:
+                typer.echo(f"Experiment:    {experiment_name}")
+            if instrument:
+                typer.echo(f"Instrument:    {instrument}")
+
+        raise typer.Exit(code=0)
+
+    # ---------------------------------------------------------------------------
     # validate
     # ---------------------------------------------------------------------------
 
@@ -123,6 +207,14 @@ if _TYPER_AVAILABLE:
     def validate(
         path: Annotated[Path, typer.Argument(help="Path to SampleSheet.csv.", metavar="FILE")],
         fmt: _FormatOption = "text",
+        min_hamming: Annotated[
+            int,
+            typer.Option(
+                "--min-hamming",
+                help="Minimum Hamming distance between indexes (default: 3).",
+                metavar="N",
+            ),
+        ] = 3,
     ) -> None:
         """Validate a sample sheet for index, adapter, and structural issues.
 
@@ -149,13 +241,14 @@ if _TYPER_AVAILABLE:
             raise RuntimeError("SampleSheetFactory.version must be set after create_parser")
         version = factory.version
 
-        result = SampleSheetValidator().validate(sheet)
+        result = SampleSheetValidator().validate(sheet, min_hamming_distance=min_hamming)
 
         if fmt == "json":
             _print_json({
                 "file": str(path),
                 "version": version.value,
                 "is_valid": result.is_valid,
+                "min_hamming_distance": min_hamming,
                 "errors": [
                     {"code": e.code, "message": e.message, "context": e.context}
                     for e in result.errors

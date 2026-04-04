@@ -197,6 +197,8 @@ class SampleSheetValidator:
     def validate(
         self,
         sheet: SampleSheetV1 | SampleSheetV2,
+        *,
+        min_hamming_distance: int = MIN_HAMMING_DISTANCE,
     ) -> ValidationResult:
         """Run all validation checks on a parsed sample sheet.
 
@@ -205,6 +207,12 @@ class SampleSheetValidator:
         sheet:
             A parsed :class:`SampleSheetV1` or :class:`SampleSheetV2`
             instance (i.e., :meth:`parse` has been called).
+        min_hamming_distance:
+            Minimum Hamming distance required between any two index sequences
+            in the same lane. Pairs below this threshold produce an
+            ``INDEX_DISTANCE_TOO_LOW`` warning. Defaults to
+            :data:`MIN_HAMMING_DISTANCE` (3). Set higher (e.g. ``4``) for
+            stricter demultiplexing requirements with longer indexes.
 
         Returns
         -------
@@ -220,7 +228,7 @@ class SampleSheetValidator:
 
         self._check_index_sequences(samples, result)
         self._check_duplicate_indices(samples, result)
-        self._check_index_distances(samples, result)
+        self._check_index_distances(samples, result, min_distance=min_hamming_distance)
         self._check_duplicate_sample_ids(samples, result)
         self._check_adapters(sheet, result)
 
