@@ -159,11 +159,21 @@ def normalize_index_lengths(
 # ---------------------------------------------------------------------------
 
 def _detect_key(samples: list[dict[str, Any]], candidates: tuple[str, ...]) -> str:
-    """Return the first candidate key that is present in any sample."""
+    """Return the first candidate key that has at least one non-empty value.
+
+    Falls back to key *presence* (regardless of value) if no candidate has
+    any non-empty value, and finally to the first candidate name if none are
+    present at all.
+    """
+    # Prefer a key that actually carries data
+    for key in candidates:
+        if any(s.get(key) for s in samples):
+            return key
+    # Fall back to key presence (all values empty/None but key exists)
     for key in candidates:
         if any(key in s for s in samples):
             return key
-    return candidates[0]  # fall back to first candidate
+    return candidates[0]
 
 
 def _apply(seq: str, target_length: int, strategy: str) -> str:

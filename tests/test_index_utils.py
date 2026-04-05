@@ -4,7 +4,6 @@ import pytest
 
 from samplesheet_parser.index_utils import normalize_index_lengths
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -146,3 +145,19 @@ class TestEdgeCases:
         samples = _make_samples([("ATTACTCG", "TATAGCCT")])
         result = normalize_index_lengths(samples)
         assert result is not samples
+
+    def test_key_with_all_none_values_skips_to_real_key(self) -> None:
+        """_detect_key must prefer the key that has non-empty values.
+
+        If 'index' is present but all None and 'Index' has real sequences,
+        auto-detection should pick 'Index', not 'index'.
+        """
+        samples = [
+            {"sample_id": "S1", "index": None, "Index": "ATTACTCG"},
+            {"sample_id": "S2", "index": None, "Index": "TCCGGAGAGG"},
+        ]
+        result = normalize_index_lengths(samples, strategy="trim")
+        # 'Index' was correctly detected — trimmed to 8
+        assert result[1]["Index"] == "TCCGGAGA"
+        # 'index' key untouched (all None)
+        assert result[0]["index"] is None

@@ -55,6 +55,7 @@ except ImportError:  # pragma: no cover
     _TYPER_AVAILABLE = False
 
 from samplesheet_parser.enums import SampleSheetVersion
+from samplesheet_parser.validators import MIN_HAMMING_DISTANCE as _MIN_HAMMING_DEFAULT
 
 if _TYPER_AVAILABLE:
     app = typer.Typer(
@@ -190,7 +191,9 @@ if _TYPER_AVAILABLE:
             typer.echo(f"Samples:       {len(samples)}")
             typer.echo(f"Lanes:         {', '.join(lanes)}")
             typer.echo(f"Index type:    {index_type}")
-            typer.echo(f"Read lengths:  {' + '.join(read_lengths) if read_lengths else '(not set)'}")
+            typer.echo(
+                f"Read lengths:  {' + '.join(read_lengths) if read_lengths else '(not set)'}"
+            )
             typer.echo(f"Adapters:      {', '.join(adapters) if adapters else '(none)'}")
             if experiment_name:
                 typer.echo(f"Experiment:    {experiment_name}")
@@ -211,10 +214,13 @@ if _TYPER_AVAILABLE:
             int,
             typer.Option(
                 "--min-hamming",
-                help="Minimum Hamming distance between indexes (default: 3).",
+                help=(
+                    f"Minimum Hamming distance between indexes "
+                    f"(default: {_MIN_HAMMING_DEFAULT}, must be >= 1)."
+                ),
                 metavar="N",
             ),
-        ] = 3,
+        ] = _MIN_HAMMING_DEFAULT,
     ) -> None:
         """Validate a sample sheet for index, adapter, and structural issues.
 
@@ -226,6 +232,11 @@ if _TYPER_AVAILABLE:
         from samplesheet_parser.validators import SampleSheetValidator
 
         _validate_fmt(fmt)
+        if min_hamming < 1:
+            typer.echo(
+                f"Error: --min-hamming must be >= 1, got {min_hamming}.", err=True
+            )
+            raise typer.Exit(code=2)
         if not path.exists():
             typer.echo(f"Error: file not found: {path}", err=True)
             raise typer.Exit(code=2)

@@ -237,13 +237,15 @@ class TestCLIInfo:
 
     def test_info_v1_shows_sample_count(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V1_A)
-        result = runner.invoke(app, ["info", str(p)])
-        assert "2" in result.output
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["sample_count"] == 2
 
     def test_info_v1_shows_read_lengths(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V1_A)
-        result = runner.invoke(app, ["info", str(p)])
-        assert "151" in result.output
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["read_lengths"] == ["151", "151"]
 
     def test_info_v1_shows_index_type(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V1_A)
@@ -432,6 +434,18 @@ class TestCLIValidate:
         )
         data = json.loads(result.output)
         assert data["min_hamming_distance"] == 4
+
+    def test_min_hamming_zero_exits_2(self, tmp_path: Path) -> None:
+        """--min-hamming 0 is invalid and should exit 2."""
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--min-hamming", "0"])
+        assert result.exit_code == 2
+
+    def test_min_hamming_negative_exits_2(self, tmp_path: Path) -> None:
+        """--min-hamming -1 is invalid and should exit 2."""
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--min-hamming", "-1"])
+        assert result.exit_code == 2
 
 
 # ---------------------------------------------------------------------------
