@@ -50,6 +50,7 @@ from typing import Annotated
 
 try:
     import typer
+
     _TYPER_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _TYPER_AVAILABLE = False
@@ -167,24 +168,24 @@ if _TYPER_AVAILABLE:
         else:
             reads_dict = sheet.reads or {}
             read_lengths = [
-                str(reads_dict[k])
-                for k in ("Read1Cycles", "Read2Cycles")
-                if k in reads_dict
+                str(reads_dict[k]) for k in ("Read1Cycles", "Read2Cycles") if k in reads_dict
             ]
             instrument = sheet.instrument_platform
 
         if fmt == "json":
-            _print_json({
-                "file": str(path),
-                "format": factory.version.value,
-                "sample_count": len(samples),
-                "lanes": lanes,
-                "index_type": index_type,
-                "read_lengths": read_lengths,
-                "adapters": adapters,
-                "experiment_name": experiment_name,
-                "instrument": instrument,
-            })
+            _print_json(
+                {
+                    "file": str(path),
+                    "format": factory.version.value,
+                    "sample_count": len(samples),
+                    "lanes": lanes,
+                    "index_type": index_type,
+                    "read_lengths": read_lengths,
+                    "adapters": adapters,
+                    "experiment_name": experiment_name,
+                    "instrument": instrument,
+                }
+            )
         else:
             typer.echo(f"File:          {path}")
             typer.echo(f"Format:        {factory.version.value}")
@@ -233,9 +234,7 @@ if _TYPER_AVAILABLE:
 
         _validate_fmt(fmt)
         if min_hamming < 1:
-            typer.echo(
-                f"Error: --min-hamming must be >= 1, got {min_hamming}.", err=True
-            )
+            typer.echo(f"Error: --min-hamming must be >= 1, got {min_hamming}.", err=True)
             raise typer.Exit(code=2)
         if not path.exists():
             typer.echo(f"Error: file not found: {path}", err=True)
@@ -255,21 +254,23 @@ if _TYPER_AVAILABLE:
         result = SampleSheetValidator().validate(sheet, min_hamming_distance=min_hamming)
 
         if fmt == "json":
-            _print_json({
-                "file": str(path),
-                "version": version.value,
-                "is_valid": result.is_valid,
-                "min_hamming_distance": min_hamming,
-                "errors": [
-                    {"code": e.code, "message": e.message, "context": e.context}
-                    for e in result.errors
-                ],
-                "warnings": [
-                    {"code": w.code, "message": w.message, "context": w.context}
-                    for w in result.warnings
-                ],
-                "summary": result.summary(),
-            })
+            _print_json(
+                {
+                    "file": str(path),
+                    "version": version.value,
+                    "is_valid": result.is_valid,
+                    "min_hamming_distance": min_hamming,
+                    "errors": [
+                        {"code": e.code, "message": e.message, "context": e.context}
+                        for e in result.errors
+                    ],
+                    "warnings": [
+                        {"code": w.code, "message": w.message, "context": w.context}
+                        for w in result.warnings
+                    ],
+                    "summary": result.summary(),
+                }
+            )
         else:
             typer.echo(f"File:    {path}")
             typer.echo(f"Format:  {version.value}")
@@ -325,8 +326,7 @@ if _TYPER_AVAILABLE:
         if converter.source_version is None:  # pragma: no cover
             raise RuntimeError("SampleSheetConverter.source_version must be set after conversion")
         typer.echo(
-            f"Converted {path.name} ({converter.source_version.value})"
-            f" → {out} ({target.value})"
+            f"Converted {path.name} ({converter.source_version.value})" f" → {out} ({target.value})"
         )
 
     # ---------------------------------------------------------------------------
@@ -360,29 +360,30 @@ if _TYPER_AVAILABLE:
             raise typer.Exit(code=2) from exc
 
         if fmt == "json":
-            _print_json({
-                "has_changes": result.has_changes,
-                "source_version": result.source_version.value,
-                "target_version": result.target_version.value,
-                "summary": result.summary(),
-                "header_changes": [
-                    {"field": c.field, "old": c.old_value, "new": c.new_value}
-                    for c in result.header_changes
-                ],
-                "samples_added": result.samples_added,
-                "samples_removed": result.samples_removed,
-                "sample_changes": [
-                    {
-                        "sample_id": sc.sample_id,
-                        "lane": sc.lane,
-                        "changes": {
-                            f: {"old": o, "new": n}
-                            for f, (o, n) in sc.changes.items()
-                        },
-                    }
-                    for sc in result.sample_changes
-                ],
-            })
+            _print_json(
+                {
+                    "has_changes": result.has_changes,
+                    "source_version": result.source_version.value,
+                    "target_version": result.target_version.value,
+                    "summary": result.summary(),
+                    "header_changes": [
+                        {"field": c.field, "old": c.old_value, "new": c.new_value}
+                        for c in result.header_changes
+                    ],
+                    "samples_added": result.samples_added,
+                    "samples_removed": result.samples_removed,
+                    "sample_changes": [
+                        {
+                            "sample_id": sc.sample_id,
+                            "lane": sc.lane,
+                            "changes": {
+                                f: {"old": o, "new": n} for f, (o, n) in sc.changes.items()
+                            },
+                        }
+                        for sc in result.sample_changes
+                    ],
+                }
+            )
         else:
             typer.echo(result.summary())
 
@@ -426,10 +427,13 @@ if _TYPER_AVAILABLE:
         output: _OutputOption = Path("SampleSheet_combined.csv"),
         to: _VersionOption = "v2",
         fmt: _FormatOption = "text",
-        force: Annotated[bool, typer.Option(
-            "--force",
-            help="Write output even if conflicts are found.",
-        )] = False,
+        force: Annotated[
+            bool,
+            typer.Option(
+                "--force",
+                help="Write output even if conflicts are found.",
+            ),
+        ] = False,
     ) -> None:
         """Merge multiple per-project sample sheets into one combined sheet.
 
@@ -469,21 +473,23 @@ if _TYPER_AVAILABLE:
             raise typer.Exit(code=2) from exc
 
         if fmt == "json":
-            _print_json({
-                "has_conflicts": result.has_conflicts,
-                "sample_count": result.sample_count,
-                "output_path": str(result.output_path) if result.output_path else None,
-                "source_versions": result.source_versions,
-                "summary": result.summary(),
-                "conflicts": [
-                    {"code": c.code, "message": c.message, "context": c.context}
-                    for c in result.conflicts
-                ],
-                "warnings": [
-                    {"code": w.code, "message": w.message, "context": w.context}
-                    for w in result.warnings
-                ],
-            })
+            _print_json(
+                {
+                    "has_conflicts": result.has_conflicts,
+                    "sample_count": result.sample_count,
+                    "output_path": str(result.output_path) if result.output_path else None,
+                    "source_versions": result.source_versions,
+                    "summary": result.summary(),
+                    "conflicts": [
+                        {"code": c.code, "message": c.message, "context": c.context}
+                        for c in result.conflicts
+                    ],
+                    "warnings": [
+                        {"code": w.code, "message": w.message, "context": w.context}
+                        for w in result.warnings
+                    ],
+                }
+            )
         else:
             typer.echo(result.summary())
 
@@ -506,19 +512,21 @@ if _TYPER_AVAILABLE:
 else:  # pragma: no cover
     # Fallbacks when Typer is not installed: keep simple type aliases so that
     # the module can be imported and type annotations remain usable.
-    _FormatOption = str  # type: ignore[assignment,misc]
-    _OutputOption = Path  # type: ignore[assignment,misc]
-    _VersionOption = str  # type: ignore[assignment,misc]
+    _FormatOption = str  # type: ignore[misc]
+    _OutputOption = Path  # type: ignore[misc]
+    _VersionOption = str  # type: ignore[misc]
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:  # pragma: no cover
     """Entry point for the ``samplesheet`` CLI command."""
     if not _TYPER_AVAILABLE:
         import sys
+
         sys.stderr.write(
             "Error: the samplesheet-parser CLI requires 'typer'.\n"
             "Install it with: pip install 'samplesheet-parser[cli]'\n"
