@@ -167,6 +167,11 @@ class SampleSheetMerger:
         Output format for the merged sheet. Defaults to
         :attr:`SampleSheetVersion.V2`. If inputs are mixed V1/V2, all
         are converted to this format.
+    min_hamming_distance:
+        Minimum Hamming distance required between any two index sequences
+        in the same lane, both within a sheet and across sheets. Pairs
+        below this threshold produce an ``INDEX_DISTANCE_TOO_LOW`` warning.
+        Defaults to :data:`MIN_HAMMING_DISTANCE` (3).
 
     Examples
     --------
@@ -181,8 +186,11 @@ class SampleSheetMerger:
     def __init__(
         self,
         target_version: SampleSheetVersion = SampleSheetVersion.V2,
+        *,
+        min_hamming_distance: int = MIN_HAMMING_DISTANCE,
     ) -> None:
         self.target_version = target_version
+        self.min_hamming_distance = min_hamming_distance
         self._paths: list[Path] = []
 
     # ------------------------------------------------------------------
@@ -267,7 +275,7 @@ class SampleSheetMerger:
         self._check_read_lengths(parsed, result)
         self._check_adapters(parsed, result)
         self._check_index_collisions(parsed, result)
-        self._check_index_distances(parsed, result)
+        self._check_index_distances(parsed, result, min_distance=self.min_hamming_distance)
 
         # ── 3. Abort early if hard conflicts found ───────────────────────
         if result.has_conflicts and abort_on_conflicts:
@@ -688,7 +696,9 @@ class SampleSheetMerger:
             sheet = SampleSheetFactory().create_parser(
                 tmp_path, parse=True, clean=False
             )
-            vresult = SampleSheetValidator().validate(sheet)
+            vresult = SampleSheetValidator().validate(
+                sheet, min_hamming_distance=self.min_hamming_distance
+            )
         except Exception as exc:
             # Convert any parse/validation failure into a structured conflict
             # so merge() always returns a MergeResult rather than raising.

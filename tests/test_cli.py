@@ -2,9 +2,13 @@
 Tests for samplesheet_parser.cli (the ``samplesheet`` CLI command).
 
 Covers:
+- info: exit 0 on valid sheet, shows format/samples/lanes/index type/reads/adapters
+- info: --format json produces parseable output with expected keys
+- info: exit 2 on missing file
 - validate: exit 0 on valid sheet, exit 1 on errors, exit 2 on missing file
 - validate: text output contains format version
 - validate: --format json produces parseable output with expected keys
+- validate: --min-hamming raises warning threshold
 - convert: V1→V2 writes FileFormatVersion, V2→V1 writes IEMFileVersion
 - convert: exit 2 on missing input, exit 2 on unknown --to version
 - diff: exit 0 on identical sheets, exit 1 on differences, exit 2 on missing file
@@ -188,10 +192,127 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 """
 
 
+# V1 sheet with two single indexes that have Hamming distance exactly 3.
+# Default --min-hamming 3 → no warning (3 is not < 3).
+# --min-hamming 4 → INDEX_DISTANCE_TOO_LOW warning (3 < 4).
+_V1_CLOSE_INDEXES = """\
+[Header]
+IEMFileVersion,5
+Experiment Name,DistanceTest
+
+[Reads]
+151
+
+[Settings]
+Adapter,AGATCGGAAGAGCACACGTCTGAACTCCAGTCA
+
+[Data]
+Lane,Sample_ID,index
+1,S1,ATTACTCG
+1,S2,GTTACCCC
+"""
+
+
 def _write(tmp_path: Path, name: str, content: str) -> Path:
     p = tmp_path / name
     p.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
     return p
+
+
+# ---------------------------------------------------------------------------
+# info
+# ---------------------------------------------------------------------------
+
+class TestCLIInfo:
+
+    def test_info_v1_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p)])
+        assert result.exit_code == 0
+
+    def test_info_v1_shows_format(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p)])
+        assert "V1" in result.output
+
+    def test_info_v1_shows_sample_count(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["sample_count"] == 2
+
+    def test_info_v1_shows_read_lengths(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["read_lengths"] == ["151", "151"]
+
+    def test_info_v1_shows_index_type(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p)])
+        assert "dual" in result.output
+
+    def test_info_v2_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["info", str(p)])
+        assert result.exit_code == 0
+
+    def test_info_v2_shows_format(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["info", str(p)])
+        assert "V2" in result.output
+
+    def test_info_v2_shows_instrument(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["info", str(p)])
+        assert "NovaSeqXSeries" in result.output
+
+    def test_info_json_exit_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        assert result.exit_code == 0
+
+    def test_info_json_has_expected_keys(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        for key in ("file", "format", "sample_count", "lanes", "index_type",
+                    "read_lengths", "adapters"):
+            assert key in data, f"missing key: {key}"
+
+    def test_info_json_sample_count(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["sample_count"] == 2
+
+    def test_info_json_format_field(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["info", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["format"] == "V2"
+
+    def test_info_missing_file_exits_2(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["info", str(tmp_path / "nope.csv")])
+        assert result.exit_code == 2
+
+    def test_info_parse_error_exits_2(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from samplesheet_parser import factory as factory_module
+
+        def _explode(self: object, *a: object, **kw: object) -> None:
+            raise ValueError("simulated parse failure")
+
+        monkeypatch.setattr(factory_module.SampleSheetFactory, "create_parser", _explode)
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p)])
+        assert result.exit_code == 2
+
+    def test_info_unknown_format_exits_2(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["info", str(p), "--format", "xml"])
+        assert result.exit_code == 2
 
 
 # ---------------------------------------------------------------------------
@@ -291,6 +412,40 @@ class TestCLIValidate:
         result = runner.invoke(app, ["validate", str(p)])
         assert result.exit_code == 2
         assert "Error" in result.output
+
+    def test_min_hamming_default_no_warning(self, tmp_path: Path) -> None:
+        """Indexes with Hamming distance 3 pass at default --min-hamming 3."""
+        p = _write(tmp_path, "sheet.csv", _V1_CLOSE_INDEXES)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert result.exit_code == 0
+        assert "INDEX_DISTANCE_TOO_LOW" not in result.output
+
+    def test_min_hamming_4_raises_warning(self, tmp_path: Path) -> None:
+        """Indexes with Hamming distance 3 produce a warning at --min-hamming 4."""
+        p = _write(tmp_path, "sheet.csv", _V1_CLOSE_INDEXES)
+        result = runner.invoke(app, ["validate", str(p), "--min-hamming", "4"])
+        assert "INDEX_DISTANCE_TOO_LOW" in result.output
+
+    def test_min_hamming_json_includes_threshold(self, tmp_path: Path) -> None:
+        """--format json output includes the min_hamming_distance value used."""
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(
+            app, ["validate", str(p), "--format", "json", "--min-hamming", "4"]
+        )
+        data = json.loads(result.output)
+        assert data["min_hamming_distance"] == 4
+
+    def test_min_hamming_zero_exits_2(self, tmp_path: Path) -> None:
+        """--min-hamming 0 is invalid and should exit 2."""
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--min-hamming", "0"])
+        assert result.exit_code == 2
+
+    def test_min_hamming_negative_exits_2(self, tmp_path: Path) -> None:
+        """--min-hamming -1 is invalid and should exit 2."""
+        p = _write(tmp_path, "sheet.csv", _V1_A)
+        result = runner.invoke(app, ["validate", str(p), "--min-hamming", "-1"])
+        assert result.exit_code == 2
 
 
 # ---------------------------------------------------------------------------
