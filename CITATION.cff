@@ -8,8 +8,8 @@ abstract: >
   Provides format auto-detection, bidirectional V1/V2 conversion,
   structural and index validation, sheet diffing, and cross-project
   merging with Hamming-distance collision detection.
-version: 0.3.2
-date-released: 2026-03-12
+version: 1.0.0
+date-released: 2026-04-05
 license: Apache-2.0
 url: "https://github.com/chaitanyakasaraneni/samplesheet-parser"
 repository-code: "https://github.com/chaitanyakasaraneni/samplesheet-parser"
