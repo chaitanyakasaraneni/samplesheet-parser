@@ -140,12 +140,12 @@ def normalize_index_lengths(
         out = dict(sample)
 
         if index1_key and target_i1:
-            v1: str | None = out.get(index1_key)  # type: ignore[assignment]
+            v1: str | None = out.get(index1_key)
             if v1:
                 out[index1_key] = _apply(v1, target_i1, strategy)
 
         if index2_key and target_i2:
-            v2: str | None = out.get(index2_key)  # type: ignore[assignment]
+            v2: str | None = out.get(index2_key)
             if v2:
                 out[index2_key] = _apply(v2, target_i2, strategy)
 
@@ -157,6 +157,7 @@ def normalize_index_lengths(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _detect_key(samples: list[dict[str, Any]], candidates: tuple[str, ...]) -> str:
     """Return the first candidate key that has at least one non-empty value.

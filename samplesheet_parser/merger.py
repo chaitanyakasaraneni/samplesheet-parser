@@ -51,6 +51,7 @@ from samplesheet_parser.validators import (
 # Result types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class MergeConflict:
     """A single error or warning produced during a merge.
@@ -66,8 +67,9 @@ class MergeConflict:
     context:
         Optional dict with extra detail.
     """
-    level:   str
-    code:    str
+
+    level: str
+    code: str
     message: str
     context: dict[str, Any] = field(default_factory=dict)
 
@@ -96,11 +98,12 @@ class MergeResult:
     source_versions:
         Format version detected for each input file, keyed by file path.
     """
-    has_conflicts:   bool = False
-    conflicts:       list[MergeConflict] = field(default_factory=list)
-    warnings:        list[MergeConflict] = field(default_factory=list)
-    output_path:     Path | None = None
-    sample_count:    int = 0
+
+    has_conflicts: bool = False
+    conflicts: list[MergeConflict] = field(default_factory=list)
+    warnings: list[MergeConflict] = field(default_factory=list)
+    output_path: Path | None = None
+    sample_count: int = 0
     source_versions: dict[str, str] = field(default_factory=dict)
 
     def add_conflict(self, code: str, message: str, **context: Any) -> None:
@@ -130,19 +133,24 @@ class MergeResult:
 
 # Validator codes that are fully covered by a pre-merge cross-sheet check
 # and must be suppressed in _validate_merged() to avoid duplicate reporting.
-_PRE_MERGE_CONFLICT_CODES: frozenset[str] = frozenset({
-    "INDEX_COLLISION",   # covered by _check_index_collisions
-    "DUPLICATE_INDEX",   # same root cause — validator sees result of collision
-})
+_PRE_MERGE_CONFLICT_CODES: frozenset[str] = frozenset(
+    {
+        "INDEX_COLLISION",  # covered by _check_index_collisions
+        "DUPLICATE_INDEX",  # same root cause — validator sees result of collision
+    }
+)
 
-_PRE_MERGE_WARNING_CODES: frozenset[str] = frozenset({
-    "INDEX_DISTANCE_TOO_LOW",  # covered by _check_index_distances
-})
+_PRE_MERGE_WARNING_CODES: frozenset[str] = frozenset(
+    {
+        "INDEX_DISTANCE_TOO_LOW",  # covered by _check_index_distances
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Merger
 # ---------------------------------------------------------------------------
+
 
 class SampleSheetMerger:
     """Combine multiple per-project SampleSheet.csv files for one flow cell.
@@ -298,10 +306,7 @@ class SampleSheetMerger:
         # ── 6. Write ─────────────────────────────────────────────────────
         out = writer.write(output_path, validate=False)  # already validated above
         result.output_path = out
-        logger.info(
-            f"Merged {len(parsed)} sheet(s) → {out} "
-            f"({result.sample_count} samples)"
-        )
+        logger.info(f"Merged {len(parsed)} sheet(s) → {out} " f"({result.sample_count} samples)")
         return result
 
     # ------------------------------------------------------------------
@@ -323,9 +328,10 @@ class SampleSheetMerger:
                 # cleaning could modify input sheets or create .backup files.
                 sheet = factory.create_parser(str(p), parse=True, clean=False)
                 parsed.append((p, sheet))
-                versions_seen.add(factory.version)
-                result.source_versions[str(p)] = factory.version.value
-                logger.debug(f"Parsed {p} as {factory.version.value}")
+                if factory.version is not None:
+                    versions_seen.add(factory.version)
+                    result.source_versions[str(p)] = factory.version.value
+                    logger.debug(f"Parsed {p} as {factory.version.value}")
             except Exception as exc:
                 result.add_conflict(
                     "PARSE_ERROR",
@@ -367,7 +373,7 @@ class SampleSheetMerger:
                 # Use a fixed key order so [Read1Cycles=151, Read2Cycles=101]
                 # and [Read2Cycles=101, Read1Cycles=151] produce the same key
                 # and don't spuriously trigger READ_LENGTH_CONFLICT.
-                lengths: list[int] = []
+                lengths = []
                 for read_key in ("Read1Cycles", "Read2Cycles"):
                     v = r.get(read_key)
                     if v:
@@ -383,8 +389,7 @@ class SampleSheetMerger:
 
         if len(length_map) > 1:
             detail = "; ".join(
-                f"{p.name}: {lens if lens else '(none)'}"
-                for lens, p in length_map.values()
+                f"{p.name}: {lens if lens else '(none)'}" for lens, p in length_map.values()
             )
             result.add_conflict(
                 "READ_LENGTH_CONFLICT",
@@ -413,9 +418,7 @@ class SampleSheetMerger:
         )
 
         for p, sheet in parsed[1:]:
-            adapters = frozenset(
-                a.upper() for a in (getattr(sheet, "adapters", []) or []) if a
-            )
+            adapters = frozenset(a.upper() for a in (getattr(sheet, "adapters", []) or []) if a)
             # Only warn when both sheets have adapters and they differ; if
             # either sheet has no adapters, there is nothing to conflict.
             if adapters and primary_adapters and adapters != primary_adapters:
@@ -448,12 +451,12 @@ class SampleSheetMerger:
             # Prefer per-row records; fall back to samples() if unavailable.
             records = getattr(sheet, "records", None) or sheet.samples()
             for record in records:
-                lane    = record.get("lane") or record.get("Lane")
-                idx1    = (record.get("index") or record.get("Index") or "").upper()
-                idx2    = (record.get("index2") or record.get("Index2") or "").upper()
+                lane = record.get("lane") or record.get("Lane")
+                idx1 = (record.get("index") or record.get("Index") or "").upper()
+                idx2 = (record.get("index2") or record.get("Index2") or "").upper()
                 raw_sid = record.get("sample_id") or record.get("Sample_ID")
-                sid     = raw_sid or "?"
-                key     = f"{idx1}+{idx2}" if idx2 else idx1
+                sid = raw_sid or "?"
+                key = f"{idx1}+{idx2}" if idx2 else idx1
 
                 # Silently skip incomplete rows — _build_writer will emit
                 # INCOMPLETE_SAMPLE_RECORD for them; no collision warning here.
@@ -498,9 +501,9 @@ class SampleSheetMerger:
         for p, sheet in parsed:
             records = getattr(sheet, "records", None) or sheet.samples()
             for record in records:
-                lane    = record.get("lane") or record.get("Lane")
-                idx1    = (record.get("index") or record.get("Index") or "").upper()
-                idx2    = (record.get("index2") or record.get("Index2") or "").upper()
+                lane = record.get("lane") or record.get("Lane")
+                idx1 = (record.get("index") or record.get("Index") or "").upper()
+                idx2 = (record.get("index2") or record.get("Index2") or "").upper()
                 sid_raw = record.get("sample_id") or record.get("Sample_ID")
                 # Skip records lacking a primary index or Sample_ID, to align
                 # with _build_writer(), which does not include such rows.
@@ -588,22 +591,43 @@ class SampleSheetMerger:
         # Keys that belong in [Header]/[BCLConvert_Settings] or are handled
         # explicitly below — must not leak into [Data]/[BCLConvert_Data] as
         # extra per-sample columns.
-        _STANDARD_SAMPLE_KEYS: frozenset[str] = frozenset({
-            # core sample fields (lowercase — V1/V2 shared interface)
-            "sample_id", "sample_name", "lane", "index", "index2",
-            "sample_project", "description", "sample_plate", "sample_well",
-            "i7_index_id", "i5_index_id",
-            # capitalised variants returned by some parser versions
-            "Index", "Index2", "Sample_Project",
-            "I7_Index_ID", "I5_Index_ID",
-            # raw CSV column-name variants in sheet.records (Title-case / V1 headers)
-            "Lane", "Sample_ID", "Sample_Name", "Description",
-            "Sample_Plate", "Sample_Well",
-            # run-level metadata that sheet.samples() may include for V2
-            "flowcell_id", "experiment_name",
-            "run_name", "instrument_platform", "instrument_type",
-            "run_description", "file_format_version",
-        })
+        _STANDARD_SAMPLE_KEYS: frozenset[str] = frozenset(
+            {
+                # core sample fields (lowercase — V1/V2 shared interface)
+                "sample_id",
+                "sample_name",
+                "lane",
+                "index",
+                "index2",
+                "sample_project",
+                "description",
+                "sample_plate",
+                "sample_well",
+                "i7_index_id",
+                "i5_index_id",
+                # capitalised variants returned by some parser versions
+                "Index",
+                "Index2",
+                "Sample_Project",
+                "I7_Index_ID",
+                "I5_Index_ID",
+                # raw CSV column-name variants in sheet.records (Title-case / V1 headers)
+                "Lane",
+                "Sample_ID",
+                "Sample_Name",
+                "Description",
+                "Sample_Plate",
+                "Sample_Well",
+                # run-level metadata that sheet.samples() may include for V2
+                "flowcell_id",
+                "experiment_name",
+                "run_name",
+                "instrument_platform",
+                "instrument_type",
+                "run_description",
+                "file_format_version",
+            }
+        )
 
         # Add samples from all other sheets.
         # Use per-row records (not samples()) so multi-lane sheets — where the
@@ -613,14 +637,14 @@ class SampleSheetMerger:
             logger.debug(f"Adding samples from {p.name}")
             sheet_records = getattr(sheet, "records", None) or sheet.samples()
             for sample in sheet_records:
-                sid  = sample.get("sample_id") or sample.get("Sample_ID") or ""
-                idx  = sample.get("index") or sample.get("Index") or ""
+                sid = sample.get("sample_id") or sample.get("Sample_ID") or ""
+                idx = sample.get("index") or sample.get("Index") or ""
                 idx2 = sample.get("index2") or sample.get("Index2") or ""
                 lane = sample.get("lane") or sample.get("Lane") or "1"
                 # Fix: fall back to capitalised key for V2 sheets
                 proj = sample.get("sample_project") or sample.get("Sample_Project") or ""
-                i7   = sample.get("i7_index_id") or sample.get("I7_Index_ID") or ""
-                i5   = sample.get("i5_index_id") or sample.get("I5_Index_ID") or ""
+                i7 = sample.get("i7_index_id") or sample.get("I7_Index_ID") or ""
+                i5 = sample.get("i5_index_id") or sample.get("I5_Index_ID") or ""
 
                 if not sid or not idx:
                     missing = []
@@ -641,16 +665,17 @@ class SampleSheetMerger:
 
                 # Only pass through genuine per-sample extra columns
                 extra = {
-                    k: v for k, v in sample.items()
+                    k: v
+                    for k, v in sample.items()
                     if k not in _STANDARD_SAMPLE_KEYS and v is not None
                 }
 
                 # Preserve per-sample metadata across all inputs by mapping
                 # both normalised and raw (capitalised) keys from sheet.records.
-                sample_name  = sample.get("sample_name") or sample.get("Sample_Name") or ""
-                description  = sample.get("description") or sample.get("Description") or ""
+                sample_name = sample.get("sample_name") or sample.get("Sample_Name") or ""
+                description = sample.get("description") or sample.get("Description") or ""
                 sample_plate = sample.get("sample_plate") or sample.get("Sample_Plate") or ""
-                sample_well  = sample.get("sample_well") or sample.get("Sample_Well") or ""
+                sample_well = sample.get("sample_well") or sample.get("Sample_Well") or ""
 
                 writer.add_sample(
                     sid,
@@ -693,9 +718,7 @@ class SampleSheetMerger:
             tmp_path = tmp.name
 
         try:
-            sheet = SampleSheetFactory().create_parser(
-                tmp_path, parse=True, clean=False
-            )
+            sheet = SampleSheetFactory().create_parser(tmp_path, parse=True, clean=False)
             vresult = SampleSheetValidator().validate(
                 sheet, min_hamming_distance=self.min_hamming_distance
             )
