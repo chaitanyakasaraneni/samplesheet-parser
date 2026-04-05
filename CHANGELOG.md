@@ -6,6 +6,51 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0] - 2026-04-05
+
+### Added
+
+- **`py.typed` marker** — package now ships inline type information per
+  PEP 561, enabling mypy and pyright to type-check downstream code without
+  extra configuration.
+
+- **`InstrumentPlatform` and `UMILocation` enums exported** — both were
+  already defined in `enums.py` but not part of the public API. They are now
+  importable directly from the top-level package and listed in `__all__`.
+
+- **`.pre-commit-config.yaml`** — pre-commit hook configuration included in
+  the repository (black, ruff with `--fix`, mypy, and standard file hygiene
+  hooks) so contributors get the same checks locally that CI enforces.
+
+### Fixed
+
+- `SampleSheetFactory.create_parser()` now returns a typed local variable
+  instead of `self.parser`, resolving a mypy `return-value` error caused by
+  the instance attribute being typed as `SampleSheetV1 | SampleSheetV2 | None`.
+
+- `SampleSheetMerger._parse_all()` guards against `factory.version` being
+  `None` before accessing `.value`, fixing a potential `AttributeError` on
+  unexpected parse paths.
+
+- Removed redundant `type: ignore[assignment]` suppressions in
+  `index_utils.py` that were no longer needed under strict mypy.
+
+### Changed
+
+- Development status classifier updated from `3 - Alpha` to
+  `5 - Production/Stable`.
+
+- Ruff config adds `[tool.ruff.lint.per-file-ignores]` to suppress E402 for
+  `samplesheet_parser/__init__.py`, where the version-detection block
+  intentionally precedes the package re-exports.
+
+- **Stability guarantee** — `1.0.0` marks the first stable release.
+  The public API (all names in `__init__.__all__`) is now subject to
+  semantic versioning: breaking changes will not be made without a major
+  version bump.
+
+---
+
 ## [0.3.4] - 2026-04-04
 
 ### Added
