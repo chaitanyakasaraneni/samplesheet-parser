@@ -68,7 +68,7 @@ class SampleSheetFactory:
 
     def __init__(self) -> None:
         self.version: SampleSheetVersion | None = None
-        self.parser:  SampleSheetV1 | SampleSheetV2 | None = None
+        self.parser: SampleSheetV1 | SampleSheetV2 | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -124,14 +124,16 @@ class SampleSheetFactory:
         self.version = detected
         kwargs: dict[str, Any] = dict(clean=clean, experiment_id=experiment_id, parse=parse)
 
+        parser: SampleSheetV1 | SampleSheetV2
         if detected == SampleSheetVersion.V2:
             logger.info("Detected BCLConvert V2 format — using SampleSheetV2")
-            self.parser = SampleSheetV2(path, **kwargs)
+            parser = SampleSheetV2(path, **kwargs)
         else:
             logger.info("Detected IEM V1 format — using SampleSheetV1")
-            self.parser = SampleSheetV1(path, **kwargs)
+            parser = SampleSheetV1(path, **kwargs)
 
-        return self.parser
+        self.parser = parser
+        return parser
 
     def get_umi_length(self) -> int:
         """Return the UMI length for the currently selected parser.

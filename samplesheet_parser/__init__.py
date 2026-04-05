@@ -29,12 +29,12 @@ except PackageNotFoundError:
     __version__ = "0.1.0-dev"
 
 __author__ = "Chaitanya Kasaraneni"
-__email__  = "kc.kasaraneni@gmail.com"
+__email__ = "kc.kasaraneni@gmail.com"
 __license__ = "Apache 2.0"
 
 from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.diff import DiffResult, SampleSheetDiff
-from samplesheet_parser.enums import IndexType, SampleSheetVersion
+from samplesheet_parser.enums import IndexType, InstrumentPlatform, SampleSheetVersion, UMILocation
 from samplesheet_parser.factory import SampleSheetFactory
 from samplesheet_parser.index_utils import normalize_index_lengths
 from samplesheet_parser.merger import MergeResult, SampleSheetMerger
@@ -49,6 +49,8 @@ __all__ = [
     "SampleSheetFactory",
     "SampleSheetVersion",
     "IndexType",
+    "InstrumentPlatform",
+    "UMILocation",
     "SampleSheetValidator",
     "ValidationResult",
     "SampleSheetConverter",
