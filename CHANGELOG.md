@@ -6,6 +6,53 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.4] - 2026-04-04
+
+### Added
+
+- **`samplesheet info` CLI command** — prints a concise summary of any V1 or
+  V2 sample sheet (format, sample count, lanes, index type, read lengths,
+  adapters, experiment name, instrument). Supports `--format json` for
+  machine-readable output; exits 0 on success, 2 on unreadable files.
+
+- **Configurable Hamming distance threshold** — `SampleSheetValidator.validate()`
+  now accepts a `min_hamming_distance` keyword argument (default: 3) so labs
+  using longer indexes can enforce stricter thresholds without changing the
+  module-level constant.
+  - `SampleSheetMerger` accepts the same parameter in `__init__()` and applies
+    it to both the intra-sheet and cross-sheet Hamming checks as well as the
+    post-merge validation step.
+  - `samplesheet validate` exposes `--min-hamming N` (must be ≥ 1; exits 2 on
+    invalid input). The JSON output includes `min_hamming_distance` for
+    auditability.
+
+- **`normalize_index_lengths()` utility** — normalizes index sequence lengths
+  across a list of sample dicts (output of `sheet.samples()`) to a consistent
+  length before merging sheets with mixed-length indexes.
+  - `strategy="trim"` — trims all indexes to the shortest sequence length.
+  - `strategy="pad"` — pads shorter indexes to the longest length using `"N"`
+    wildcard characters (supported by BCLConvert ≥ 3.9 and bcl2fastq ≥ 2.20).
+  - Auto-detects V1-style (`index`/`index2`) and V2-style (`Index`/`Index2`)
+    field names; explicit `index1_key`/`index2_key` overrides supported.
+  - Exported from the top-level package as `normalize_index_lengths`.
+
+- **CI / pre-commit integration guide** in README — GitHub Actions workflow
+  and pre-commit hook configuration for automatic sample sheet validation on
+  every commit or pull request that touches a `SampleSheet.csv`.
+
+### Fixed
+
+- `_detect_key()` in `index_utils` now selects the key with at least one
+  non-empty value before falling back to key presence, preventing silent
+  normalization skip when a key exists but all its values are `None` or `""`.
+
+### Changed
+
+- `--min-hamming` CLI option default and help text are now derived from the
+  `MIN_HAMMING_DISTANCE` constant in `validators.py` to prevent drift.
+
+---
+
 ## [0.3.3] - 2026-03-13
 
 ### Documentation
