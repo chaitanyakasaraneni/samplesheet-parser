@@ -59,12 +59,35 @@ from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.validators import MIN_HAMMING_DISTANCE as _MIN_HAMMING_DEFAULT
 
 if _TYPER_AVAILABLE:
+    from samplesheet_parser import __version__
+
+    def _version_callback(value: bool) -> None:
+        if value:
+            typer.echo(f"samplesheet-parser {__version__}")
+            raise typer.Exit()
+
     app = typer.Typer(
         name="samplesheet",
         help="Format-agnostic parser and toolkit for Illumina SampleSheet.csv files.",
         no_args_is_help=True,
         pretty_exceptions_enable=False,
     )
+
+    @app.callback()
+    def _main_callback(
+        version: Annotated[
+            bool,
+            typer.Option(
+                "--version",
+                "-V",
+                help="Show version and exit.",
+                callback=_version_callback,
+                is_eager=True,
+                is_flag=True,
+            ),
+        ] = False,
+    ) -> None:
+        pass
 
     # ---------------------------------------------------------------------------
     # Shared option types

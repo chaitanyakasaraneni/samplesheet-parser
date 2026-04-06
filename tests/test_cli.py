@@ -220,8 +220,35 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
+# --version
+# ---------------------------------------------------------------------------
+
+
+class TestCLIVersion:
+
+    def test_version_exits_0(self) -> None:
+        result = runner.invoke(app, ["--version"])
+        assert result.exit_code == 0
+
+    def test_version_short_flag_exits_0(self) -> None:
+        result = runner.invoke(app, ["-V"])
+        assert result.exit_code == 0
+
+    def test_version_output_contains_package_name(self) -> None:
+        result = runner.invoke(app, ["--version"])
+        assert "samplesheet-parser" in result.output
+
+    def test_version_output_contains_version_string(self) -> None:
+        from samplesheet_parser import __version__
+
+        result = runner.invoke(app, ["--version"])
+        assert __version__ in result.output
+
+
+# ---------------------------------------------------------------------------
 # info
 # ---------------------------------------------------------------------------
+
 
 class TestCLIInfo:
 
@@ -276,8 +303,15 @@ class TestCLIInfo:
         p = _write(tmp_path, "sheet.csv", _V1_A)
         result = runner.invoke(app, ["info", str(p), "--format", "json"])
         data = json.loads(result.output)
-        for key in ("file", "format", "sample_count", "lanes", "index_type",
-                    "read_lengths", "adapters"):
+        for key in (
+            "file",
+            "format",
+            "sample_count",
+            "lanes",
+            "index_type",
+            "read_lengths",
+            "adapters",
+        ):
             assert key in data, f"missing key: {key}"
 
     def test_info_json_sample_count(self, tmp_path: Path) -> None:
@@ -318,6 +352,7 @@ class TestCLIInfo:
 # ---------------------------------------------------------------------------
 # validate
 # ---------------------------------------------------------------------------
+
 
 class TestCLIValidate:
 
@@ -397,9 +432,7 @@ class TestCLIValidate:
         assert result.exit_code == 0
         assert not (tmp_path / "sheet.csv.backup").exists()
 
-    def test_parse_error_exits_2(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_parse_error_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Lines 148-150: create_parser raises → exit 2 with error message."""
         from samplesheet_parser import factory as factory_module
 
@@ -429,9 +462,7 @@ class TestCLIValidate:
     def test_min_hamming_json_includes_threshold(self, tmp_path: Path) -> None:
         """--format json output includes the min_hamming_distance value used."""
         p = _write(tmp_path, "sheet.csv", _V1_A)
-        result = runner.invoke(
-            app, ["validate", str(p), "--format", "json", "--min-hamming", "4"]
-        )
+        result = runner.invoke(app, ["validate", str(p), "--format", "json", "--min-hamming", "4"])
         data = json.loads(result.output)
         assert data["min_hamming_distance"] == 4
 
@@ -451,6 +482,7 @@ class TestCLIValidate:
 # ---------------------------------------------------------------------------
 # convert
 # ---------------------------------------------------------------------------
+
 
 class TestCLIConvert:
 
@@ -517,6 +549,7 @@ class TestCLIConvert:
 # diff
 # ---------------------------------------------------------------------------
 
+
 class TestCLIDiff:
 
     def test_identical_sheets_exit_0(self, tmp_path: Path) -> None:
@@ -567,9 +600,15 @@ class TestCLIDiff:
         b = _write(tmp_path, "b.csv", _V1_B)
         result = runner.invoke(app, ["diff", str(a), str(b), "--format", "json"])
         data = json.loads(result.output)
-        for key in ("has_changes", "source_version", "target_version",
-                    "header_changes", "samples_added", "samples_removed",
-                    "sample_changes"):
+        for key in (
+            "has_changes",
+            "source_version",
+            "target_version",
+            "header_changes",
+            "samples_added",
+            "samples_removed",
+            "sample_changes",
+        ):
             assert key in data
 
     def test_cross_format_v1_v2_exits_1_on_differences(self, tmp_path: Path) -> None:
@@ -598,9 +637,7 @@ class TestCLIDiff:
         assert "Sample field changes" in result.output
         assert "SampleA1" in result.output
 
-    def test_diff_exception_exits_2(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_diff_exception_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Lines 260-262: compare() raises → exit 2 with error message."""
         from samplesheet_parser import diff as diff_module
 
@@ -617,7 +654,7 @@ class TestCLIDiff:
 
     def test_text_output_samples_added(self, tmp_path: Path) -> None:
         """Lines 307-309: samples_added branch in text output."""
-        a = _write(tmp_path, "a.csv", _V1_A)           # has SampleA1, SampleA2
+        a = _write(tmp_path, "a.csv", _V1_A)  # has SampleA1, SampleA2
         b = _write(tmp_path, "b.csv", _V1_A_MODIFIED)  # has SampleA1, SampleA3
         result = runner.invoke(app, ["diff", str(a), str(b)])
         assert result.exit_code == 1
@@ -626,7 +663,7 @@ class TestCLIDiff:
     def test_text_output_samples_removed(self, tmp_path: Path) -> None:
         """Lines 310-311: samples_removed branch in text output."""
         a = _write(tmp_path, "a.csv", _V1_A_MODIFIED)  # has SampleA1, SampleA3
-        b = _write(tmp_path, "b.csv", _V1_A)           # has SampleA1, SampleA2
+        b = _write(tmp_path, "b.csv", _V1_A)  # has SampleA1, SampleA2
         result = runner.invoke(app, ["diff", str(a), str(b)])
         assert result.exit_code == 1
         assert "added" in result.output.lower() or "removed" in result.output.lower()
@@ -635,6 +672,7 @@ class TestCLIDiff:
 # ---------------------------------------------------------------------------
 # merge
 # ---------------------------------------------------------------------------
+
 
 class TestCLIMerge:
 
@@ -667,10 +705,16 @@ class TestCLIMerge:
 
     def test_missing_file_exits_2(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
-        result = runner.invoke(app, [
-            "merge", str(a), str(tmp_path / "nope.csv"),
-            "--output", str(tmp_path / "out.csv"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "merge",
+                str(a),
+                str(tmp_path / "nope.csv"),
+                "--output",
+                str(tmp_path / "out.csv"),
+            ],
+        )
         assert result.exit_code == 2
 
     def test_force_flag_writes_despite_collision(self, tmp_path: Path) -> None:
@@ -701,9 +745,18 @@ class TestCLIMerge:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "combined.csv"
-        result = runner.invoke(app, [
-            "merge", str(a), str(b), "--output", str(out), "--format", "json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "merge",
+                str(a),
+                str(b),
+                "--output",
+                str(out),
+                "--format",
+                "json",
+            ],
+        )
         data = json.loads(result.output)
         assert data is not None
 
@@ -711,21 +764,45 @@ class TestCLIMerge:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "combined.csv"
-        result = runner.invoke(app, [
-            "merge", str(a), str(b), "--output", str(out), "--format", "json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "merge",
+                str(a),
+                str(b),
+                "--output",
+                str(out),
+                "--format",
+                "json",
+            ],
+        )
         data = json.loads(result.output)
-        for key in ("has_conflicts", "sample_count", "output_path",
-                    "source_versions", "conflicts", "warnings"):
+        for key in (
+            "has_conflicts",
+            "sample_count",
+            "output_path",
+            "source_versions",
+            "conflicts",
+            "warnings",
+        ):
             assert key in data
 
     def test_json_sample_count_is_correct(self, tmp_path: Path) -> None:
-        a = _write(tmp_path, "a.csv", _V1_A)   # 2 samples
-        b = _write(tmp_path, "b.csv", _V1_B)   # 2 samples
+        a = _write(tmp_path, "a.csv", _V1_A)  # 2 samples
+        b = _write(tmp_path, "b.csv", _V1_B)  # 2 samples
         out = tmp_path / "combined.csv"
-        result = runner.invoke(app, [
-            "merge", str(a), str(b), "--output", str(out), "--format", "json",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "merge",
+                str(a),
+                str(b),
+                "--output",
+                str(out),
+                "--format",
+                "json",
+            ],
+        )
         data = json.loads(result.output)
         assert data["sample_count"] == 4
 
@@ -739,9 +816,7 @@ class TestCLIMerge:
         assert result.exit_code == 1
         assert out.exists()
 
-    def test_merge_exception_exits_2(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_merge_exception_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """Lines 370-372: merger.merge() raises → exit 2 with error message."""
         from samplesheet_parser import merger as merger_module
 
@@ -752,9 +827,16 @@ class TestCLIMerge:
 
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
-        result = runner.invoke(app, [
-            "merge", str(a), str(b), "--output", str(tmp_path / "out.csv"),
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "merge",
+                str(a),
+                str(b),
+                "--output",
+                str(tmp_path / "out.csv"),
+            ],
+        )
         assert result.exit_code == 2
         assert "Error" in result.output
 
@@ -762,6 +844,7 @@ class TestCLIMerge:
 # ---------------------------------------------------------------------------
 # _validate_fmt — unknown format exits 2 on all commands that accept --format
 # ---------------------------------------------------------------------------
+
 
 class TestCLIUnknownFormat:
 
@@ -780,7 +863,16 @@ class TestCLIUnknownFormat:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "combined.csv"
-        result = runner.invoke(app, [
-            "merge", str(a), str(b), "--output", str(out), "--format", "xml",
-        ])
+        result = runner.invoke(
+            app,
+            [
+                "merge",
+                str(a),
+                str(b),
+                "--output",
+                str(out),
+                "--format",
+                "xml",
+            ],
+        )
         assert result.exit_code == 2
