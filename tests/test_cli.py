@@ -244,6 +244,20 @@ class TestCLIVersion:
         result = runner.invoke(app, ["--version"])
         assert __version__ in result.output
 
+    def test_version_fallback_when_package_not_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from importlib.metadata import PackageNotFoundError
+
+        import samplesheet_parser.cli as cli_module
+
+        monkeypatch.setattr(
+            cli_module,
+            "_metadata_version",
+            lambda _: (_ for _ in ()).throw(PackageNotFoundError()),
+        )
+        result = runner.invoke(app, ["--version"])
+        assert result.exit_code == 0
+        assert "unknown" in result.output
+
 
 # ---------------------------------------------------------------------------
 # info
