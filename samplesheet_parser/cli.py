@@ -59,11 +59,16 @@ from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.validators import MIN_HAMMING_DISTANCE as _MIN_HAMMING_DEFAULT
 
 if _TYPER_AVAILABLE:
-    from samplesheet_parser import __version__
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _metadata_version
 
     def _version_callback(value: bool) -> None:
         if value:
-            typer.echo(f"samplesheet-parser {__version__}")
+            try:
+                _ver = _metadata_version("samplesheet-parser")
+            except PackageNotFoundError:
+                _ver = "unknown"
+            typer.echo(f"samplesheet-parser {_ver}")
             raise typer.Exit()
 
     app = typer.Typer(
