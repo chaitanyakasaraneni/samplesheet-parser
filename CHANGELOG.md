@@ -6,6 +6,54 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.0] - 2026-04-05
+
+### Added
+
+- **`--version` / `-V` CLI flag** — prints the installed package version
+  and exits. Reads the version via `importlib.metadata` so the full package
+  is not loaded just to print a version string.
+
+- **`demo_converter.py`** — runnable example covering V1→V2 conversion,
+  V2→V1 (lossy) conversion, and a full V1→V2→V1 roundtrip with sample
+  identity verification.
+
+- **`demo_diff.py`** — runnable example covering five diff scenarios:
+  identical sheets, header change, sample added, index correction, and
+  cross-format (V1 vs its V2 conversion) diff.
+
+- **`demo_writer.py`** — runnable example covering the fluent
+  `SampleSheetWriter` API: building V1 and V2 sheets from scratch,
+  correcting a sample index on an existing sheet, and removing a sample
+  before submission.
+
+- **`demo_index_utils.py`** — runnable example covering
+  `normalize_index_lengths` with trim and pad strategies, dual-index
+  normalization, and a real-sheet walkthrough.
+
+### Fixed
+
+- `SampleSheetFactory.create_parser()` now returns a typed local variable
+  instead of `self.parser`, resolving a mypy `return-value` error caused
+  by the instance attribute being typed as `SampleSheetV1 | SampleSheetV2
+  | None`.
+
+- `cli.py` fallback type aliases (`_FormatOption`, `_OutputOption`,
+  `_VersionOption`) reduced from `type: ignore[assignment,misc]` to
+  `type: ignore[misc]` — the `assignment` suppression was unused under
+  current mypy.
+
+### Tests
+
+- `TestCLIVersion` — four new tests covering `--version` exit code, `-V`
+  short flag, package name in output, version string in output, and
+  `PackageNotFoundError` fallback to `"unknown"`.
+
+- Five Copilot PR #23 review comments resolved: long test signatures and
+  `runner.invoke(...)` calls wrapped to the 100-char line limit.
+
+---
+
 ## [1.0.0] - 2026-04-05
 
 ### Added

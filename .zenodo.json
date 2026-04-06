@@ -4,7 +4,7 @@
   "upload_type": "software",
   "access_right": "open",
   "license": "Apache-2.0",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "keywords": [
     "bioinformatics", "Illumina", "SampleSheet", "BCLConvert",
     "demultiplexing", "genomics", "sequencing", "Python"
