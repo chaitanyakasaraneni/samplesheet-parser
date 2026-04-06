@@ -28,7 +28,7 @@ Thanks for contributing! This guide explains how to set up a local development e
 git clone https://github.com/chaitanyakasaraneni/samplesheet-parser.git
 cd samplesheet-parser
 
-# 2. Create a virtual environment (Python 3.10+)
+# 2. Create a virtual environment (Python 3.12+)
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
