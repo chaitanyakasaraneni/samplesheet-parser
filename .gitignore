@@ -45,3 +45,4 @@ env/
 *.backup
 *.tmp
 
+site/
