@@ -1,0 +1,4 @@
+samplesheetparser:
+  - modules/nf-core/samplesheetparser/**
+samplesheetparser_convert:
+  - modules/nf-core/samplesheetparser/convert/**
