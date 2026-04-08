@@ -558,6 +558,34 @@ class TestCLIConvert:
         assert result.exit_code == 1
         assert "Error" in result.output
 
+    def test_convert_json_format_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V1_A)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(
+            app, ["convert", str(p), "--to", "v2", "--output", str(out), "--format", "json"]
+        )
+        assert result.exit_code == 0
+
+    def test_convert_json_format_is_valid_json(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V1_A)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(
+            app, ["convert", str(p), "--to", "v2", "--output", str(out), "--format", "json"]
+        )
+        data = json.loads(result.output)
+        assert data["source_version"] == "V1"
+        assert data["target_version"] == "V2"
+        assert data["input"] == str(p)
+        assert data["output"] == str(out)
+
+    def test_convert_bad_format_exits_2(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "in.csv", _V1_A)
+        out = tmp_path / "out.csv"
+        result = runner.invoke(
+            app, ["convert", str(p), "--to", "v2", "--output", str(out), "--format", "xml"]
+        )
+        assert result.exit_code == 2
+
 
 # ---------------------------------------------------------------------------
 # diff

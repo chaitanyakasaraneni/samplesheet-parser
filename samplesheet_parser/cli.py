@@ -30,6 +30,7 @@ Usage
 
     samplesheet convert SampleSheet_v1.csv --to v2 --output SampleSheet_v2.csv
     samplesheet convert SampleSheet_v2.csv --to v1 --output SampleSheet_v1.csv
+    samplesheet convert SampleSheet_v1.csv --to v2 --output out.csv --format json
 
     samplesheet diff old/SampleSheet.csv new/SampleSheet.csv
     samplesheet diff old/SampleSheet.csv new/SampleSheet.csv --format json
@@ -325,6 +326,7 @@ if _TYPER_AVAILABLE:
         path: Annotated[Path, typer.Argument(help="Input SampleSheet.csv.", metavar="FILE")],
         to: _VersionOption = "v2",
         output: _OutputOption = Path("SampleSheet_converted.csv"),
+        fmt: _FormatOption = "text",
     ) -> None:
         """Convert a sample sheet between V1 (IEM/bcl2fastq) and V2 (BCLConvert) formats.
 
@@ -335,6 +337,7 @@ if _TYPER_AVAILABLE:
         """
         from samplesheet_parser.converter import SampleSheetConverter
 
+        _validate_fmt(fmt)
         if not path.exists():
             typer.echo(f"Error: file not found: {path}", err=True)
             raise typer.Exit(code=2)
@@ -353,9 +356,21 @@ if _TYPER_AVAILABLE:
 
         if converter.source_version is None:  # pragma: no cover
             raise RuntimeError("SampleSheetConverter.source_version must be set after conversion")
-        typer.echo(
-            f"Converted {path.name} ({converter.source_version.value})" f" → {out} ({target.value})"
-        )
+
+        if fmt == "json":
+            _print_json(
+                {
+                    "input": str(path),
+                    "output": str(out),
+                    "source_version": converter.source_version.value,
+                    "target_version": target.value,
+                }
+            )
+        else:
+            typer.echo(
+                f"Converted {path.name} ({converter.source_version.value})"
+                f" → {out} ({target.value})"
+            )
 
     # ---------------------------------------------------------------------------
     # diff
