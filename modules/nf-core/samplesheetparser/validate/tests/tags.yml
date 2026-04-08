@@ -1,0 +1,4 @@
+samplesheetparser:
+  - modules/nf-core/samplesheetparser/**
+samplesheetparser_validate:
+  - modules/nf-core/samplesheetparser/validate/**
