@@ -6,6 +6,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Added
+
+- **`--format json` for `samplesheet convert`** — the convert command now accepts
+  `--format json` and emits a structured JSON object with `input`, `output`,
+  `source_version`, and `target_version` keys. All five CLI subcommands now
+  support `--format json` uniformly.
+
+- **Bioconda recipe (`recipes/meta.yaml`)** — a `noarch: python` conda recipe
+  targeting Python ≥ 3.12 with `loguru` as the only runtime dependency.
+  The CLI extra (`typer`) is intentionally omitted from the base recipe so the
+  conda package stays lightweight; users who need the `samplesheet` CLI can
+  `conda install typer` alongside.
+
+### Tests
+
+- Three new `TestCLIConvert` tests covering `--format json` exit code,
+  JSON output structure (`source_version`, `target_version`, `input`, `output`
+  keys), and the `--format xml` invalid-format guard.
+
+---
+
 ## [1.1.0] - 2026-04-05
 
 ### Added
