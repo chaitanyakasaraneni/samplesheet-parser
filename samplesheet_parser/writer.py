@@ -97,31 +97,33 @@ def _validate_field(value: str, field_name: str) -> str:
     return value
 
 
-
 # ---------------------------------------------------------------------------
 # Internal sample record
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _SampleRecord:
     """Internal representation of a single sample row."""
-    sample_id:    str
-    index:        str
-    index2:       str        = ""
-    lane:         str        = "1"
-    sample_name:  str        = ""
-    sample_plate: str        = ""
-    sample_well:  str        = ""
-    i7_index_id:  str        = ""
-    i5_index_id:  str        = ""
-    project:      str        = ""
-    description:  str        = ""
-    extra:        dict[str, str] = field(default_factory=dict)
+
+    sample_id: str
+    index: str
+    index2: str = ""
+    lane: str = "1"
+    sample_name: str = ""
+    sample_plate: str = ""
+    sample_well: str = ""
+    i7_index_id: str = ""
+    i5_index_id: str = ""
+    project: str = ""
+    description: str = ""
+    extra: dict[str, str] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
 # Writer
 # ---------------------------------------------------------------------------
+
 
 class SampleSheetWriter:
     """
@@ -151,28 +153,28 @@ class SampleSheetWriter:
         self.version = version
 
         # Header fields
-        self._run_name:    str        = ""
-        self._run_desc:    str        = ""
-        self._platform:    str        = ""
-        self._instrument:  str        = ""
-        self._date:        str        = ""
-        self._workflow:    str        = ""
-        self._chemistry:   str        = ""
-        self._iem_version: str        = "5"
+        self._run_name: str = ""
+        self._run_desc: str = ""
+        self._platform: str = ""
+        self._instrument: str = ""
+        self._date: str = ""
+        self._workflow: str = ""
+        self._chemistry: str = ""
+        self._iem_version: str = "5"
         self._extra_header: dict[str, str] = {}
 
         # Reads
-        self._read1:   int = 0
-        self._read2:   int = 0
-        self._index1:  int = 0
-        self._index2:  int = 0
+        self._read1: int = 0
+        self._read2: int = 0
+        self._index1: int = 0
+        self._index2: int = 0
 
         # Settings
-        self._adapter_read1:    str = ""
-        self._adapter_read2:    str = ""
-        self._override_cycles:  str = ""
+        self._adapter_read1: str = ""
+        self._adapter_read2: str = ""
+        self._override_cycles: str = ""
         self._software_version: str = ""
-        self._extra_settings:   dict[str, str] = {}
+        self._extra_settings: dict[str, str] = {}
 
         # Samples
         self._samples: list[_SampleRecord] = []
@@ -233,13 +235,13 @@ class SampleSheetWriter:
     def set_header(
         self,
         *,
-        run_name:   str = "",
-        run_desc:   str = "",
-        platform:   str = "",
+        run_name: str = "",
+        run_desc: str = "",
+        platform: str = "",
         instrument: str = "",
-        date_str:   str = "",
-        workflow:   str = "",
-        chemistry:  str = "",
+        date_str: str = "",
+        workflow: str = "",
+        chemistry: str = "",
         **extra: str,
     ) -> SampleSheetWriter:
         """
@@ -271,23 +273,23 @@ class SampleSheetWriter:
         SampleSheetWriter
             ``self``, for method chaining.
         """
-        _validate_field(run_name,   "run_name")
-        _validate_field(run_desc,   "run_desc")
-        _validate_field(platform,   "platform")
+        _validate_field(run_name, "run_name")
+        _validate_field(run_desc, "run_desc")
+        _validate_field(platform, "platform")
         _validate_field(instrument, "instrument")
-        _validate_field(date_str,   "date_str")
-        _validate_field(workflow,   "workflow")
-        _validate_field(chemistry,  "chemistry")
+        _validate_field(date_str, "date_str")
+        _validate_field(workflow, "workflow")
+        _validate_field(chemistry, "chemistry")
         for k, v in extra.items():
             _validate_field(k, f"extra header key '{k}'")
             _validate_field(v, k)
-        self._run_name   = run_name
-        self._run_desc   = run_desc
-        self._platform   = platform
+        self._run_name = run_name
+        self._run_desc = run_desc
+        self._platform = platform
         self._instrument = instrument
-        self._date       = date_str
-        self._workflow   = workflow
-        self._chemistry  = chemistry
+        self._date = date_str
+        self._workflow = workflow
+        self._chemistry = chemistry
         self._extra_header.update(extra)
         return self
 
@@ -298,8 +300,8 @@ class SampleSheetWriter:
     def set_reads(
         self,
         *,
-        read1:  int,
-        read2:  int = 0,
+        read1: int,
+        read2: int = 0,
         index1: int = 0,
         index2: int = 0,
     ) -> SampleSheetWriter:
@@ -322,8 +324,8 @@ class SampleSheetWriter:
         SampleSheetWriter
             ``self``, for method chaining.
         """
-        self._read1  = read1
-        self._read2  = read2
+        self._read1 = read1
+        self._read2 = read2
         self._index1 = index1
         self._index2 = index2
         return self
@@ -398,7 +400,7 @@ class SampleSheetWriter:
         SampleSheetWriter
             ``self``, for method chaining.
         """
-        _validate_field(key,   "key")
+        _validate_field(key, "key")
         _validate_field(value, key)
         self._extra_settings[key] = value
         return self
@@ -411,16 +413,16 @@ class SampleSheetWriter:
         self,
         sample_id: str,
         *,
-        index:        str,
-        index2:       str = "",
-        lane:         str = "1",
-        sample_name:  str = "",
+        index: str,
+        index2: str = "",
+        lane: str = "1",
+        sample_name: str = "",
         sample_plate: str = "",
-        sample_well:  str = "",
-        i7_index_id:  str = "",
-        i5_index_id:  str = "",
-        project:      str = "",
-        description:  str = "",
+        sample_well: str = "",
+        i7_index_id: str = "",
+        i5_index_id: str = "",
+        project: str = "",
+        description: str = "",
         **extra: str,
     ) -> SampleSheetWriter:
         """
@@ -458,17 +460,17 @@ class SampleSheetWriter:
         if not index:
             raise ValueError(f"index must not be empty for sample '{sample_id}'.")
 
-        _validate_field(sample_id,    "sample_id")
-        _validate_field(index,        "index")
-        _validate_field(index2,       "index2")
-        _validate_field(lane,         "lane")
-        _validate_field(sample_name,  "sample_name")
+        _validate_field(sample_id, "sample_id")
+        _validate_field(index, "index")
+        _validate_field(index2, "index2")
+        _validate_field(lane, "lane")
+        _validate_field(sample_name, "sample_name")
         _validate_field(sample_plate, "sample_plate")
-        _validate_field(sample_well,  "sample_well")
-        _validate_field(i7_index_id,  "i7_index_id")
-        _validate_field(i5_index_id,  "i5_index_id")
-        _validate_field(project,      "project")
-        _validate_field(description,  "description")
+        _validate_field(sample_well, "sample_well")
+        _validate_field(i7_index_id, "i7_index_id")
+        _validate_field(i5_index_id, "i5_index_id")
+        _validate_field(project, "project")
+        _validate_field(description, "description")
         for k, v in extra.items():
             _validate_field(k, f"extra key '{k}'")
             _validate_field(v, k)
@@ -522,13 +524,10 @@ class SampleSheetWriter:
         before = len(self._samples)
         if lane is not None:
             self._samples = [
-                s for s in self._samples
-                if not (s.sample_id == sample_id and s.lane == str(lane))
+                s for s in self._samples if not (s.sample_id == sample_id and s.lane == str(lane))
             ]
         else:
-            self._samples = [
-                s for s in self._samples if s.sample_id != sample_id
-            ]
+            self._samples = [s for s in self._samples if s.sample_id != sample_id]
         if len(self._samples) == before:
             raise KeyError(
                 f"Sample '{sample_id}'"
@@ -570,8 +569,15 @@ class SampleSheetWriter:
             If no matching sample is found.
         """
         _KNOWN = {
-            "index", "index2", "lane", "sample_name", "sample_plate",
-            "sample_well", "i7_index_id", "i5_index_id", "project",
+            "index",
+            "index2",
+            "lane",
+            "sample_name",
+            "sample_plate",
+            "sample_well",
+            "i7_index_id",
+            "i5_index_id",
+            "project",
             "description",
         }
         matched = False
@@ -593,6 +599,20 @@ class SampleSheetWriter:
                 + (f" in lane {lane!r}" if lane is not None else "")
                 + " not found."
             )
+        return self
+
+    def clear_samples(self) -> SampleSheetWriter:
+        """Remove all samples from the writer, preserving header/reads/settings.
+
+        Useful when you want to copy metadata from an existing sheet via
+        :meth:`from_sheet` but replace the sample rows entirely.
+
+        Returns
+        -------
+        SampleSheetWriter
+            ``self``, for method chaining.
+        """
+        self._samples.clear()
         return self
 
     @property
@@ -652,8 +672,7 @@ class SampleSheetWriter:
 
         out.write_text(content, encoding="utf-8")
         logger.info(
-            f"Wrote {self.version.value} sheet with {len(self._samples)} "
-            f"sample(s) to {out}"
+            f"Wrote {self.version.value} sheet with {len(self._samples)} " f"sample(s) to {out}"
         )
         return out.resolve()
 
@@ -722,9 +741,9 @@ class SampleSheetWriter:
 
         # [BCLConvert_Data]
         lines.append("[BCLConvert_Data]")
-        has_index2  = any(s.index2 for s in self._samples)
+        has_index2 = any(s.index2 for s in self._samples)
         has_project = any(s.project for s in self._samples)
-        extra_cols  = self._extra_columns()
+        extra_cols = self._extra_columns()
 
         cols = ["Lane", "Sample_ID", "Index"]
         if has_index2:
@@ -755,9 +774,7 @@ class SampleSheetWriter:
         lines.append(f"IEMFileVersion,{self._iem_version}")
         if self._run_name:
             lines.append(f"Experiment Name,{self._run_name}")
-        date_val = (
-            self._date or date.today().strftime("%Y-%m-%d")
-        )
+        date_val = self._date or date.today().strftime("%Y-%m-%d")
         lines.append(f"Date,{date_val}")
         if self._workflow:
             lines.append(f"Workflow,{self._workflow}")
@@ -789,14 +806,14 @@ class SampleSheetWriter:
 
         # [Data]
         lines.append("[Data]")
-        has_index2     = any(s.index2 for s in self._samples)
-        has_i7_name    = any(s.i7_index_id for s in self._samples)
-        has_i5_name    = any(s.i5_index_id for s in self._samples)
-        has_plate      = any(s.sample_plate for s in self._samples)
-        has_well       = any(s.sample_well for s in self._samples)
-        has_project    = any(s.project for s in self._samples)
-        has_desc       = any(s.description for s in self._samples)
-        extra_cols     = self._extra_columns()
+        has_index2 = any(s.index2 for s in self._samples)
+        has_i7_name = any(s.i7_index_id for s in self._samples)
+        has_i5_name = any(s.i5_index_id for s in self._samples)
+        has_plate = any(s.sample_plate for s in self._samples)
+        has_well = any(s.sample_well for s in self._samples)
+        has_project = any(s.project for s in self._samples)
+        has_desc = any(s.description for s in self._samples)
+        extra_cols = self._extra_columns()
 
         cols = ["Lane", "Sample_ID", "Sample_Name"]
         if has_plate:
@@ -860,6 +877,7 @@ class SampleSheetWriter:
         content = self.to_string()
         # Write to a temp buffer and parse back
         import tempfile
+
         with tempfile.NamedTemporaryFile(
             mode="w", suffix=".csv", delete=False, encoding="utf-8"
         ) as tmp:
@@ -867,9 +885,7 @@ class SampleSheetWriter:
             tmp_path = tmp.name
 
         try:
-            sheet = SampleSheetFactory().create_parser(
-                tmp_path, parse=True, clean=False
-            )
+            sheet = SampleSheetFactory().create_parser(tmp_path, parse=True, clean=False)
             result = SampleSheetValidator().validate(sheet)
         finally:
             Path(tmp_path).unlink(missing_ok=True)
@@ -881,15 +897,14 @@ class SampleSheetWriter:
         if not result.is_valid:
             error_lines = "\n".join(f"  {e}" for e in result.errors)
             raise ValueError(
-                f"Sheet failed validation — fix errors before writing:\n"
-                f"{error_lines}"
+                f"Sheet failed validation — fix errors before writing:\n" f"{error_lines}"
             )
 
     def _load_from_v1(self, sheet: SampleSheetV1) -> None:
         """Populate writer state from a parsed V1 sheet."""
-        self._run_name  = sheet.experiment_name or ""
-        self._date      = sheet.date or ""
-        self._workflow  = sheet.workflow or ""
+        self._run_name = sheet.experiment_name or ""
+        self._date = sheet.date or ""
+        self._workflow = sheet.workflow or ""
         self._chemistry = sheet.chemistry or ""
         self._iem_version = sheet.iem_version or "5"
 
@@ -901,75 +916,103 @@ class SampleSheetWriter:
         self._adapter_read1 = sheet.adapter_read1 or ""
         self._adapter_read2 = sheet.adapter_read2 or ""
 
-        for record in (sheet.records or []):
-            std = {k: v for k, v in record.items() if k in (
-                "Lane", "Sample_ID", "Sample_Name", "Sample_Plate",
-                "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID",
-                "index2", "Sample_Project", "Description",
-            )}
-            extra = {k: v for k, v in record.items() if k not in (
-                "Lane", "Sample_ID", "Sample_Name", "Sample_Plate",
-                "Sample_Well", "I7_Index_ID", "index", "I5_Index_ID",
-                "index2", "Sample_Project", "Description",
-            )}
+        for record in sheet.records or []:
+            std = {
+                k: v
+                for k, v in record.items()
+                if k
+                in (
+                    "Lane",
+                    "Sample_ID",
+                    "Sample_Name",
+                    "Sample_Plate",
+                    "Sample_Well",
+                    "I7_Index_ID",
+                    "index",
+                    "I5_Index_ID",
+                    "index2",
+                    "Sample_Project",
+                    "Description",
+                )
+            }
+            extra = {
+                k: v
+                for k, v in record.items()
+                if k
+                not in (
+                    "Lane",
+                    "Sample_ID",
+                    "Sample_Name",
+                    "Sample_Plate",
+                    "Sample_Well",
+                    "I7_Index_ID",
+                    "index",
+                    "I5_Index_ID",
+                    "index2",
+                    "Sample_Project",
+                    "Description",
+                )
+            }
             sid = std.get("Sample_ID", "")
             idx = std.get("index", "")
             if not sid or not idx:
                 continue
-            self._samples.append(_SampleRecord(
-                sample_id=sid,
-                index=idx,
-                index2=std.get("index2", "") or "",
-                lane=std.get("Lane", "1") or "1",
-                sample_name=std.get("Sample_Name", "") or "",
-                sample_plate=std.get("Sample_Plate", "") or "",
-                sample_well=std.get("Sample_Well", "") or "",
-                i7_index_id=std.get("I7_Index_ID", "") or "",
-                i5_index_id=std.get("I5_Index_ID", "") or "",
-                project=std.get("Sample_Project", "") or "",
-                description=std.get("Description", "") or "",
-                extra=extra,
-            ))
+            self._samples.append(
+                _SampleRecord(
+                    sample_id=sid,
+                    index=idx,
+                    index2=std.get("index2", "") or "",
+                    lane=std.get("Lane", "1") or "1",
+                    sample_name=std.get("Sample_Name", "") or "",
+                    sample_plate=std.get("Sample_Plate", "") or "",
+                    sample_well=std.get("Sample_Well", "") or "",
+                    i7_index_id=std.get("I7_Index_ID", "") or "",
+                    i5_index_id=std.get("I5_Index_ID", "") or "",
+                    project=std.get("Sample_Project", "") or "",
+                    description=std.get("Description", "") or "",
+                    extra=extra,
+                )
+            )
 
     def _load_from_v2(self, sheet: SampleSheetV2) -> None:
         """Populate writer state from a parsed V2 sheet."""
         h = sheet.header or {}
-        self._run_name    = sheet.experiment_name or h.get("RunName", "")
-        self._run_desc    = h.get("RunDescription", "")
-        self._platform    = h.get("InstrumentPlatform", "")
-        self._instrument  = h.get("InstrumentType", "")
+        self._run_name = sheet.experiment_name or h.get("RunName", "")
+        self._run_desc = h.get("RunDescription", "")
+        self._platform = h.get("InstrumentPlatform", "")
+        self._instrument = h.get("InstrumentType", "")
 
         r = sheet.reads or {}
-        self._read1  = r.get("Read1Cycles", 0)
-        self._read2  = r.get("Read2Cycles", 0)
+        self._read1 = r.get("Read1Cycles", 0)
+        self._read2 = r.get("Read2Cycles", 0)
         self._index1 = r.get("Index1Cycles", 0)
         self._index2 = r.get("Index2Cycles", 0)
 
         s = sheet.settings or {}
-        self._adapter_read1    = s.get("AdapterRead1", "")
-        self._adapter_read2    = s.get("AdapterRead2", "")
-        self._override_cycles  = s.get("OverrideCycles", "")
+        self._adapter_read1 = s.get("AdapterRead1", "")
+        self._adapter_read2 = s.get("AdapterRead2", "")
+        self._override_cycles = s.get("OverrideCycles", "")
         self._software_version = s.get("SoftwareVersion", "")
         # remaining settings → extra
-        skip = {
-            "AdapterRead1", "AdapterRead2", "OverrideCycles", "SoftwareVersion"
-        }
+        skip = {"AdapterRead1", "AdapterRead2", "OverrideCycles", "SoftwareVersion"}
         for k, v in s.items():
             if k not in skip:
                 self._extra_settings[k] = v
 
         std_cols = {"Lane", "Sample_ID", "Index", "Index2", "Sample_Project"}
-        for record in (sheet.records or []):
+        for record in sheet.records or []:
             sid = record.get("Sample_ID", "")
             idx = record.get("Index", "")
             if not sid or not idx:
                 continue
             extra = {k: v for k, v in record.items() if k not in std_cols}
-            self._samples.append(_SampleRecord(
-                sample_id=sid,
-                index=idx,
-                index2=record.get("Index2", "") or "",
-                lane=record.get("Lane", "1") or "1",
-                project=record.get("Sample_Project", "") or "",
-                extra=extra,
-            ))
+            self._samples.append(
+                _SampleRecord(
+                    sample_id=sid,
+                    index=idx,
+                    index2=record.get("Index2", "") or "",
+                    lane=record.get("Lane", "1") or "1",
+                    project=record.get("Sample_Project", "") or "",
+                    extra=extra,
+                )
+            )

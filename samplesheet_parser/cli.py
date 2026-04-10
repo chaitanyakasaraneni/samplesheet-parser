@@ -600,7 +600,7 @@ if _TYPER_AVAILABLE:
 
         Header, reads, and settings are copied into every output file; only
         the sample rows are divided.  Output filenames are
-        ``{prefix}{group}{_SampleSheet.csv}``.
+        ``{prefix}{group}_SampleSheet.csv``.
 
         Exits 0 on success.
         Exits 1 if warnings were produced (e.g. samples with no project).

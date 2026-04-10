@@ -215,27 +215,33 @@ class SampleSheetSplitter:
         # ── Group records ────────────────────────────────────────────────
         groups: dict[str, list[dict[str, Any]]] = {}
         records: list[dict[str, Any]] = getattr(sheet, "records", None) or sheet.samples()
+        unassigned_count = 0
 
         for record in records:
             if self._by == "project":
-                key = (
-                    record.get("sample_project")
-                    or record.get("Sample_Project")
-                    or self._unassigned_label
-                )
+                raw = record.get("sample_project") or record.get("Sample_Project") or ""
+                if raw:
+                    key = raw
+                else:
+                    key = self._unassigned_label
+                    unassigned_count += 1
             else:  # lane
-                key = str(record.get("lane") or record.get("Lane") or self._unassigned_label)
+                raw = str(record.get("lane") or record.get("Lane") or "")
+                if raw:
+                    key = raw
+                else:
+                    key = self._unassigned_label
+                    unassigned_count += 1
             groups.setdefault(key, []).append(record)
 
         if not groups:
             result.warnings.append("No samples found in input sheet — no files written.")
             return result
 
-        if self._unassigned_label in groups:
-            count = len(groups[self._unassigned_label])
+        if unassigned_count:
             field_name = "project" if self._by == "project" else "lane"
             result.warnings.append(
-                f"{count} sample(s) have no {field_name} and will be written "
+                f"{unassigned_count} sample(s) have no {field_name} and will be written "
                 f"to '{prefix}{_safe_filename(self._unassigned_label)}{suffix}'."
             )
 
@@ -246,7 +252,7 @@ class SampleSheetSplitter:
             writer = SampleSheetWriter.from_sheet(sheet, version=target_version)
             # from_sheet loads all samples from the source; clear them so we
             # add only this group's rows.
-            writer._samples.clear()
+            writer.clear_samples()
 
             for record in group_records:
                 sid = record.get("sample_id") or record.get("Sample_ID") or ""

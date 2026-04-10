@@ -1052,6 +1052,19 @@ class TestCLISplit:
         result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
         assert "Warnings" in result.output
 
+    def test_split_exception_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        from samplesheet_parser import splitter as splitter_mod
+
+        monkeypatch.setattr(
+            splitter_mod.SampleSheetSplitter,
+            "split",
+            lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
+        assert result.exit_code == 2
+
 
 # ---------------------------------------------------------------------------
 # CLI — filter
@@ -1150,19 +1163,6 @@ class TestCLIFilter:
         )
         assert "2" in result.output
         assert str(out) in result.output
-
-    def test_split_exception_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
-        out_dir = tmp_path / "split"
-        from samplesheet_parser import splitter as splitter_mod
-
-        monkeypatch.setattr(
-            splitter_mod.SampleSheetSplitter,
-            "split",
-            lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")),
-        )
-        result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
-        assert result.exit_code == 2
 
     def test_filter_exception_exits_2(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

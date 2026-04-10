@@ -54,13 +54,11 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 2: Split by lane — same combined sheet → one file per lane
-# The combined_clean.csv has all samples on lane 1, so this produces a
-# single file. Swap in a multi-lane sheet to see multiple outputs.
+# Scenario 2: Split by lane — V1 multi-lane sheet → one file per lane
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 2: Split by lane (V2 combined → per-lane files)")
+print("Scenario 2: Split by lane (V1 multi-lane → per-lane files)")
 print("=" * 60)
 
 splitter = SampleSheetSplitter(SHEETS / "v1_multi_lane.csv", by="lane")

@@ -195,7 +195,7 @@ class SampleSheetFilter:
 
         writer = SampleSheetWriter.from_sheet(sheet, version=target_version)
         # from_sheet loads all samples; clear so only matched rows are added.
-        writer._samples.clear()
+        writer.clear_samples()
 
         for record in records:
             rec_project = record.get("sample_project") or record.get("Sample_Project") or ""
@@ -206,7 +206,7 @@ class SampleSheetFilter:
                 continue
             if lane_str is not None and rec_lane != lane_str:
                 continue
-            if sample_id is not None and not fnmatch.fnmatch(rec_sid, sample_id):
+            if sample_id is not None and not fnmatch.fnmatchcase(rec_sid, sample_id):
                 continue
 
             idx = record.get("index") or record.get("Index") or ""
