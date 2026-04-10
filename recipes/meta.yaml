@@ -21,11 +21,11 @@ build:
 
 requirements:
   host:
-    - python >=3.12
+    - python
     - pip
     - hatchling
   run:
-    - python >=3.12
+    - python
     - loguru >=0.7
     - typer >=0.9
 
@@ -33,7 +33,7 @@ test:
   imports:
     - samplesheet_parser
   commands:
-    - python -c "from samplesheet_parser import SampleSheetFactory, SampleSheetValidator"
+    - pip check
   requires:
     - pip
 
