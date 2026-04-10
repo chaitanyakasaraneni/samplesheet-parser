@@ -10,18 +10,92 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **`SampleSheetSplitter` and `SplitResult`** — splits a combined sheet into
+  one file per project or per lane (the inverse of `SampleSheetMerger`).
+  - `SampleSheetSplitter(path, *, by="project"|"lane", target_version=None, unassigned_label="unassigned")`
+  - `split(output_dir, *, prefix="", suffix="_SampleSheet.csv", validate=True) → SplitResult`
+  - Header, reads, and settings are copied into every output file; only sample
+    rows are divided. Samples with no project/lane are grouped under a
+    configurable `unassigned_label`.
+  - Incomplete records (missing `Sample_ID` or `Index`) are skipped with a
+    warning. Groups that produce no valid samples are omitted with a warning.
+  - `SampleSheetSplitter` and `SplitResult` are exported from the top-level
+    package.
+
+- **`SampleSheetFilter` and `FilterResult`** — extracts a subset of samples
+  from a sheet by project, lane, or sample ID (with glob support).
+  - `SampleSheetFilter(path, *, target_version=None)`
+  - `filter(output_path, *, project=None, lane=None, sample_id=None, validate=True) → FilterResult`
+  - Multiple criteria are ANDed — a sample must match all provided criteria.
+  - `sample_id` supports glob patterns (e.g. `"CTRL_*"`, `"SAMPLE_00[1-3]"`)
+    via `fnmatch.fnmatchcase` for consistent case-sensitive behavior across
+    platforms.
+  - No file is written when no samples match; `FilterResult.output_path` is
+    `None` in that case.
+  - `SampleSheetFilter` and `FilterResult` are exported from the top-level
+    package.
+
+- **`samplesheet split` CLI command** — splits a combined sheet into per-group
+  files. Accepts `--by project|lane`, `--output-dir / -d`, `--to v1|v2`,
+  `--format json|text`, and `--prefix`. Exits 0 on clean split, 1 if warnings
+  were produced, 2 on bad arguments or unreadable files.
+
+- **`samplesheet filter` CLI command** — filters samples by `--project / -p`,
+  `--lane / -l`, and `--sample-id / -s` (glob patterns supported). Accepts
+  `--output / -o`, `--to v1|v2`, and `--format json|text`. Exits 0 when
+  samples match, 1 when no samples match, 2 on bad arguments.
+
+- **`SampleSheetWriter.clear_samples()`** — public method to remove all samples
+  from a writer while preserving header, reads, and settings. Enables the
+  copy-metadata-then-repopulate pattern without accessing the private
+  `_samples` attribute.
+
 - **`--format json` for `samplesheet convert`** — the convert command now accepts
   `--format json` and emits a structured JSON object with `input`, `output`,
-  `source_version`, and `target_version` keys. All five CLI subcommands now
+  `source_version`, and `target_version` keys. All seven CLI subcommands now
   support `--format json` uniformly.
 
 - **Bioconda recipe (`recipes/meta.yaml`)** — a `noarch: python` conda recipe
-  targeting Python ≥ 3.12 with `loguru` as the only runtime dependency.
-  The CLI extra (`typer`) is intentionally omitted from the base recipe so the
-  conda package stays lightweight; users who need the `samplesheet` CLI can
+  with `loguru` as the only runtime dependency. Python version is not pinned
+  (noarch packages rely on the conda solver for compatibility). The CLI extra
+  (`typer`) is intentionally omitted from the base recipe so the conda package
+  stays lightweight; users who need the `samplesheet` CLI can
   `conda install typer` alongside.
 
+- **nf-core compatible Nextflow modules** — three modules following
+  nf-core/modules conventions, each with `main.nf`, `meta.yml`,
+  `environment.yml`, nf-test tests, and `tags.yml`:
+  - `SAMPLESHEETPARSER_VALIDATE` — validates V1/V2 sheets and emits a
+    structured JSON report; exits 1 on errors so pipelines fail before
+    demultiplexing.
+  - `SAMPLESHEETPARSER_CONVERT` — bidirectional V1↔V2 conversion with target
+    version passed as a channel value.
+  - `SAMPLESHEETPARSER_INFO` — emits a JSON metadata summary (format, sample
+    count, lanes, index type, read lengths, adapters) for run logging and
+    conditional pipeline branching.
+
+- **Example scripts** — `examples/demo_splitter.py` and
+  `examples/demo_filter.py` demonstrating the new split and filter APIs with
+  three and four runnable scenarios respectively.
+
 ### Tests
+
+- **`tests/test_splitter.py`** — 46 tests covering: split by project and lane,
+  header/reads/settings preservation, unassigned samples (custom label),
+  incomplete records (missing `Sample_ID` or `Index`, all-incomplete group),
+  empty input, target version override, custom prefix/suffix, output directory
+  creation, `SplitResult` summary and `source_version`, and error conditions
+  (`FileNotFoundError`, `ValueError` on invalid `--by`).
+
+- **`tests/test_filter.py`** — 46 tests covering: filter by project, lane
+  (string and int), and sample ID (exact and glob); multiple ANDed criteria;
+  no-match behaviour (no file written, `matched_count == 0`); header/settings
+  preservation; target version override; `FilterResult` attributes; incomplete
+  records; and error conditions (`ValueError`, `FileNotFoundError`).
+
+- **`TestCLISplit` and `TestCLIFilter`** in `tests/test_cli.py` — 13 tests each
+  covering happy paths, JSON output, warning exit codes, error exit codes,
+  exception paths (via `monkeypatch`), and text output formatting.
 
 - Three new `TestCLIConvert` tests covering `--format json` exit code,
   JSON output structure (`source_version`, `target_version`, `input`, `output`
