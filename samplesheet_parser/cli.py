@@ -10,6 +10,8 @@ validate    Validate a sheet — exit 0 if clean, exit 1 if errors.
 convert     Convert between V1 and V2 formats.
 diff        Diff two sheets — exit 1 if changes detected.
 merge       Merge multiple project sheets into one combined sheet.
+split       Split a combined sheet into per-project or per-lane files.
+filter      Extract a subset of samples by project, lane, or sample ID.
 
 Installation
 ------------
@@ -37,6 +39,13 @@ Usage
 
     samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv
     samplesheet merge ProjectA.csv ProjectB.csv ProjectC.csv --output combined.csv --to v1
+
+    samplesheet split combined.csv --output-dir ./per_project/
+    samplesheet split combined.csv --by lane --output-dir ./per_lane/ --to v1
+
+    samplesheet filter SampleSheet.csv --project ProjectA --output filtered.csv
+    samplesheet filter SampleSheet.csv --lane 2 --output filtered.csv
+    samplesheet filter SampleSheet.csv --sample-id "CTRL_*" --output controls.csv
 
 Authors
 -------
@@ -551,6 +560,192 @@ if _TYPER_AVAILABLE:
 
         has_issues = result.has_conflicts or bool(result.warnings)
         raise typer.Exit(code=1 if has_issues else 0)
+
+    # ---------------------------------------------------------------------------
+    # split
+    # ---------------------------------------------------------------------------
+
+    @app.command()
+    def split(
+        path: Annotated[Path, typer.Argument(help="Input SampleSheet.csv.", metavar="FILE")],
+        by: Annotated[
+            str,
+            typer.Option(
+                "--by",
+                help="Grouping key: 'project' (default) or 'lane'.",
+                metavar="KEY",
+            ),
+        ] = "project",
+        output_dir: Annotated[
+            Path,
+            typer.Option(
+                "--output-dir",
+                "-d",
+                help="Directory in which to write the split files.",
+                metavar="DIR",
+            ),
+        ] = Path("."),
+        to: _VersionOption = "v2",
+        fmt: _FormatOption = "text",
+        prefix: Annotated[
+            str,
+            typer.Option(
+                "--prefix",
+                help="String prepended to each output filename.",
+                metavar="STR",
+            ),
+        ] = "",
+    ) -> None:
+        """Split a combined sheet into one file per project or per lane.
+
+        Header, reads, and settings are copied into every output file; only
+        the sample rows are divided.  Output filenames are
+        ``{prefix}{group}{_SampleSheet.csv}``.
+
+        Exits 0 on success.
+        Exits 1 if warnings were produced (e.g. samples with no project).
+        Exits 2 on bad arguments or unreadable files.
+        """
+        from samplesheet_parser.splitter import SampleSheetSplitter
+
+        _validate_fmt(fmt)
+        if by not in ("project", "lane"):
+            typer.echo(f"Error: --by must be 'project' or 'lane', got {by!r}.", err=True)
+            raise typer.Exit(code=2)
+        if not path.exists():
+            typer.echo(f"Error: file not found: {path}", err=True)
+            raise typer.Exit(code=2)
+
+        target = _resolve_version(to)
+
+        try:
+            splitter = SampleSheetSplitter(path, by=by, target_version=target)
+            result = splitter.split(output_dir, prefix=prefix)
+        except Exception as exc:
+            typer.echo(f"Error: split failed: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+        if fmt == "json":
+            _print_json(
+                {
+                    "source_version": result.source_version,
+                    "by": by,
+                    "output_dir": str(output_dir),
+                    "summary": result.summary(),
+                    "files": {k: str(v) for k, v in result.output_files.items()},
+                    "sample_counts": result.sample_counts,
+                    "warnings": result.warnings,
+                }
+            )
+        else:
+            typer.echo(result.summary())
+            if result.output_files:
+                typer.echo(f"\nOutput files ({output_dir}):")
+                for group, out_path in sorted(result.output_files.items()):
+                    count = result.sample_counts[group]
+                    typer.echo(f"  {out_path.name}  ({count} sample(s))  [{group}]")
+            if result.warnings:
+                typer.echo("\nWarnings:")
+                for w in result.warnings:
+                    typer.echo(f"  {w}")
+
+        raise typer.Exit(code=1 if result.warnings else 0)
+
+    # ---------------------------------------------------------------------------
+    # filter
+    # ---------------------------------------------------------------------------
+
+    @app.command(name="filter")
+    def filter_cmd(
+        path: Annotated[Path, typer.Argument(help="Input SampleSheet.csv.", metavar="FILE")],
+        output: _OutputOption = Path("SampleSheet_filtered.csv"),
+        project: Annotated[
+            str,
+            typer.Option(
+                "--project",
+                "-p",
+                help="Keep only samples matching this Sample_Project (exact).",
+                metavar="NAME",
+            ),
+        ] = "",
+        lane: Annotated[
+            str,
+            typer.Option(
+                "--lane",
+                "-l",
+                help="Keep only samples from this lane.",
+                metavar="N",
+            ),
+        ] = "",
+        sample_id: Annotated[
+            str,
+            typer.Option(
+                "--sample-id",
+                "-s",
+                help="Keep only samples matching this Sample_ID or glob pattern.",
+                metavar="PATTERN",
+            ),
+        ] = "",
+        to: _VersionOption = "v2",
+        fmt: _FormatOption = "text",
+    ) -> None:
+        """Extract a subset of samples from a sheet by project, lane, or sample ID.
+
+        Multiple criteria are ANDed — a sample must match all provided
+        criteria.  ``--sample-id`` supports glob patterns (e.g. ``'CTRL_*'``).
+
+        Exits 0 if at least one sample matched.
+        Exits 1 if no samples matched the criteria.
+        Exits 2 on bad arguments or unreadable files.
+        """
+        from samplesheet_parser.filter import SampleSheetFilter
+
+        _validate_fmt(fmt)
+        if not project and not lane and not sample_id:
+            typer.echo(
+                "Error: at least one of --project, --lane, or --sample-id is required.",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        if not path.exists():
+            typer.echo(f"Error: file not found: {path}", err=True)
+            raise typer.Exit(code=2)
+
+        target = _resolve_version(to)
+
+        try:
+            flt = SampleSheetFilter(path, target_version=target)
+            result = flt.filter(
+                output,
+                project=project or None,
+                lane=lane or None,
+                sample_id=sample_id or None,
+            )
+        except Exception as exc:
+            typer.echo(f"Error: filter failed: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+        if fmt == "json":
+            _print_json(
+                {
+                    "source_version": result.source_version,
+                    "matched_count": result.matched_count,
+                    "total_count": result.total_count,
+                    "output_path": str(result.output_path) if result.output_path else None,
+                    "summary": result.summary(),
+                    "criteria": {
+                        "project": project or None,
+                        "lane": lane or None,
+                        "sample_id": sample_id or None,
+                    },
+                }
+            )
+        else:
+            typer.echo(result.summary())
+            if result.output_path:
+                typer.echo(f"Output: {result.output_path}")
+
+        raise typer.Exit(code=0 if result.matched_count > 0 else 1)
 
 else:  # pragma: no cover
     # Fallbacks when Typer is not installed: keep simple type aliases so that
