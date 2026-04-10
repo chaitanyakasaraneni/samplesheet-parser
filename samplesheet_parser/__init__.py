@@ -36,10 +36,12 @@ from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.diff import DiffResult, SampleSheetDiff
 from samplesheet_parser.enums import IndexType, InstrumentPlatform, SampleSheetVersion, UMILocation
 from samplesheet_parser.factory import SampleSheetFactory
+from samplesheet_parser.filter import FilterResult, SampleSheetFilter
 from samplesheet_parser.index_utils import normalize_index_lengths
 from samplesheet_parser.merger import MergeResult, SampleSheetMerger
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
+from samplesheet_parser.splitter import SampleSheetSplitter, SplitResult
 from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
 from samplesheet_parser.writer import SampleSheetWriter
 
@@ -59,6 +61,10 @@ __all__ = [
     "SampleSheetWriter",
     "SampleSheetMerger",
     "MergeResult",
+    "SampleSheetSplitter",
+    "SplitResult",
+    "SampleSheetFilter",
+    "FilterResult",
     "normalize_index_lengths",
     "__version__",
 ]

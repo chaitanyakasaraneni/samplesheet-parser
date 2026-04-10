@@ -918,3 +918,265 @@ class TestCLIUnknownFormat:
             ],
         )
         assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# split fixtures
+# ---------------------------------------------------------------------------
+
+_V2_COMBINED = """\
+[Header]
+FileFormatVersion,2
+RunName,CombinedRun
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,SampleA1,ATTACTCGAT,TATAGCCTGT,ProjectA
+1,SampleA2,TCCGGAGAGA,ATAGAGGCGT,ProjectA
+1,SampleB1,GCTTGTTTCC,CGTTAGAGTT,ProjectB
+1,SampleB2,ATTCAGAAGT,CGATCTCGTT,ProjectB
+"""
+
+_V2_NO_PROJECT = """\
+[Header]
+FileFormatVersion,2
+RunName,NoProjectRun
+
+[Reads]
+Read1Cycles,151
+Index1Cycles,10
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index
+1,Sample1,ATTACTCGAT
+1,Sample2,TCCGGAGAGA
+"""
+
+
+# ---------------------------------------------------------------------------
+# CLI — split
+# ---------------------------------------------------------------------------
+
+
+class TestCLISplit:
+
+    def test_split_by_project_exits_0_no_warnings(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
+        assert result.exit_code == 0
+
+    def test_split_by_project_creates_files(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
+        assert (out_dir / "ProjectA_SampleSheet.csv").exists()
+        assert (out_dir / "ProjectB_SampleSheet.csv").exists()
+
+    def test_split_by_lane(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        result = runner.invoke(
+            app, ["split", str(src), "--by", "lane", "--output-dir", str(out_dir)]
+        )
+        assert result.exit_code == 0
+
+    def test_split_with_warnings_exits_1(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_NO_PROJECT)
+        out_dir = tmp_path / "split"
+        result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
+        assert result.exit_code == 1
+
+    def test_split_json_output(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        result = runner.invoke(
+            app, ["split", str(src), "--output-dir", str(out_dir), "--format", "json"]
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "files" in data
+        assert "sample_counts" in data
+        assert data["by"] == "project"
+
+    def test_split_missing_file_exits_2(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app, ["split", str(tmp_path / "missing.csv"), "--output-dir", str(tmp_path)]
+        )
+        assert result.exit_code == 2
+
+    def test_split_invalid_by_exits_2(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        result = runner.invoke(
+            app,
+            ["split", str(src), "--by", "sample", "--output-dir", str(tmp_path)],
+        )
+        assert result.exit_code == 2
+
+    def test_split_unknown_format_exits_2(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        result = runner.invoke(
+            app,
+            ["split", str(src), "--output-dir", str(tmp_path), "--format", "xml"],
+        )
+        assert result.exit_code == 2
+
+    def test_split_with_prefix(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir), "--prefix", "Run_"])
+        assert (out_dir / "Run_ProjectA_SampleSheet.csv").exists()
+
+    def test_split_text_output_lists_files(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
+        assert "ProjectA" in result.output
+        assert "ProjectB" in result.output
+
+    def test_split_text_output_shows_warnings(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_NO_PROJECT)
+        out_dir = tmp_path / "split"
+        result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
+        assert "Warnings" in result.output
+
+    def test_split_exception_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out_dir = tmp_path / "split"
+        from samplesheet_parser import splitter as splitter_mod
+
+        monkeypatch.setattr(
+            splitter_mod.SampleSheetSplitter,
+            "split",
+            lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# CLI — filter
+# ---------------------------------------------------------------------------
+
+
+class TestCLIFilter:
+
+    def test_filter_by_project_exits_0(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(
+            app, ["filter", str(src), "--project", "ProjectA", "--output", str(out)]
+        )
+        assert result.exit_code == 0
+
+    def test_filter_by_project_writes_file(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        runner.invoke(app, ["filter", str(src), "--project", "ProjectA", "--output", str(out)])
+        assert out.exists()
+        content = out.read_text()
+        assert "SampleA1" in content
+        assert "SampleB1" not in content
+
+    def test_filter_by_lane(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(app, ["filter", str(src), "--lane", "1", "--output", str(out)])
+        assert result.exit_code == 0
+
+    def test_filter_by_sample_id_glob(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(
+            app, ["filter", str(src), "--sample-id", "SampleA*", "--output", str(out)]
+        )
+        assert result.exit_code == 0
+
+    def test_filter_no_match_exits_1(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(
+            app,
+            ["filter", str(src), "--project", "NonExistent", "--output", str(out)],
+        )
+        assert result.exit_code == 1
+
+    def test_filter_no_criteria_exits_2(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(app, ["filter", str(src), "--output", str(out)])
+        assert result.exit_code == 2
+
+    def test_filter_missing_file_exits_2(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app,
+            [
+                "filter",
+                str(tmp_path / "missing.csv"),
+                "--project",
+                "X",
+                "--output",
+                str(tmp_path / "out.csv"),
+            ],
+        )
+        assert result.exit_code == 2
+
+    def test_filter_unknown_format_exits_2(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(
+            app,
+            ["filter", str(src), "--project", "ProjectA", "--output", str(out), "--format", "xml"],
+        )
+        assert result.exit_code == 2
+
+    def test_filter_json_output(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(
+            app,
+            ["filter", str(src), "--project", "ProjectA", "--output", str(out), "--format", "json"],
+        )
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["matched_count"] == 2
+        assert data["total_count"] == 4
+        assert data["criteria"]["project"] == "ProjectA"
+
+    def test_filter_text_output_shows_summary(self, tmp_path: Path) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        result = runner.invoke(
+            app, ["filter", str(src), "--project", "ProjectA", "--output", str(out)]
+        )
+        assert "2" in result.output
+        assert str(out) in result.output
+
+    def test_filter_exception_exits_2(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        src = _write(tmp_path, "combined.csv", _V2_COMBINED)
+        out = tmp_path / "filtered.csv"
+        from samplesheet_parser import filter as filter_mod
+
+        monkeypatch.setattr(
+            filter_mod.SampleSheetFilter,
+            "filter",
+            lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        result = runner.invoke(
+            app, ["filter", str(src), "--project", "ProjectA", "--output", str(out)]
+        )
+        assert result.exit_code == 2
