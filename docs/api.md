@@ -12,6 +12,8 @@ from samplesheet_parser import (
     SampleSheetDiff,
     SampleSheetWriter,
     SampleSheetMerger,
+    SampleSheetSplitter,
+    SampleSheetFilter,
     normalize_index_lengths,
 )
 ```
@@ -118,6 +120,7 @@ from samplesheet_parser import (
 | `add_sample(sample_id, *, index, ...)` | `self` | Append a sample row (fluent) |
 | `remove_sample(sample_id, *, lane=)` | `self` | Remove sample(s) by ID, optionally scoped to a lane (fluent) |
 | `update_sample(sample_id, *, lane=, **fields)` | `self` | Update fields on an existing sample in-place (fluent) |
+| `clear_samples()` | `self` | Remove all samples while preserving header/reads/settings (fluent) |
 | `write(path, *, validate=True)` | `Path` | Serialise to disk; validates first by default |
 | `to_string()` | `str` | Serialise to string without writing to disk |
 | `.sample_count` | `int` | Number of samples currently in the writer |
@@ -143,6 +146,46 @@ from samplesheet_parser import (
 | `source_versions` | `dict[str, str]` | Per-input-file detected version |
 | `conflicts` | `list[MergeConflict]` | Structured conflict records |
 | `warnings` | `list[MergeConflict]` | Structured warning records |
+| `summary()` | `str` | One-line human-readable summary |
+
+---
+
+## SampleSheetSplitter
+
+| Method / attribute | Returns | Description |
+|---|---|---|
+| `SampleSheetSplitter(path, *, by="project", target_version=None, unassigned_label="unassigned")` | — | Instantiate with input path and grouping strategy |
+| `split(output_dir, *, prefix="", suffix="_SampleSheet.csv", validate=True)` | `SplitResult` | Parse input and write one file per group |
+
+### SplitResult
+
+| Attribute / method | Type | Description |
+|---|---|---|
+| `output_files` | `dict[str, Path]` | Group key → path of the written file |
+| `sample_counts` | `dict[str, int]` | Group key → number of samples written |
+| `warnings` | `list[str]` | Non-fatal issues (incomplete records, unassigned samples) |
+| `source_version` | `str` | `"V1"` or `"V2"` |
+| `summary()` | `str` | One-line human-readable summary |
+
+---
+
+## SampleSheetFilter
+
+| Method / attribute | Returns | Description |
+|---|---|---|
+| `SampleSheetFilter(path, *, target_version=None)` | — | Instantiate with input path |
+| `filter(output_path, *, project=None, lane=None, sample_id=None, validate=True)` | `FilterResult` | Write filtered copy to `output_path`; at least one criterion required |
+
+`sample_id` supports glob patterns (e.g. `"CTRL_*"`) via `fnmatch.fnmatchcase` — matching is always case-sensitive.
+
+### FilterResult
+
+| Attribute / method | Type | Description |
+|---|---|---|
+| `matched_count` | `int` | Samples that passed all filter criteria |
+| `total_count` | `int` | Total samples in the input sheet |
+| `output_path` | `Path \| None` | Path written; `None` when no samples matched |
+| `source_version` | `str` | `"V1"` or `"V2"` |
 | `summary()` | `str` | One-line human-readable summary |
 
 ---

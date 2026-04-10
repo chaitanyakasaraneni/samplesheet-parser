@@ -69,7 +69,10 @@ nav:
     - Diffing: guide/diffing.md
     - Writing & Editing: guide/writing.md
     - Merging: guide/merging.md
+    - Splitting: guide/splitting.md
+    - Filtering: guide/filtering.md
     - Index Utilities: guide/index_utils.md
+  - Examples: examples.md
   - CLI Reference: cli.md
   - API Reference: api.md
   - CI Integration: ci.md
