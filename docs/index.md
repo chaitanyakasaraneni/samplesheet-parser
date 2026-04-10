@@ -2,7 +2,7 @@
 
 **Format-agnostic parser for Illumina SampleSheet.csv files.**
 
-Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
+Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, diff comparison, multi-sheet merging, splitting, filtering, programmatic sheet creation, and a full-featured CLI.
 
 [![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
@@ -33,6 +33,8 @@ Existing tools either hard-code one format or require the caller to know which f
 | **Validation** | 9 checks covering index chars, length, duplicates, Hamming distance, adapters |
 | **Diff** | Cross-format structural comparison with per-field change records |
 | **Merge** | Combine multiple per-project sheets with collision detection |
+| **Split** | Divide a combined sheet into per-project or per-lane files |
+| **Filter** | Extract a sample subset by project, lane, or ID (glob patterns supported) |
 | **Writer** | Fluent API for building or editing sheets programmatically |
 | **CLI** | Full shell interface with `--format json` for pipeline integration |
 | **UMI parsing** | Decode `OverrideCycles` to extract UMI length and location |
@@ -54,4 +56,4 @@ print(result.summary())
 # PASS — 0 error(s), 0 warning(s)
 ```
 
-See [Installation](installation.md) for full setup options, or jump to the [Quickstart guide](guide/quickstart.md).
+See [Installation](installation.md) for full setup options, jump to the [Quickstart guide](guide/quickstart.md), or browse the [Examples](examples.md) for end-to-end runnable scenarios.

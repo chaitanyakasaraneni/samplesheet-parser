@@ -167,3 +167,84 @@ samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv --format json
 | `--force` | `False` | Write output even if conflicts are found |
 
 **Exit codes:** `0` = clean merge, `1` = conflicts or warnings, `2` = bad arguments or unreadable files.
+
+---
+
+## split
+
+Split a combined sheet into one file per project or per lane.
+
+```bash
+samplesheet split combined.csv --output-dir ./per_project/
+samplesheet split combined.csv --by lane --output-dir ./per_lane/
+samplesheet split combined.csv --output-dir ./out/ --to v1
+samplesheet split combined.csv --output-dir ./out/ --prefix Run001_ --format json
+```
+
+**Options:**
+
+| Option | Default | Description |
+|---|---|---|
+| `--by` | `project` | Grouping strategy: `project` or `lane` |
+| `--output-dir` / `-d` | `./split/` | Directory in which to write output files |
+| `--to` | (same as input) | Target format: `v1` or `v2` |
+| `--format` / `-f` | `text` | Output format: `text` or `json` |
+| `--prefix` | `""` | String prepended to each output filename |
+
+Output filenames follow the pattern `{prefix}{group}_SampleSheet.csv`.
+
+**Exit codes:** `0` = success, `1` = warnings produced (e.g. unassigned samples), `2` = bad arguments or unreadable files.
+
+**JSON output:**
+```json
+{
+  "source_version": "V2",
+  "groups": {
+    "ProjectA": {"file": "ProjectA_SampleSheet.csv", "sample_count": 4},
+    "ProjectB": {"file": "ProjectB_SampleSheet.csv", "sample_count": 6}
+  },
+  "warnings": []
+}
+```
+
+---
+
+## filter
+
+Extract a subset of samples from a sheet by project, lane, or sample ID.
+
+```bash
+samplesheet filter combined.csv --project ProjectA --output ProjectA.csv
+samplesheet filter combined.csv --lane 1 --output lane1.csv
+samplesheet filter combined.csv --sample-id "CTRL_*" --output controls.csv
+samplesheet filter combined.csv --project ProjectA --lane 1 --output out.csv
+samplesheet filter combined.csv --project ProjectA --output out.csv --format json
+```
+
+**Options:**
+
+| Option | Default | Description |
+|---|---|---|
+| `--project` / `-p` | — | Keep only samples matching this `Sample_Project` |
+| `--lane` / `-l` | — | Keep only samples from this lane |
+| `--sample-id` / `-s` | — | Keep only samples matching this ID or glob pattern |
+| `--output` / `-o` | `SampleSheet_filtered.csv` | Output file path |
+| `--to` | (same as input) | Target format: `v1` or `v2` |
+| `--format` / `-f` | `text` | Output format: `text` or `json` |
+
+At least one of `--project`, `--lane`, or `--sample-id` is required.  Multiple criteria are ANDed.
+
+`--sample-id` supports glob patterns (e.g. `"CTRL_*"`, `"SAMPLE_00[1-3]"`); matching is case-sensitive on all platforms.
+
+**Exit codes:** `0` = samples matched and written, `1` = no samples matched (no output written), `2` = bad arguments or unreadable files.
+
+**JSON output:**
+```json
+{
+  "matched_count": 2,
+  "total_count": 12,
+  "source_version": "V2",
+  "output": "ProjectA.csv",
+  "criteria": {"project": "ProjectA", "lane": null, "sample_id": null}
+}
+```
