@@ -12,6 +12,8 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18989694.svg)](https://doi.org/10.5281/zenodo.18989694)
 [![Docs](https://readthedocs.org/projects/illumina-samplesheet/badge/)](https://illumina-samplesheet.readthedocs.io)
 
+**Docs:** https://illumina-samplesheet.readthedocs.io/ | **PyPI:** https://pypi.org/project/samplesheet-parser/
+
 ![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_v03.png)
 
 *`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — `SampleSheetConverter` handles bidirectional conversion, `SampleSheetValidator` catches index and adapter issues, `SampleSheetDiff` compares two sheets across any combination of V1/V2 formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
