@@ -8,6 +8,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.2.0] - 2026-04-14
+
+### Changed
+
+- Minimum `typer` version raised from `>=0.9` to `>=0.12` to ensure
+  compatibility with `click >=8.2` (`make_metavar` signature change).
+
 ### Added
 
 - **`SampleSheetSplitter` and `SplitResult`** — splits a combined sheet into
