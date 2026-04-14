@@ -1,0 +1,4 @@
+samplesheetparser:
+  - modules/nf-core/samplesheetparser/**
+samplesheetparser_merge:
+  - modules/nf-core/samplesheetparser/merge/**

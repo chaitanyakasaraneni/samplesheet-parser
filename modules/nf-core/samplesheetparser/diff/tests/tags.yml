@@ -1,0 +1,4 @@
+samplesheetparser:
+  - modules/nf-core/samplesheetparser/**
+samplesheetparser_diff:
+  - modules/nf-core/samplesheetparser/diff/**
