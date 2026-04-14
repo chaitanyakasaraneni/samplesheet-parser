@@ -17,14 +17,11 @@ pip install "samplesheet-parser[cli]"
 
 ## conda / Bioconda
 
-!!! note "Bioconda package pending"
-    The Bioconda recipe has been submitted and is awaiting review. Once merged, install with:
+```bash
+conda install -c bioconda samplesheet-parser
+```
 
-    ```bash
-    conda install -c bioconda samplesheet-parser
-    ```
-
-    The Bioconda package includes the `samplesheet` CLI by default.
+The Bioconda package includes the `samplesheet` CLI by default.
 
 ## Development install
 
