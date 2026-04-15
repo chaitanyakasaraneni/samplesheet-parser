@@ -11,6 +11,7 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 [![codecov](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser/branch/main/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18989694.svg)](https://doi.org/10.5281/zenodo.18989694)
 [![Docs](https://readthedocs.org/projects/illumina-samplesheet/badge/)](https://illumina-samplesheet.readthedocs.io)
+[![Install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/samplesheet-parser/README.html)
 
 **Docs:** https://illumina-samplesheet.readthedocs.io/ | **PyPI:** https://pypi.org/project/samplesheet-parser/
 
