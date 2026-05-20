@@ -243,8 +243,10 @@ class SampleSheetConverter:
         """Convert a V2 sheet to IEM V1 format and write to *output_path*.
 
         This is a **lossy** conversion. V2-only fields (``OverrideCycles``,
-        ``Cloud_Data``, ``InstrumentPlatform``, etc.) are dropped and a
-        warning is logged for each dropped field.
+        ``Cloud_Data``, ``SoftwareVersion``, etc.) are dropped and a warning
+        is logged for each dropped field. ``InstrumentPlatform`` /
+        ``InstrumentType`` are preserved as the V1 ``Instrument Type``
+        header so the workflow signal survives a round trip.
 
         Parameters
         ----------

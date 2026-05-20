@@ -354,8 +354,9 @@ if _TYPER_AVAILABLE:
     ) -> None:
         """Convert a sample sheet between V1 (IEM/bcl2fastq) and V2 (BCLConvert) formats.
 
-        V2→V1 conversion is lossy: V2-only fields (OverrideCycles, InstrumentPlatform,
-        etc.) are dropped with a warning.
+        V2→V1 conversion is lossy: V2-only fields (OverrideCycles, SoftwareVersion,
+        Cloud_Data, etc.) are dropped with a warning. InstrumentPlatform /
+        InstrumentType are preserved as the V1 'Instrument Type' header.
 
         For workflow-B instruments (NovaSeq X/X Plus, NextSeq, iSeq, MiniSeq,
         HiSeq 3000/4000), Index2 is reverse-complemented to match the target

@@ -35,11 +35,17 @@ out = converter.to_v1("SampleSheet_v1.csv")
     V2-only fields are dropped during V2 → V1 conversion:
 
     - `OverrideCycles`
-    - `InstrumentPlatform`
-    - `FileFormatVersion`
-    - `[BCLConvert_Settings]` keys with no V1 equivalent
+    - `FileFormatVersion` (replaced by `IEMFileVersion`)
+    - `SoftwareVersion` and other `[BCLConvert_Settings]` keys with no V1 equivalent
+    - `[Cloud_Data]` / `[Cloud_Settings]` sections
 
     A warning is logged for each dropped field.
+
+    !!! info "Instrument is preserved"
+        `InstrumentPlatform` and `InstrumentType` are **not** dropped —
+        their value is written to the V1 `[Header]` as `Instrument Type`
+        so the workflow signal survives a round trip. The original V2
+        header key itself is not kept (V1 uses a different key name).
 
 ## Round-trip
 
