@@ -22,15 +22,29 @@ equivalent and are dropped with a warning:
 - Per-sample ``OverrideCycles`` column
 - ``InstrumentPlatform``, ``SoftwareVersion`` (BCLConvert-specific)
 
+Index 2 (i5) orientation
+------------------------
+``bcl2fastq`` and ``BCLConvert`` disagree on the orientation of i5 for
+workflow-B instruments (NovaSeq X / X Plus, NextSeq 500/550/1000/2000,
+iSeq 100, MiniSeq, HiSeq 3000/4000). For those instruments, ``Index2``
+is reverse-complemented on conversion in both directions. The workflow
+is auto-detected from the V1 ``Instrument Type`` or V2
+``InstrumentPlatform`` header; pass ``workflow=`` to override.
+
+If the sheet has a non-empty Index2 column and the workflow cannot be
+determined and no override is given, conversion fails with a clear
+error rather than silently producing a wrong sheet. See
+:mod:`samplesheet_parser.instruments`.
+
 Examples
 --------
 >>> from samplesheet_parser import SampleSheetConverter
 >>>
->>> # V1 → V2
+>>> # V1 → V2 — workflow auto-detected from [Header] Instrument Type
 >>> SampleSheetConverter("SampleSheet_v1.csv").to_v2("SampleSheet_v2.csv")
 >>>
->>> # V2 → V1 (lossy)
->>> SampleSheetConverter("SampleSheet_v2.csv").to_v1("SampleSheet_v1.csv")
+>>> # V2 → V1 with explicit workflow override (e.g. NovaSeq 6000 v1.5)
+>>> SampleSheetConverter("SampleSheet_v2.csv", workflow="b").to_v1("SampleSheet_v1.csv")
 """
 
 from __future__ import annotations
@@ -41,6 +55,12 @@ from loguru import logger
 
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
+from samplesheet_parser.instruments import (
+    Workflow,
+    detect_workflow,
+    parse_workflow,
+    reverse_complement,
+)
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 
@@ -60,10 +80,10 @@ _V2_ONLY_SETTINGS: set[str] = {
     "SoftwareVersion",
 }
 
+# Fields that have no V1 counterpart and are dropped silently on V2 → V1.
+# (FileFormatVersion is replaced by IEMFileVersion.)
 _V2_ONLY_HEADER: set[str] = {
     "FileFormatVersion",
-    "InstrumentPlatform",
-    "InstrumentType",
 }
 
 _V2_ONLY_DATA_COLUMNS: set[str] = {
@@ -75,6 +95,7 @@ _V2_ONLY_DATA_COLUMNS: set[str] = {
 # Converter
 # ---------------------------------------------------------------------------
 
+
 class SampleSheetConverter:
     """
     Converts Illumina sample sheets between IEM V1 and BCLConvert V2 formats.
@@ -84,6 +105,13 @@ class SampleSheetConverter:
     path:
         Path to the source ``SampleSheet.csv`` file. The format is
         auto-detected using :class:`~samplesheet_parser.SampleSheetFactory`.
+    workflow:
+        Instrument i5 workflow override. Accepts :class:`Workflow` or the
+        strings ``"a"`` / ``"b"``. When ``None`` (default), the workflow
+        is auto-detected from the V1 ``Instrument Type`` or V2
+        ``InstrumentPlatform`` header. Pass an explicit value for
+        chemistry-dependent instruments (e.g. NovaSeq 6000) or when the
+        instrument field is missing.
 
     Examples
     --------
@@ -93,14 +121,23 @@ class SampleSheetConverter:
 
     >>> conv = SampleSheetConverter("SampleSheet_v2.csv")
     >>> conv.to_v1("SampleSheet_v1.csv")  # emits warnings for dropped fields
+
+    >>> # NovaSeq 6000 with v1.5 chemistry — must override (ambiguous)
+    >>> SampleSheetConverter("SampleSheet.csv", workflow="b").to_v2("out.csv")
     """
 
-    def __init__(self, path: str | Path) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        workflow: Workflow | str | None = None,
+    ) -> None:
         self.path = Path(path)
         factory = SampleSheetFactory()
         # clean=False: converter must never modify or back up the source file
         self._sheet = factory.create_parser(self.path, parse=True, clean=False)
         self.source_version: SampleSheetVersion = factory.version  # type: ignore[assignment]
+        self.workflow_override: Workflow | None = parse_workflow(workflow)
         logger.info(f"SampleSheetConverter: detected {self.source_version} for {self.path}")
 
     # ------------------------------------------------------------------
@@ -126,9 +163,7 @@ class SampleSheetConverter:
             If the source sheet is already V2.
         """
         if self.source_version == SampleSheetVersion.V2:
-            raise ValueError(
-                "Source sheet is already V2. No conversion needed."
-            )
+            raise ValueError("Source sheet is already V2. No conversion needed.")
 
         sheet = self._sheet
         if not isinstance(sheet, SampleSheetV1):
@@ -136,6 +171,16 @@ class SampleSheetConverter:
                 f"Expected SampleSheetV1 for V1 \N{RIGHTWARDS ARROW} V2 conversion, "
                 f"got {type(sheet).__name__!r}."
             )
+
+        # Resolve workflow before writing any output — fail fast if the
+        # sheet has a non-empty Index2 column and we cannot tell whether
+        # to RC it. See _needs_i5_rc().
+        needs_rc = self._needs_i5_rc(
+            instrument=sheet.instrument_type,
+            records=sheet.records or [],
+            index2_key="index2",
+            direction="V1 → V2",
+        )
 
         out = Path(output_path)
         lines: list[str] = []
@@ -149,6 +194,10 @@ class SampleSheetConverter:
         description = getattr(sheet, "description", None) or ""
         if description:
             lines.append(f"RunDescription,{description}")
+        # Preserve Instrument Type → InstrumentType so the workflow signal
+        # survives a V1 → V2 → V1 round trip.
+        if sheet.instrument_type:
+            lines.append(f"InstrumentType,{sheet.instrument_type}")
         lines.append("")
 
         # [Reads]
@@ -176,8 +225,8 @@ class SampleSheetConverter:
             # section parseable by SampleSheetV2.parse_data()
             v2_columns = self._v1_data_columns_to_v2(sheet.columns)
             lines.append(",".join(v2_columns))
-            for record in (sheet.records or []):
-                row = self._v1_record_to_v2(record, v2_columns)
+            for record in sheet.records or []:
+                row = self._v1_record_to_v2(record, v2_columns, rc_index2=needs_rc)
                 lines.append(",".join(row))
         lines.append("")
 
@@ -208,12 +257,22 @@ class SampleSheetConverter:
             If the source sheet is already V1.
         """
         if self.source_version == SampleSheetVersion.V1:
-            raise ValueError(
-                "Source sheet is already V1. No conversion needed."
-            )
+            raise ValueError("Source sheet is already V1. No conversion needed.")
 
         sheet = self._sheet
         assert isinstance(sheet, SampleSheetV2)
+
+        # Resolve workflow up front. Prefer InstrumentPlatform; fall back
+        # to InstrumentType (some V2 sheets only declare the latter).
+        instrument = sheet.instrument_platform or (
+            sheet.header.get("InstrumentType") if sheet.header else None
+        )
+        needs_rc = self._needs_i5_rc(
+            instrument=instrument,
+            records=sheet.records or [],
+            index2_key="Index2",
+            direction="V2 → V1",
+        )
 
         out = Path(output_path)
         lines: list[str] = []
@@ -224,9 +283,7 @@ class SampleSheetConverter:
         lines.append("IEMFileVersion,5")
 
         run_name = (
-            sheet.experiment_name
-            or (sheet.header.get("RunName") if sheet.header else None)
-            or ""
+            sheet.experiment_name or (sheet.header.get("RunName") if sheet.header else None) or ""
         )
         if run_name:
             lines.append(f"Experiment Name,{run_name}")
@@ -234,6 +291,15 @@ class SampleSheetConverter:
         run_desc = sheet.header.get("RunDescription", "") if sheet.header else ""
         if run_desc:
             lines.append(f"Description,{run_desc}")
+
+        # Preserve instrument so the workflow signal survives a round trip.
+        # V2 may declare InstrumentType, InstrumentPlatform, or both —
+        # prefer the more specific InstrumentType when present.
+        v2_instrument = (sheet.header.get("InstrumentType") if sheet.header else None) or (
+            sheet.header.get("InstrumentPlatform") if sheet.header else None
+        )
+        if v2_instrument:
+            lines.append(f"Instrument Type,{v2_instrument}")
 
         # Track dropped V2-only header fields
         if sheet.header:
@@ -285,8 +351,8 @@ class SampleSheetConverter:
             # Always emit column header even when records == [] to keep the
             # section parseable by SampleSheetV1.parse_data()
             lines.append(",".join(v1_columns))
-            for record in (sheet.records or []):
-                row = self._v2_record_to_v1(record, v1_columns)
+            for record in sheet.records or []:
+                row = self._v2_record_to_v1(record, v1_columns, rc_index2=needs_rc)
                 lines.append(",".join(row))
         lines.append("")
 
@@ -312,18 +378,18 @@ class SampleSheetConverter:
     def _v1_data_columns_to_v2(self, v1_columns: list[str]) -> list[str]:
         """Map V1 [Data] column names to V2 [BCLConvert_Data] equivalents."""
         mapping = {
-            "Sample_ID":      "Sample_ID",
-            "Sample_Name":    "Sample_Name",
-            "Lane":           "Lane",
-            "index":          "Index",
-            "index2":         "Index2",
+            "Sample_ID": "Sample_ID",
+            "Sample_Name": "Sample_Name",
+            "Lane": "Lane",
+            "index": "Index",
+            "index2": "Index2",
             "Sample_Project": "Sample_Project",
             # Drop V1-only columns
-            "I7_Index_ID":    None,
-            "I5_Index_ID":    None,
-            "Sample_Plate":   None,
-            "Sample_Well":    None,
-            "Description":    None,
+            "I7_Index_ID": None,
+            "I5_Index_ID": None,
+            "Sample_Plate": None,
+            "Sample_Well": None,
+            "Description": None,
         }
         result = []
         for col in v1_columns:
@@ -336,35 +402,43 @@ class SampleSheetConverter:
         self,
         record: dict[str, str],
         v2_columns: list[str],
+        *,
+        rc_index2: bool = False,
     ) -> list[str]:
-        """Convert a single V1 data record to a V2 row."""
+        """Convert a single V1 data record to a V2 row.
+
+        When *rc_index2* is True, the ``index2`` value is reverse-
+        complemented before being written under the V2 ``Index2`` column.
+        """
         col_map = {
-            "index":  "Index",
+            "index": "Index",
             "index2": "Index2",
         }
-        # Build intermediate dict with V2 keys
         v2_record: dict[str, str] = {}
         for k, v in record.items():
             new_key = col_map.get(k, k)
-            if new_key in v2_columns:
-                v2_record[new_key] = v
+            if new_key not in v2_columns:
+                continue
+            if rc_index2 and k == "index2" and v:
+                v = reverse_complement(v)
+            v2_record[new_key] = v
 
         return [v2_record.get(col, "") for col in v2_columns]
 
     def _v2_data_columns_to_v1(self, v2_columns: list[str]) -> list[str]:
         """Map V2 [BCLConvert_Data] column names to V1 [Data] equivalents."""
         mapping = {
-            "Sample_ID":      "Sample_ID",
-            "Sample_Name":    "Sample_Name",
-            "Lane":           "Lane",
-            "Index":          "index",
-            "Index2":         "index2",
+            "Sample_ID": "Sample_ID",
+            "Sample_Name": "Sample_Name",
+            "Lane": "Lane",
+            "Index": "index",
+            "Index2": "index2",
             "Sample_Project": "Sample_Project",
         }
         result = []
         for col in v2_columns:
             if col in _V2_ONLY_DATA_COLUMNS:
-                continue   # drop silently — already warned above
+                continue  # drop silently — already warned above
             mapped = mapping.get(col, col)
             result.append(mapped)
         return result
@@ -373,10 +447,16 @@ class SampleSheetConverter:
         self,
         record: dict[str, str],
         v1_columns: list[str],
+        *,
+        rc_index2: bool = False,
     ) -> list[str]:
-        """Convert a single V2 data record to a V1 row."""
+        """Convert a single V2 data record to a V1 row.
+
+        When *rc_index2* is True, the ``Index2`` value is reverse-
+        complemented before being written under the V1 ``index2`` column.
+        """
         col_map = {
-            "Index":  "index",
+            "Index": "index",
             "Index2": "index2",
         }
         v1_record: dict[str, str] = {}
@@ -384,10 +464,67 @@ class SampleSheetConverter:
             if k in _V2_ONLY_DATA_COLUMNS:
                 continue
             new_key = col_map.get(k, k)
-            if new_key in v1_columns:
-                v1_record[new_key] = v
+            if new_key not in v1_columns:
+                continue
+            if rc_index2 and k == "Index2" and v:
+                v = reverse_complement(v)
+            v1_record[new_key] = v
 
         return [v1_record.get(col, "") for col in v1_columns]
+
+    # ------------------------------------------------------------------
+    # Workflow / i5 orientation
+    # ------------------------------------------------------------------
+
+    def _needs_i5_rc(
+        self,
+        *,
+        instrument: str | None,
+        records: list[dict[str, str]],
+        index2_key: str,
+        direction: str,
+    ) -> bool:
+        """Decide whether ``Index2`` should be reverse-complemented.
+
+        Resolution order:
+          1. Explicit ``workflow=`` constructor override wins.
+          2. Otherwise auto-detect from *instrument*.
+          3. If detection fails and any record carries a non-empty
+             ``index2_key``, raise ``ValueError`` — silently passing the
+             i5 through would produce a wrong sheet for workflow-B
+             instruments.
+          4. If no Index2 values are present, return ``False`` (no-op).
+        """
+        has_index2_values = any(rec.get(index2_key) for rec in records)
+
+        def _log(wf: Workflow, source: str) -> None:
+            action = "be reverse-complemented" if wf == Workflow.B else "be passed through"
+            logger.info(f"{direction}: workflow={wf.value} ({source}); Index2 will {action}.")
+
+        if self.workflow_override is not None:
+            _log(self.workflow_override, "explicit override")
+            return self.workflow_override == Workflow.B
+
+        detected = detect_workflow(instrument)
+        if detected is not None:
+            _log(detected, f"auto-detected from {instrument!r}")
+            return detected == Workflow.B
+
+        # Workflow unknown.
+        if has_index2_values:
+            instr_repr = f"{instrument!r}" if instrument else "<missing>"
+            raise ValueError(
+                f"{direction}: cannot determine i5 orientation workflow for "
+                f"instrument {instr_repr}. The sheet has dual indexes, and "
+                f"workflow-A vs workflow-B instruments record Index2 in "
+                f"opposite orientations. Pass workflow='a' or workflow='b' "
+                f"explicitly (CLI: --workflow {{a,b}}). See "
+                f"samplesheet_parser.instruments for the full instrument table."
+            )
+
+        # No Index2 to convert — silent pass-through is safe.
+        logger.debug(f"{direction}: no Index2 values, skipping workflow detection.")
+        return False
 
     # ------------------------------------------------------------------
     # Dunder

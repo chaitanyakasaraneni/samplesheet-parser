@@ -45,6 +45,7 @@ IEMFileVersion,5
 Experiment Name,RunA
 Date,2024-01-15
 Workflow,GenerateFASTQ
+Instrument Type,MiSeq
 Chemistry,Amplicon
 
 [Reads]
@@ -66,6 +67,7 @@ IEMFileVersion,5
 Experiment Name,RunA
 Date,2024-01-15
 Workflow,GenerateFASTQ
+Instrument Type,MiSeq
 Chemistry,Amplicon
 
 [Reads]
@@ -88,6 +90,7 @@ IEMFileVersion,5
 Experiment Name,RunA
 Date,2024-01-15
 Workflow,GenerateFASTQ
+Instrument Type,MiSeq
 Chemistry,Amplicon
 
 [Reads]
@@ -109,6 +112,7 @@ IEMFileVersion,5
 Experiment Name,InvalidRun
 Date,2024-01-15
 Workflow,GenerateFASTQ
+Instrument Type,MiSeq
 Chemistry,Amplicon
 
 [Reads]
@@ -153,6 +157,7 @@ IEMFileVersion,5
 Experiment Name,RunA
 Date,2024-01-15
 Workflow,GenerateFASTQ
+Instrument Type,MiSeq
 Chemistry,Amplicon
 
 [Reads]
@@ -176,6 +181,7 @@ IEMFileVersion,5
 Experiment Name,RunA
 Date,2024-01-15
 Workflow,GenerateFASTQ
+Instrument Type,MiSeq
 Chemistry,Amplicon
 
 [Reads]

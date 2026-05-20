@@ -8,6 +8,38 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`SampleSheetConverter` now reverse-complements `Index2` for workflow-B
+  instruments** (NovaSeq X / X Plus, NextSeq 500/550/1000/2000, iSeq 100,
+  MiniSeq, HiSeq 3000/4000) on V1 ↔ V2 conversion. `bcl2fastq` records i5 as
+  read on the chip (reverse-complemented for workflow-B instruments) while
+  `BCLConvert` expects i5 in the forward orientation; previously the
+  converter passed `Index2` through verbatim, silently producing V2 sheets
+  that demultiplexed to the wrong samples ([#30]).
+- The workflow is auto-detected from `[Header] Instrument Type` (V1) or
+  `InstrumentPlatform` / `InstrumentType` (V2). When the sheet has a
+  non-empty `Index2` column and the workflow cannot be determined, the
+  converter raises `ValueError` and the CLI exits non-zero rather than
+  guessing.
+- V2 → V1 conversion now preserves the instrument as `Instrument Type` in
+  the V1 `[Header]` so the workflow signal survives a round trip.
+
+### Added
+
+- **`samplesheet_parser.instruments`** — public module exposing
+  `Workflow` (StrEnum: `A` / `B`), `WORKFLOW_A_INSTRUMENTS` /
+  `WORKFLOW_B_INSTRUMENTS` / `AMBIGUOUS_INSTRUMENTS` tables,
+  `detect_workflow()`, `parse_workflow()`, and `reverse_complement()`.
+- **`SampleSheetConverter(path, *, workflow=...)`** — explicit workflow
+  override accepting `"a"`, `"b"`, or a `Workflow` enum value. Required for
+  ambiguous instruments such as `NovaSeq 6000` (workflow depends on v1.0
+  vs v1.5 chemistry).
+- **`samplesheet convert --workflow {a,b}` / `-w`** — CLI override that
+  takes precedence over auto-detection.
+
+[#30]: https://github.com/chaitanyakasaraneni/samplesheet-parser/issues/30
+
 ---
 
 ## [1.2.0] - 2026-04-14

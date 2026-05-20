@@ -33,6 +33,7 @@ Usage
     samplesheet convert SampleSheet_v1.csv --to v2 --output SampleSheet_v2.csv
     samplesheet convert SampleSheet_v2.csv --to v1 --output SampleSheet_v1.csv
     samplesheet convert SampleSheet_v1.csv --to v2 --output out.csv --format json
+    samplesheet convert NovaSeq6000.v1.csv --to v2 --workflow b --output out.csv
 
     samplesheet diff old/SampleSheet.csv new/SampleSheet.csv
     samplesheet diff old/SampleSheet.csv new/SampleSheet.csv --format json
@@ -336,15 +337,36 @@ if _TYPER_AVAILABLE:
         to: _VersionOption = "v2",
         output: _OutputOption = Path("SampleSheet_converted.csv"),
         fmt: _FormatOption = "text",
+        workflow: Annotated[
+            str,
+            typer.Option(
+                "--workflow",
+                "-w",
+                help=(
+                    "Instrument i5 orientation workflow: 'a' (MiSeq, HiSeq 2000/2500, "
+                    "NovaSeq 6000 v1.0) or 'b' (NovaSeq X/X Plus, NextSeq, iSeq, "
+                    "MiniSeq, HiSeq 3000/4000, NovaSeq 6000 v1.5). Overrides "
+                    "auto-detection from the instrument header."
+                ),
+                metavar="{a,b}",
+            ),
+        ] = "",
     ) -> None:
         """Convert a sample sheet between V1 (IEM/bcl2fastq) and V2 (BCLConvert) formats.
 
         V2→V1 conversion is lossy: V2-only fields (OverrideCycles, InstrumentPlatform,
         etc.) are dropped with a warning.
 
+        For workflow-B instruments (NovaSeq X/X Plus, NextSeq, iSeq, MiniSeq,
+        HiSeq 3000/4000), Index2 is reverse-complemented to match the target
+        demultiplexer's expected orientation. The workflow is auto-detected
+        from the instrument header; use --workflow to override (required for
+        NovaSeq 6000, which is chemistry-dependent).
+
         Exits 0 on success, 1 on conversion error, 2 on bad arguments.
         """
         from samplesheet_parser.converter import SampleSheetConverter
+        from samplesheet_parser.instruments import parse_workflow
 
         _validate_fmt(fmt)
         if not path.exists():
@@ -354,7 +376,13 @@ if _TYPER_AVAILABLE:
         target = _resolve_version(to)
 
         try:
-            converter = SampleSheetConverter(str(path))
+            wf = parse_workflow(workflow) if workflow else None
+        except ValueError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=2) from exc
+
+        try:
+            converter = SampleSheetConverter(str(path), workflow=wf)
             if target == SampleSheetVersion.V2:
                 out = converter.to_v2(str(output))
             else:
