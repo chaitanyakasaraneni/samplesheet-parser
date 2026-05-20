@@ -77,11 +77,13 @@ WORKFLOW_B_INSTRUMENTS: frozenset[str] = frozenset(
         "novaseqx",
         "novaseqxplus",
         "novaseqxseries",
-        # NextSeq family
+        # NextSeq family — V2 sheets sometimes declare the combined
+        # platform "NextSeq1000/2000", which normalises to "nextseq10002000".
         "nextseq500",
         "nextseq550",
         "nextseq1000",
         "nextseq2000",
+        "nextseq10002000",
         # Small / benchtop sequencers
         "iseq",
         "iseq100",

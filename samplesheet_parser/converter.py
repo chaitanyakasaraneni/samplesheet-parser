@@ -20,7 +20,12 @@ equivalent and are dropped with a warning:
 - ``OverrideCycles``
 - ``Cloud_Data`` / ``Cloud_Settings`` sections
 - Per-sample ``OverrideCycles`` column
-- ``InstrumentPlatform``, ``SoftwareVersion`` (BCLConvert-specific)
+- ``FileFormatVersion`` (replaced by ``IEMFileVersion``)
+- ``SoftwareVersion`` and other BCLConvert-specific settings
+
+``InstrumentPlatform`` / ``InstrumentType`` are mapped to the V1
+``Instrument Type`` header so the workflow signal survives a round
+trip; they are not dropped.
 
 Index 2 (i5) orientation
 ------------------------

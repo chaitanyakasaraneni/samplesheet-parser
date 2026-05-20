@@ -62,6 +62,8 @@ class TestDetectWorkflow:
             "NextSeq 550",
             "NextSeq 1000",
             "NextSeq2000",
+            "NextSeq1000/2000",  # combined V2 InstrumentPlatform value
+            "NextSeq 1000/2000",
             "iSeq",
             "iSeq 100",
             "MiniSeq",

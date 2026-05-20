@@ -539,9 +539,9 @@ class TestConverterEdgeCases:
             "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
         )
         converter = SampleSheetConverter(str(p))
-        # description is a runtime-set attribute on SampleSheetV1; use setattr
-        # to keep mypy happy without conditionally narrowing the union type.
-        converter._sheet.description = "My run description"  # type: ignore[union-attr]
+        # `description` is a runtime attribute set on SampleSheetV1 only; use
+        # setattr so mypy doesn't need to narrow the parser-union type.
+        setattr(converter._sheet, "description", "My run description")  # noqa: B010
         out = tmp_path / "out.csv"
         converter.to_v2(str(out))
         assert "RunDescription,My run description" in out.read_text()
@@ -558,6 +558,23 @@ class TestConverterEdgeCases:
         out = tmp_path / "out.csv"
         SampleSheetConverter(str(p)).to_v1(str(out))
         assert "OverrideCycles" not in out.read_text()
+
+    def test_v2_record_with_unknown_key_is_skipped(self, tmp_path: Path) -> None:
+        """Defensive guard: a record carrying a key not in v1_columns is dropped.
+
+        Hard to trigger via the parser, but verifies the inner branch directly.
+        """
+        p = tmp_path / "v2.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\nInstrumentPlatform,MiSeq\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n"
+        )
+        converter = SampleSheetConverter(str(p))
+        row = converter._v2_record_to_v1(
+            record={"Sample_ID": "S1", "Index": "ATTACTCG", "PhantomColumn": "X"},
+            v1_columns=["Sample_ID", "index"],
+        )
+        assert row == ["S1", "ATTACTCG"]
 
 
 # ---------------------------------------------------------------------------
