@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.3.0] - 2026-05-20
+
 ### Fixed
 
 - **`SampleSheetConverter` now reverse-complements `Index2` for workflow-B
@@ -21,7 +25,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `InstrumentPlatform` / `InstrumentType` (V2). When the sheet has a
   non-empty `Index2` column and the workflow cannot be determined, the
   converter raises `ValueError` and the CLI exits non-zero rather than
-  guessing.
+  guessing. **Behavior change:** dual-index sheets with no recognised
+  instrument header that previously converted (with silently wrong `Index2`)
+  will now fail loudly until `workflow=` / `--workflow` is supplied.
 - V2 → V1 conversion now preserves the instrument as `Instrument Type` in
   the V1 `[Header]` so the workflow signal survives a round trip.
 
