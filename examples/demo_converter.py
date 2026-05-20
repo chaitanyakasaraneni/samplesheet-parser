@@ -52,7 +52,10 @@ print("=" * 60)
 src_v1 = SHEETS / "v1_dual_index.csv"
 out_v2 = OUT / "converted_v1_to_v2.csv"
 
-converter = SampleSheetConverter(str(src_v1))
+# v1_dual_index.csv declares Instrument Type=NovaSeq 6000, whose i5
+# orientation depends on chemistry (v1.0 = workflow A, v1.5 = workflow B).
+# Pass an explicit workflow so the converter doesn't have to guess.
+converter = SampleSheetConverter(str(src_v1), workflow="a")
 result_path = converter.to_v2(str(out_v2))
 
 print(f"  Input  : {src_v1.name}  ({converter.source_version.value})")
@@ -93,8 +96,8 @@ print("=" * 60)
 tmp_v2 = OUT / "roundtrip_v2.csv"
 tmp_v1 = OUT / "roundtrip_v1.csv"
 
-SampleSheetConverter(str(src_v1)).to_v2(str(tmp_v2))
-SampleSheetConverter(str(tmp_v2)).to_v1(str(tmp_v1))
+SampleSheetConverter(str(src_v1), workflow="a").to_v2(str(tmp_v2))
+SampleSheetConverter(str(tmp_v2), workflow="a").to_v1(str(tmp_v1))
 
 factory_orig = SampleSheetFactory()
 sheet_orig = factory_orig.create_parser(src_v1, parse=True)

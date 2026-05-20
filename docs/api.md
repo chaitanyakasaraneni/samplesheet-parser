@@ -51,11 +51,49 @@ from samplesheet_parser import (
 
 ## SampleSheetConverter
 
-| Method | Returns | Description |
+```python
+SampleSheetConverter(path, *, workflow: Workflow | str | None = None)
+```
+
+| Method / attribute | Returns | Description |
 |---|---|---|
 | `to_v2(output_path)` | `Path` | Convert IEM V1 → BCLConvert V2 |
 | `to_v1(output_path)` | `Path` | Convert BCLConvert V2 → IEM V1 (lossy) |
 | `.source_version` | `SampleSheetVersion \| None` | Auto-detected format of the input |
+| `.workflow_override` | `Workflow \| None` | Resolved workflow override, if any |
+
+The `workflow` parameter accepts `"a"`, `"b"`, or a `Workflow` enum value
+and overrides auto-detection of the i5 orientation workflow from the
+instrument header. See
+[Conversion → Index 2 orientation](guide/conversion.md#index-2-i5-orientation).
+
+---
+
+## samplesheet_parser.instruments
+
+i5 orientation workflow classification helpers.
+
+```python
+from samplesheet_parser.instruments import (
+    Workflow,
+    detect_workflow,
+    parse_workflow,
+    reverse_complement,
+    WORKFLOW_A_INSTRUMENTS,
+    WORKFLOW_B_INSTRUMENTS,
+    AMBIGUOUS_INSTRUMENTS,
+)
+```
+
+| Name | Kind | Description |
+|---|---|---|
+| `Workflow` | `StrEnum` | `Workflow.A` (i5 forward) / `Workflow.B` (i5 RC'd on chip) |
+| `detect_workflow(name)` | `Workflow \| None` | Classify an instrument name; `None` for unknown or ambiguous (e.g. `NovaSeq 6000`) |
+| `parse_workflow(value)` | `Workflow \| None` | Coerce a CLI string (`"a"` / `"b"`) to `Workflow` |
+| `reverse_complement(seq)` | `str` | Reverse-complement a DNA sequence (preserves `N`, case-preserving) |
+| `WORKFLOW_A_INSTRUMENTS` | `frozenset[str]` | Normalised names of workflow-A instruments |
+| `WORKFLOW_B_INSTRUMENTS` | `frozenset[str]` | Normalised names of workflow-B instruments |
+| `AMBIGUOUS_INSTRUMENTS` | `frozenset[str]` | Instruments whose workflow depends on chemistry and require an explicit override |
 
 ---
 

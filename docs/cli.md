@@ -100,6 +100,7 @@ Convert between V1 (IEM/bcl2fastq) and V2 (BCLConvert) formats.
 samplesheet convert SampleSheet_v1.csv --to v2 --output SampleSheet_v2.csv
 samplesheet convert SampleSheet_v2.csv --to v1 --output SampleSheet_v1.csv
 samplesheet convert SampleSheet_v1.csv --to v2 --output out.csv --format json
+samplesheet convert NovaSeq6000.v1.csv --to v2 --workflow b --output out.csv
 ```
 
 **Options:**
@@ -109,9 +110,21 @@ samplesheet convert SampleSheet_v1.csv --to v2 --output out.csv --format json
 | `--to` | `v2` | Target format: `v1` or `v2` |
 | `--output` / `-o` | `SampleSheet_converted.csv` | Output file path |
 | `--format` / `-f` | `text` | Output format: `text` or `json` |
+| `--workflow` / `-w` | auto-detect | i5 orientation: `a` (MiSeq, HiSeq 2000/2500, NovaSeq 6000 v1.0) or `b` (NovaSeq X/X Plus, NextSeq, iSeq, MiniSeq, HiSeq 3000/4000, NovaSeq 6000 v1.5). Overrides header auto-detection. |
 
 !!! warning "V2 → V1 is lossy"
-    V2-only fields (`OverrideCycles`, `InstrumentPlatform`, etc.) are dropped with a warning.
+    V2-only fields (`OverrideCycles`, `FileFormatVersion`, etc.) are dropped with a warning. `InstrumentPlatform` is preserved as `Instrument Type` in the V1 header.
+
+!!! info "Index 2 (i5) orientation"
+    For workflow-B instruments, `Index2` is reverse-complemented to
+    match the target demultiplexer's expected orientation. The workflow
+    is auto-detected from the instrument header; pass `--workflow` to
+    override (required for `NovaSeq 6000`, which is chemistry-dependent).
+
+    If the sheet has dual indexes and the workflow cannot be determined
+    and no override is given, `convert` exits non-zero with a clear
+    error rather than producing a silently-wrong sheet. See
+    [Conversion → Index 2 orientation](guide/conversion.md#index-2-i5-orientation).
 
 **JSON output:**
 ```json
