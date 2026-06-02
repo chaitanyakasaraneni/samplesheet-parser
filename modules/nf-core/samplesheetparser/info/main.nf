@@ -3,16 +3,16 @@ process SAMPLESHEETPARSER_INFO {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/samplesheet-parser:1.2.0--pyhdfd78af_0' :
-        'biocontainers/samplesheet-parser:1.2.0--pyhdfd78af_0' }"
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/samplesheet-parser:1.3.0--pyhdfd78af_0' :
+        'quay.io/biocontainers/samplesheet-parser:1.3.0--pyhdfd78af_0' }"
 
     input:
     tuple val(meta), path(samplesheet)
 
     output:
     tuple val(meta), path("*.info.json"), emit: json
-    path "versions.yml",                  emit: versions
+    tuple val("${task.process}"), val('samplesheet-parser'), eval("samplesheet --version | sed 's/samplesheet-parser //'"), topic: versions, emit: versions_samplesheetparser
 
     when:
     task.ext.when == null || task.ext.when
@@ -22,24 +22,13 @@ process SAMPLESHEETPARSER_INFO {
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
     samplesheet info \\
-        --format json \\
         ${args} \\
         ${samplesheet} > ${prefix}.info.json
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        samplesheet-parser: \$(samplesheet --version | sed 's/samplesheet-parser //')
-    END_VERSIONS
     """
 
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    echo '{"format": "V1", "sample_count": 0, "lanes": [], "index_type": "none"}' > ${prefix}.info.json
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        samplesheet-parser: \$(samplesheet --version | sed 's/samplesheet-parser //')
-    END_VERSIONS
+    touch ${prefix}.info.json
     """
 }

@@ -12,10 +12,9 @@ keywords:
   - bclconvert
   - bcl2fastq
   - genomics
-
 tools:
   - samplesheet-parser:
-      description: >
+      description: |
         Format-agnostic parser for Illumina SampleSheet.csv files.
         Supports IEM V1 (bcl2fastq) and BCLConvert V2 with auto-detection,
         bidirectional conversion, index validation, and Hamming distance checking.
@@ -23,9 +22,9 @@ tools:
       documentation: https://illumina-samplesheet.readthedocs.io
       tool_dev_url: https://github.com/chaitanyakasaraneni/samplesheet-parser
       doi: "10.5281/zenodo.18989694"
-      licence: ["Apache-2.0"]
+      licence:
+        - "Apache-2.0"
       identifier: biotools:samplesheet-parser
-
 input:
   - - meta:
         type: map
@@ -40,10 +39,9 @@ input:
         pattern: "*.{csv,CSV}"
         ontologies:
           - edam: "http://edamontology.org/format_3752"
-
 output:
-  - samplesheet:
-      - meta:
+  samplesheet:
+    - - meta:
           type: map
           description: Groovy Map containing sample information
       - "*.filtered.csv":
@@ -52,8 +50,10 @@ output:
             Filtered SampleSheet.csv. Not emitted when no samples match
             the criteria (optional output).
           pattern: "*.filtered.csv"
-  - json:
-      - meta:
+          ontologies:
+            - edam: "http://edamontology.org/format_3752"
+  json:
+    - - meta:
           type: map
           description: Groovy Map containing sample information
       - "*.filter.json":
@@ -62,12 +62,29 @@ output:
             Structured JSON filter report with matched_count, total_count,
             output_path, summary, and criteria fields.
           pattern: "*.filter.json"
-  - versions:
-      - "versions.yml":
-          type: file
-          description: File containing software versions
-          pattern: "versions.yml"
-
+          ontologies:
+            - edam: http://edamontology.org/format_3464
+  versions_samplesheetparser:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - samplesheet-parser:
+          type: string
+          description: The name of the tool
+      - samplesheet --version | sed 's/samplesheet-parser //':
+          type: eval
+          description: The expression to obtain the version of the tool
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - samplesheet-parser:
+          type: string
+          description: The name of the tool
+      - samplesheet --version | sed 's/samplesheet-parser //':
+          type: eval
+          description: The expression to obtain the version of the tool
 authors:
   - "@chaitanyakasaraneni"
 maintainers:

@@ -12,10 +12,9 @@ keywords:
   - bclconvert
   - bcl2fastq
   - genomics
-
 tools:
   - samplesheet-parser:
-      description: >
+      description: |
         Format-agnostic parser for Illumina SampleSheet.csv files.
         Supports IEM V1 (bcl2fastq) and BCLConvert V2 with auto-detection,
         bidirectional conversion, index validation, and Hamming distance checking.
@@ -23,9 +22,9 @@ tools:
       documentation: https://illumina-samplesheet.readthedocs.io
       tool_dev_url: https://github.com/chaitanyakasaraneni/samplesheet-parser
       doi: "10.5281/zenodo.18989694"
-      licence: ["Apache-2.0"]
+      licence:
+        - "Apache-2.0"
       identifier: biotools:samplesheet-parser
-
 input:
   - - meta:
         type: map
@@ -44,10 +43,9 @@ input:
         pattern: "*.{csv,CSV}"
         ontologies:
           - edam: "http://edamontology.org/format_3752"
-
 output:
-  - json:
-      - meta:
+  json:
+    - - meta:
           type: map
           description: Groovy Map containing sample information
       - "*.diff.json":
@@ -57,12 +55,29 @@ output:
             target_version, header_changes, samples_added, samples_removed,
             and sample_changes fields.
           pattern: "*.diff.json"
-  - versions:
-      - "versions.yml":
-          type: file
-          description: File containing software versions
-          pattern: "versions.yml"
-
+          ontologies:
+            - edam: http://edamontology.org/format_3464
+  versions_samplesheetparser:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - samplesheet-parser:
+          type: string
+          description: The name of the tool
+      - samplesheet --version | sed 's/samplesheet-parser //':
+          type: eval
+          description: The expression to obtain the version of the tool
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The name of the process
+      - samplesheet-parser:
+          type: string
+          description: The name of the tool
+      - samplesheet --version | sed 's/samplesheet-parser //':
+          type: eval
+          description: The expression to obtain the version of the tool
 authors:
   - "@chaitanyakasaraneni"
 maintainers:

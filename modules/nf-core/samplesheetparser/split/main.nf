@@ -3,9 +3,9 @@ process SAMPLESHEETPARSER_SPLIT {
     label 'process_single'
 
     conda "${moduleDir}/environment.yml"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/samplesheet-parser:1.2.0--pyhdfd78af_0' :
-        'biocontainers/samplesheet-parser:1.2.0--pyhdfd78af_0' }"
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/samplesheet-parser:1.3.0--pyhdfd78af_0' :
+        'quay.io/biocontainers/samplesheet-parser:1.3.0--pyhdfd78af_0' }"
 
     input:
     tuple val(meta), path(samplesheet)
@@ -14,7 +14,7 @@ process SAMPLESHEETPARSER_SPLIT {
     output:
     tuple val(meta), path("split/*.csv"), emit: samplesheets
     tuple val(meta), path("*.split.json"), emit: json
-    path "versions.yml",                   emit: versions
+    tuple val("${task.process}"), val('samplesheet-parser'), eval("samplesheet --version | sed 's/samplesheet-parser //'"), topic: versions, emit: versions_samplesheetparser
 
     when:
     task.ext.when == null || task.ext.when
@@ -34,11 +34,6 @@ process SAMPLESHEETPARSER_SPLIT {
         --format json \\
         ${args} \\
         ${samplesheet} > ${prefix}.split.json
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        samplesheet-parser: \$(samplesheet --version | sed 's/samplesheet-parser //')
-    END_VERSIONS
     """
 
     stub:
@@ -46,11 +41,6 @@ process SAMPLESHEETPARSER_SPLIT {
     """
     mkdir -p split
     touch split/stub_SampleSheet.csv
-    echo '{"by": "${by}", "files": {}, "sample_counts": {}, "warnings": []}' > ${prefix}.split.json
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        samplesheet-parser: \$(samplesheet --version | sed 's/samplesheet-parser //')
-    END_VERSIONS
+    touch ${prefix}.split.json
     """
 }
