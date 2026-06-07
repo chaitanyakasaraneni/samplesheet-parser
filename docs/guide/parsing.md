@@ -73,12 +73,41 @@ print(rs.read_structure)
 
 ## Shared interface
 
-Both `SampleSheetV1` and `SampleSheetV2` expose:
+Both `SampleSheetV1` and `SampleSheetV2` satisfy the `SampleSheetParser` Protocol and expose:
 
 | Method / attribute | Returns | Description |
 |---|---|---|
 | `parse(do_clean=True)` | `None` | Parse all sections |
-| `samples()` | `list[dict]` | One record per unique sample |
+| `clean()` | `str` | Return cleaned content as a string — source file is **never** modified |
+| `samples()` | `list[dict]` | One record per unique `(sample_id, lane)` pair |
 | `index_type()` | `str` | `"dual"`, `"single"`, or `"none"` |
+| `parse_custom_section(name, *, required=False)` | `dict[str, str]` | Parse any non-standard section as key/value pairs |
 | `.adapters` | `list[str]` | Adapter sequences |
 | `.experiment_name` | `str \| None` | Run/experiment name |
+
+### In-memory cleaning
+
+`parse(do_clean=True)` (the default) cleans the file content in memory before parsing — stripping BOM, quotes, stray whitespace, and normalising V2 section names. **The source file on disk is never modified and no `.backup` files are created.**
+
+```python
+# Access the cleaned content directly
+cleaned = sheet.clean()   # returns str, no file I/O side-effects
+
+# Parse with cleaning (default)
+sheet.parse()
+
+# Parse without cleaning (raw file)
+sheet.parse(do_clean=False)
+```
+
+### Multi-lane deduplication
+
+`samples()` deduplicates by `(sample_id, lane)` pair, not by `sample_id` alone. A sample appearing across multiple lanes produces one record per lane.
+
+```python
+sheet.parse()
+samples = sheet.samples()
+# Multi-lane sheet with Sample1 in lanes 1 and 2 → two records:
+# [{"sample_id": "Sample1", "lane": "1", ...},
+#  {"sample_id": "Sample1", "lane": "2", ...}]
+```

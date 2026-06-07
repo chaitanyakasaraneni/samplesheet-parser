@@ -5,7 +5,7 @@
 Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
 
 [![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-yellow.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/samplesheet-parser/README.html)
 
@@ -40,7 +40,7 @@ pip install samplesheet-parser
 pip install "samplesheet-parser[cli]"
 ```
 
-Requires Python 3.12+. No mandatory runtime dependencies beyond `loguru`.
+Requires Python 3.10+. No mandatory runtime dependencies.
 
 ---
 
@@ -410,9 +410,20 @@ sheet.get_read_structure()   # → ReadStructure dataclass
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `create_parser(path, *, clean, experiment_id, parse)` | `SampleSheetV1 \| SampleSheetV2` | Auto-detect format and return appropriate parser |
+| `create_parser(path, *, clean, experiment_id, parse)` | `SampleSheetParser` | Auto-detect format and return appropriate parser |
+| `register(detector, parser_class, version)` | `None` | Register a custom format detector (class method, LIFO) |
+| `clear_registry()` | `None` | Remove all custom registrations (class method) |
 | `get_umi_length()` | `int` | UMI length from the current parser |
 | `.version` | `SampleSheetVersion` | Detected format version |
+
+### `SampleSheetParser` (Protocol)
+
+A `runtime_checkable` structural protocol satisfied by both `SampleSheetV1` and `SampleSheetV2`. Third-party parsers that implement the same methods and attributes can be registered with `SampleSheetFactory.register()` without inheriting from any base class.
+
+```python
+from samplesheet_parser import SampleSheetParser, SampleSheetV1
+assert isinstance(SampleSheetV1("sheet.csv"), SampleSheetParser)
+```
 
 ### `SampleSheetV1` / `SampleSheetV2` (shared interface)
 
@@ -443,6 +454,17 @@ sheet.get_read_structure()   # → ReadStructure dataclass
 |---|---|---|
 | `validate(sheet)` | `ValidationResult` | Run all checks; returns structured result |
 | `_check_index_distances(samples, result, min_distance=3)` | `None` | Hamming distance check (callable directly for custom thresholds) |
+
+### `hamming_distance`
+
+```python
+from samplesheet_parser import hamming_distance
+
+hamming_distance("ATTACTCG", "ATTACTCA")   # → 1
+hamming_distance("ATTACTCG", "GCTAGCTA")   # → 6
+```
+
+Public helper for computing the Hamming distance between two index sequences. Sequences of unequal length are compared up to the shorter length.
 
 ### `SampleSheetWriter`
 
@@ -539,7 +561,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.10'
 
       - run: pip install "samplesheet-parser[cli]"
 

@@ -2,8 +2,8 @@
 
 ## Requirements
 
-- Python 3.12 or higher
-- No mandatory runtime dependencies beyond [`loguru`](https://github.com/Delgan/loguru)
+- Python 3.10 or higher
+- No mandatory runtime dependencies
 
 ## pip (recommended)
 

@@ -10,6 +10,65 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.0.0] - 2026-06-06
+
+### Breaking changes
+
+- **Python 3.10+ required** (was 3.12+). The `str, Enum` mixin replaces
+  `StrEnum` throughout `enums.py` and `instruments.py`, giving identical
+  behaviour on all supported versions.
+- **`loguru` dependency removed.** The library now uses `logging.getLogger(__name__)`
+  in every module. Host applications retain full control of log configuration.
+  If you previously relied on `loguru` sinks seeing library log output, wire up
+  a standard `logging` handler instead.
+- **`clean()` now returns the cleaned content as a `str` and never writes to
+  disk.** Previously `SampleSheetV1.clean()` and `SampleSheetV2.clean()` wrote
+  to the source file and created a `.backup` alongside it. The source file is
+  now untouched; the cleaned string is passed in-memory to `read()`. Callers
+  that relied on the side-effect (file written, `.backup` created) must adapt.
+- **`samples()` deduplication key changed from `sample_id` to `(sample_id, lane)`.**
+  Multi-lane sheets where the same sample appears in multiple lanes now return
+  one record *per lane* rather than silently dropping all but the first row.
+- **`SampleSheetFactory.create_parser()` return type is now `SampleSheetParser`**
+  (the new Protocol) rather than `SampleSheetV1 | SampleSheetV2`. Both concrete
+  types structurally satisfy the Protocol; the change only affects code with
+  explicit type annotations on the return value.
+- **`_hamming_distance` renamed to `hamming_distance`** (underscore removed).
+  Import path: `from samplesheet_parser import hamming_distance` or
+  `from samplesheet_parser.validators import hamming_distance`.
+
+### Fixed
+
+- **V2 `parse_data()` no longer silently drops keys with empty-string values.**
+  The `{k: v for k, v in ... if v}` filter was removing keys whose value was
+  `""`, making V2 record dicts structurally inconsistent with V1. All keys are
+  now preserved; values are stripped of surrounding whitespace only.
+- **`converter.to_v1()` bare `assert` replaced with explicit `TypeError`.**
+  `assert isinstance(sheet, SampleSheetV2)` is stripped by `python -O`; the
+  guard now raises `TypeError` unconditionally when the wrong type is passed.
+
+### Added
+
+- **`SampleSheetParser` Protocol** (`samplesheet_parser.protocol`) — a
+  `runtime_checkable` structural protocol satisfied by both `SampleSheetV1`
+  and `SampleSheetV2`. Third-party parsers that implement the same interface
+  can be registered with the factory without inheriting from any base class.
+  `isinstance(sheet, SampleSheetParser)` works at runtime.
+- **`SampleSheetFactory.register(detector, parser_class, version)`** — class
+  method that registers a custom format detector. Registered detectors are
+  tried before the built-in V1/V2 detection in LIFO order. Useful for
+  supporting hypothetical V3 formats or vendor-specific variants.
+- **`SampleSheetFactory.clear_registry()`** — removes all custom registrations.
+  Intended for use in tests to prevent cross-test contamination.
+- **`detect_workflow()` accepts `extra_a` / `extra_b` keyword arguments** —
+  caller-supplied `frozenset[str]` of instrument names checked before the
+  built-in tables. Allows narrowing workflow classification without subclassing.
+- **`hamming_distance` is now a public export** — available as
+  `from samplesheet_parser import hamming_distance` and documented in the API
+  reference.
+
+---
+
 ## [1.3.0] - 2026-05-20
 
 ### Fixed

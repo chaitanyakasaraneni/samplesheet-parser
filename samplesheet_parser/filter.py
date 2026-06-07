@@ -25,14 +25,15 @@ Chaitanya Kasaraneni
 from __future__ import annotations
 
 import fnmatch
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
+
+logger = logging.getLogger(__name__)
 
 # Raw record keys that are standard sample fields — not extra columns
 _STANDARD_SAMPLE_KEYS: frozenset[str] = frozenset(
