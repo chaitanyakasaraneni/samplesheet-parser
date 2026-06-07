@@ -41,12 +41,13 @@ https://support.illumina.com/downloads/illumina-experiment-manager-software.html
 
 from __future__ import annotations
 
-import os
+import io
+import logging
 import re
 from collections import namedtuple
 from pathlib import Path
 
-from loguru import logger
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Standard IEM V1 column definitions (from Illumina's public documentation)
@@ -75,20 +76,20 @@ STANDARD_HEADER_KEYS = {
     "Experiment Name",
     "Date",
     "Workflow",
-    "Application",        # e.g. "FASTQ Only"
-    "Instrument Type",    # e.g. "MiSeq" — note: NextSeq/MiniSeq auto-RC index2
-    "Assay",              # LP kit identifier, irrelevant to sequencer
-    "Index Adapters",     # Illumina index set name, irrelevant to sequencer
-    "Chemistry",          # "Amplicon" = dual index, "Default" = no/single index
+    "Application",  # e.g. "FASTQ Only"
+    "Instrument Type",  # e.g. "MiSeq" — note: NextSeq/MiniSeq auto-RC index2
+    "Assay",  # LP kit identifier, irrelevant to sequencer
+    "Index Adapters",  # Illumina index set name, irrelevant to sequencer
+    "Chemistry",  # "Amplicon" = dual index, "Default" = no/single index
     "Description",
 }
 
 #: [Settings] keys that carry well-known semantics in V1 sheets.
 STANDARD_SETTINGS_KEYS = {
     "ReverseComplement",  # 1 = reverse-complement R2 (Nextera Mate Pair), 0 = all others
-    "Adapter",            # Read 1 adapter (legacy single-key form)
-    "AdapterRead2",       # Read 2 adapter — used alongside Adapter key per IEM spec
-    "AdapterRead1",       # Explicit Read 1 adapter (BCLConvert V1-mode alias)
+    "Adapter",  # Read 1 adapter (legacy single-key form)
+    "AdapterRead2",  # Read 2 adapter — used alongside Adapter key per IEM spec
+    "AdapterRead1",  # Explicit Read 1 adapter (BCLConvert V1-mode alias)
 }
 
 #: Default IEM section names (lowercase, as stored internally).
@@ -225,10 +226,10 @@ class SampleSheetV1:
             If required sections (``[Header]``, ``[Data]``, or any section
             listed in ``required_sections``) cannot be parsed.
         """
+        content: str | None = None
         if do_clean:
-            self.clean()
-
-        self.read()
+            content = self.clean()
+        self.read(content=content)
 
         # Validate caller-specified required sections up front, before any
         # other parsing, so the error is clean and actionable.
@@ -247,14 +248,12 @@ class SampleSheetV1:
             try:
                 method()
             except Exception as exc:
-                raise ValueError(
-                    f"Invalid sample sheet. Error parsing [{name}]: {exc}"
-                ) from exc
+                raise ValueError(f"Invalid sample sheet. Error parsing [{name}]: {exc}") from exc
 
         # Optional sections — warn on failure
         for name, method in [
-            ("Reads",         self.parse_reads),
-            ("Settings",      self.parse_settings),
+            ("Reads", self.parse_reads),
+            ("Settings", self.parse_settings),
             ("Experiment ID", self._parse_experiment_id),
         ]:
             try:
@@ -313,9 +312,7 @@ class SampleSheetV1:
         # raises ValueError
         """
         if not self._section_dict:
-            raise RuntimeError(
-                "Sample sheet has not been read yet — call parse() or read() first."
-            )
+            raise RuntimeError("Sample sheet has not been read yet — call parse() or read() first.")
 
         key = section_name.lower()
 
@@ -334,9 +331,7 @@ class SampleSheetV1:
         for line in self._section_dict[key]:
             parts = line.split(",", 1)
             if len(parts) < 2 or not parts[0].strip():
-                logger.warning(
-                    f"Skipping malformed line in [{section_name}]: {line!r}"
-                )
+                logger.warning(f"Skipping malformed line in [{section_name}]: {line!r}")
                 continue
             result[parts[0].strip()] = parts[1].strip()
 
@@ -361,33 +356,35 @@ class SampleSheetV1:
         if self.records is None:
             raise RuntimeError("Call parse() before calling samples().")
 
-        seen: set[str] = set()
+        seen: set[tuple[str, str | None]] = set()
         result: list[dict[str, str | None]] = []
 
         for record in self.records:
             sid = record.get("Sample_ID", "")
-            if sid in seen:
+            lane = record.get("Lane")
+            key = (sid, lane)
+            if key in seen:
                 continue
-            seen.add(sid)
+            seen.add(key)
 
             sample: dict[str, str | None] = {
-                "sample_id":        sid,
-                "sample_name":      record.get("Sample_Name"),
-                "lane":             record.get("Lane"),
-                "index":            record.get("index"),
-                "index2":           record.get("index2"),
-                "sample_project":   record.get("Sample_Project"),
-                "description":      record.get("Description"),
+                "sample_id": sid,
+                "sample_name": record.get("Sample_Name"),
+                "lane": record.get("Lane"),
+                "index": record.get("index"),
+                "index2": record.get("index2"),
+                "sample_project": record.get("Sample_Project"),
+                "description": record.get("Description"),
                 # Preserve fields present in many real-world V1 sheets.
                 # Callers that previously relied on these keys would
                 # receive KeyError if they were dropped.
-                "sample_plate":     record.get("Sample_Plate"),
-                "sample_well":      record.get("Sample_Well"),
-                "flowcell_id":      record.get("flowcell_id"),
-                "experiment_name":  record.get("Experiment_Name"),
+                "sample_plate": record.get("Sample_Plate"),
+                "sample_well": record.get("Sample_Well"),
+                "flowcell_id": record.get("flowcell_id"),
+                "experiment_name": record.get("Experiment_Name"),
             }
             # Include any non-standard columns from [Data]
-            for col in (self.columns or []):
+            for col in self.columns or []:
                 if col not in STANDARD_DATA_COLUMNS and col not in sample:
                     sample[col] = record.get(col)
 
@@ -423,7 +420,7 @@ class SampleSheetV1:
     # ------------------------------------------------------------------
 
     def clean(self) -> str:
-        """Clean the sample sheet in-place.
+        """Return a cleaned copy of the sample sheet as a string.
 
         Actions
         -------
@@ -431,63 +428,68 @@ class SampleSheetV1:
         2. Replace ``Experiment Name`` value if ``experiment_id`` is set.
         3. Strip all whitespace from rows inside ``[Data]``.
 
-        A backup of the original is written to ``<path>.backup``.
+        The source file is **not** modified.
 
         Returns
         -------
         str
-            Path to the cleaned file (same as ``self.path``).
+            Cleaned content ready to pass to :meth:`read`.
         """
-        tmp_path    = self.path + ".tmp"
-        backup_path = self.path + ".backup"
+        with open(self.path, newline="\n", encoding="utf-8-sig") as fh:
+            raw = fh.read()
+        return self._clean_content(raw)
+
+    def _clean_content(self, raw: str) -> str:
+        """Apply cleaning transformations to *raw* and return the result."""
         in_data = False
+        out: list[str] = []
 
-        with open(self.path, newline="\n", encoding="utf-8-sig") as ih, \
-             open(tmp_path, "w", encoding="utf-8") as oh:
-            for line in ih:
-                # Strip tabs and carriage returns everywhere
-                line = re.sub(r"[\t\r]", "", line)
+        for line in raw.splitlines(keepends=True):
+            line = re.sub(r"[\t\r]", "", line)
 
-                # Replace experiment name if requested
-                if self.experiment_id and line.lower().startswith("experiment name"):
-                    cols = line.split(",")
-                    if len(cols) >= 2:
-                        self.experiment_name = cols[1].strip()
-                        cols[1] = self.experiment_id
-                        line = ",".join(cols)
-                        if not line.endswith("\n"):
-                            line += "\n"
-
-                oh.write(line)
-
-                if "[data]" in line.lower():
-                    # Write the column header line as-is
-                    oh.write(next(ih))
-                    in_data = True
-                    break
+            if self.experiment_id and line.lower().startswith("experiment name"):
+                cols = line.split(",")
+                if len(cols) >= 2:
+                    self.experiment_name = cols[1].strip()
+                    cols[1] = self.experiment_id
+                    line = ",".join(cols)
+                    if not line.endswith("\n"):
+                        line += "\n"
 
             if in_data:
-                for line in ih:
-                    line = _RX_NO_WS.sub("", line)
-                    oh.write(line + "\n")
+                line = _RX_NO_WS.sub("", line) + "\n"
+            elif "[data]" in line.lower():
+                in_data = True
 
-        os.rename(self.path, backup_path)
-        os.rename(tmp_path, self.path)
-        return self.path
+            out.append(line)
 
-    def read(self) -> None:
-        """Read the file and bucket lines by section.
+        return "".join(out)
+
+    def read(self, content: str | None = None) -> None:
+        """Read and bucket lines by section.
 
         Populates both ``self.raw`` (standard sections via ``SheetInfo``)
         and ``self._section_dict`` (all sections, including any custom
         ones not in ``DEFAULT_SECTIONS``). The latter is what
         :meth:`parse_custom_section` reads from.
+
+        Parameters
+        ----------
+        content:
+            Pre-cleaned content string. When provided the file on disk is
+            not read; pass the return value of :meth:`clean` here.
         """
         section_dict: dict[str, list[str]] = {s: [] for s in DEFAULT_SECTIONS}
-        section_list: list[str] = []  # lowercased names actually seen in the file
+        section_list: list[str] = []
         curr_section: str | None = None
 
-        with open(self.path, newline="\n", encoding="utf-8-sig") as fh:
+        fh_ctx: io.IOBase
+        if content is not None:
+            fh_ctx = io.StringIO(content)
+        else:
+            fh_ctx = open(self.path, newline="\n", encoding="utf-8-sig")
+
+        with fh_ctx as fh:
             for line in fh:
                 line = _RX_STRIP.sub("", line)
 
@@ -511,14 +513,8 @@ class SampleSheetV1:
 
                 section_dict.setdefault(curr_section, []).append(stripped)
 
-        # Full dict — includes custom sections — used by parse_custom_section
         self._section_dict = section_dict
-
-        # Track sections actually present in the file (used by required_sections checks).
-        # _section_dict is pre-seeded with DEFAULT_SECTIONS so its keys() cannot be used.
         self.sections = section_list
-
-        # SheetInfo only covers the well-known standard sections
         self.raw = SheetInfo(**{k: section_dict.get(k, []) for k in DEFAULT_SECTIONS})
 
     def parse_header(self) -> None:
@@ -533,15 +529,15 @@ class SampleSheetV1:
         self.header = header
 
         # Extract well-known attributes
-        self.iem_version     = header.get("IEMFileVersion")
+        self.iem_version = header.get("IEMFileVersion")
         self.experiment_name = header.get("Experiment Name")
-        self.date            = header.get("Date")
-        self.workflow        = header.get("Workflow")
-        self.application     = header.get("Application")
+        self.date = header.get("Date")
+        self.workflow = header.get("Workflow")
+        self.application = header.get("Application")
         self.instrument_type = header.get("Instrument Type")
-        self.assay           = header.get("Assay")
-        self.index_adapters  = header.get("Index Adapters")
-        self.chemistry       = header.get("Chemistry")
+        self.assay = header.get("Assay")
+        self.index_adapters = header.get("Index Adapters")
+        self.chemistry = header.get("Chemistry")
 
         # Honour experiment_id override
         if self.experiment_id and self.experiment_name != self.experiment_id:
@@ -602,7 +598,7 @@ class SampleSheetV1:
         if not lines:
             raise ValueError("Empty [Data] section.")
 
-        columns  = [c.strip() for c in lines[0].split(",")]
+        columns = [c.strip() for c in lines[0].split(",")]
         records: list[dict[str, str]] = []
 
         for line in lines[1:]:
@@ -647,10 +643,10 @@ class SampleSheetV1:
                 f"Experiment ID '{self.experiment_id}' does not match expected "
                 f"Illumina run folder format (YYMMDD_InstrumentID_RunNumber_SideFlowcellID)."
             )
-        self.seq_date      = match.group("seq_date")
+        self.seq_date = match.group("seq_date")
         self.instrument_id = match.group("instrument_id")
         self.flowcell_side = match.group("flowcell_side")
-        self.flowcell_id   = match.group("flowcell_id")
+        self.flowcell_id = match.group("flowcell_id")
 
     # ------------------------------------------------------------------
     # Dunder

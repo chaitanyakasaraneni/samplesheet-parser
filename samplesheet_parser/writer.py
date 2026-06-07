@@ -46,16 +46,18 @@ Illumina BCLConvert Software Guide (document # 1000000004084)
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
+from samplesheet_parser.protocol import SampleSheetParser
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # CSV safety
@@ -186,7 +188,7 @@ class SampleSheetWriter:
     @classmethod
     def from_sheet(
         cls,
-        sheet: SampleSheetV1 | SampleSheetV2,
+        sheet: SampleSheetParser,
         *,
         version: SampleSheetVersion | None = None,
     ) -> SampleSheetWriter:
@@ -223,7 +225,7 @@ class SampleSheetWriter:
 
         if isinstance(sheet, SampleSheetV1):
             writer._load_from_v1(sheet)
-        else:
+        elif isinstance(sheet, SampleSheetV2):
             writer._load_from_v2(sheet)
 
         return writer

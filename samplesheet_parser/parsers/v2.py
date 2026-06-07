@@ -44,13 +44,14 @@ https://support.illumina.com/sequencing/sequencing_software/bcl-convert.html
 
 from __future__ import annotations
 
-import os
+import io
+import logging
 import re
 from collections import namedtuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from loguru import logger
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Section constants
@@ -70,49 +71,81 @@ SheetInfo = namedtuple(
     defaults=([], [], [], [], [], []),
 )
 
-REQUIRED_HEADER_FIELDS: frozenset[str] = frozenset({
-    "FileFormatVersion",
-})
+REQUIRED_HEADER_FIELDS: frozenset[str] = frozenset(
+    {
+        "FileFormatVersion",
+    }
+)
 
-REQUIRED_DATA_COLUMNS: frozenset[str] = frozenset({
-    "Sample_ID",
-    "Index",
-})
+REQUIRED_DATA_COLUMNS: frozenset[str] = frozenset(
+    {
+        "Sample_ID",
+        "Index",
+    }
+)
 
-STANDARD_HEADER: frozenset[str] = frozenset({
-    "FileFormatVersion", "RunName", "RunDescription",
-    "InstrumentPlatform", "InstrumentType", "ExperimentName",
-})
+STANDARD_HEADER: frozenset[str] = frozenset(
+    {
+        "FileFormatVersion",
+        "RunName",
+        "RunDescription",
+        "InstrumentPlatform",
+        "InstrumentType",
+        "ExperimentName",
+    }
+)
 
-STANDARD_SETTINGS: frozenset[str] = frozenset({
-    "SoftwareVersion", "AdapterRead1", "AdapterRead2",
-    "OverrideCycles", "FastqCompressionFormat",
-    "BarcodeMismatchesIndex1", "BarcodeMismatchesIndex2",
-    "CreateFastqForIndexReads", "NoLaneSplitting",
-    "TrimUMI",
-})
+STANDARD_SETTINGS: frozenset[str] = frozenset(
+    {
+        "SoftwareVersion",
+        "AdapterRead1",
+        "AdapterRead2",
+        "OverrideCycles",
+        "FastqCompressionFormat",
+        "BarcodeMismatchesIndex1",
+        "BarcodeMismatchesIndex2",
+        "CreateFastqForIndexReads",
+        "NoLaneSplitting",
+        "TrimUMI",
+    }
+)
 
-STANDARD_DATA_COLUMNS: frozenset[str] = frozenset({
-    "Lane", "Sample_ID", "Sample_Name", "Sample_Project",
-    "Index", "Index2",
-})
+STANDARD_DATA_COLUMNS: frozenset[str] = frozenset(
+    {
+        "Lane",
+        "Sample_ID",
+        "Sample_Name",
+        "Sample_Project",
+        "Index",
+        "Index2",
+    }
+)
 
 _RX_STRIP = re.compile(r"""['"\r\n\t]""")
 _RX_NO_WS = re.compile(r"[\s\t\r]+")
 
 # Canonical section names that clean() normalises to [BCLConvert_Settings] / [BCLConvert_Data].
 # Only exact matches (case-insensitive) are renamed; arbitrary custom sections are left untouched.
-_BCL_SETTINGS: frozenset[str] = frozenset({
-    "[settings]", "[bclconvert_settings]", "[bclconvertsettings]",
-})
-_BCL_DATA: frozenset[str] = frozenset({
-    "[data]", "[bclconvert_data]", "[bclconvertdata]",
-})
+_BCL_SETTINGS: frozenset[str] = frozenset(
+    {
+        "[settings]",
+        "[bclconvert_settings]",
+        "[bclconvertsettings]",
+    }
+)
+_BCL_DATA: frozenset[str] = frozenset(
+    {
+        "[data]",
+        "[bclconvert_data]",
+        "[bclconvertdata]",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ReadStructure:
@@ -129,14 +162,16 @@ class ReadStructure:
         Detailed per-segment breakdown:
         ``{"read1_template": 151, "index1_length": 10, "index1_umi": 9, ...}``
     """
-    umi_length:     int = 0
-    umi_location:   str | None = None
+
+    umi_length: int = 0
+    umi_location: str | None = None
     read_structure: dict[str, int] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
+
 
 class SampleSheetV2:
     """
@@ -191,26 +226,28 @@ class SampleSheetV2:
 
         # Populated by parse()
         self.raw: SheetInfo = SheetInfo()
-        self.header:            dict[str, str] | None = None
-        self.settings:          dict[str, str] | None = None
-        self.reads:             dict[str, int]        = {}
-        self.columns:           list[str] | None      = None
-        self.records:           list[dict[str, str]]  = []
-        self.adapters:          list[str]             = []
-        self.cloud_data:        list[dict[str, str]]  = []
-        self.sections:          list[str]             = []
+        self.header: dict[str, str] | None = None
+        self.settings: dict[str, str] | None = None
+        self.reads: dict[str, int] = {}
+        self.columns: list[str] | None = None
+        self.records: list[dict[str, str]] = []
+        self.adapters: list[str] = []
+        self.cloud_data: list[dict[str, str]] = []
+        self.sections: list[str] = []
 
         # Header-derived
-        self.experiment_name:    str | None = None
+        self.experiment_name: str | None = None
         self.instrument_platform: str | None = None
-        self.software_version:   str | None = None
+        self.software_version: str | None = None
 
         # Full section dict — includes custom sections — used by parse_custom_section
         self._section_dict: dict[str, list[str]] = {}
 
         # Custom field tracking
         self.custom_fields: dict[str, set[str]] = {
-            "header": set(), "settings": set(), "data": set()
+            "header": set(),
+            "settings": set(),
+            "data": set(),
         }
 
         if parse or (parse is None and self.AUTO_PARSE):
@@ -243,9 +280,10 @@ class SampleSheetV2:
             If ``[Header]``, ``[BCLConvert_Data]``, or any section listed
             in ``required_sections`` cannot be parsed.
         """
+        content: str | None = None
         if do_clean:
-            self.clean()
-        self.read()
+            content = self.clean()
+        self.read(content=content)
 
         # Validate caller-specified required sections up front.
         # Use self.sections (sections actually encountered in the file) rather than
@@ -263,14 +301,12 @@ class SampleSheetV2:
             try:
                 method()
             except Exception as exc:
-                raise ValueError(
-                    f"Invalid V2 sample sheet. Error parsing [{name}]: {exc}"
-                ) from exc
+                raise ValueError(f"Invalid V2 sample sheet. Error parsing [{name}]: {exc}") from exc
 
         for name, method in [
-            ("Reads",             self.parse_reads),
+            ("Reads", self.parse_reads),
             ("BCLConvert_Settings", self.parse_settings),
-            ("Cloud_Data",        self.parse_cloud_data),
+            ("Cloud_Data", self.parse_cloud_data),
         ]:
             try:
                 method()
@@ -290,24 +326,26 @@ class SampleSheetV2:
             ``index2``, ``lane``, ``sample_project``, ``experiment_name``,
             ``run_name``, ``instrument_platform``.
         """
-        seen: set[str] = set()
+        seen: set[tuple[str, str | None]] = set()
         result: list[dict[str, str | None]] = []
 
         for record in self.records:
             sid = record.get("Sample_ID", "")
-            if sid in seen:
+            lane = record.get("Lane")
+            key = (sid, lane)
+            if key in seen:
                 continue
-            seen.add(sid)
+            seen.add(key)
 
             sample: dict[str, str | None] = {
-                "sample_id":          sid,
-                "sample_name":        record.get("Sample_Name"),
-                "lane":               record.get("Lane"),
-                "index":              record.get("Index"),
-                "index2":             record.get("Index2"),
-                "sample_project":     record.get("Sample_Project"),
-                "experiment_name":    self.header.get("ExperimentName") if self.header else None,
-                "run_name":           self.header.get("RunName") if self.header else None,
+                "sample_id": sid,
+                "sample_name": record.get("Sample_Name"),
+                "lane": record.get("Lane"),
+                "index": record.get("Index"),
+                "index2": record.get("Index2"),
+                "sample_project": record.get("Sample_Project"),
+                "experiment_name": self.header.get("ExperimentName") if self.header else None,
+                "run_name": self.header.get("RunName") if self.header else None,
                 "instrument_platform": self.instrument_platform,
             }
 
@@ -371,7 +409,7 @@ class SampleSheetV2:
     # ------------------------------------------------------------------
 
     def clean(self) -> str:
-        """Clean the sample sheet in-place and keep a ``.backup`` copy.
+        """Return a cleaned copy of the sample sheet as a string.
 
         Actions
         -------
@@ -381,62 +419,73 @@ class SampleSheetV2:
         3. Replace ``ExperimentName`` if ``experiment_id`` is set.
         4. Strip all whitespace from rows inside data sections.
 
+        The source file is **not** modified.
+
         Returns
         -------
         str
-            Path to the cleaned file.
+            Cleaned content ready to pass to :meth:`read`.
         """
-        tmp_path    = self.path + ".tmp"
-        backup_path = self.path + ".backup"
+        with open(self.path, encoding="utf-8-sig") as fh:
+            raw = fh.read()
+        return self._clean_content(raw)
+
+    def _clean_content(self, raw: str) -> str:
+        """Apply cleaning transformations to *raw* and return the result."""
         in_data = False
+        out: list[str] = []
 
-        with open(self.path, encoding="utf-8-sig") as ih, \
-             open(tmp_path, "w", encoding="utf-8") as oh:
-            for line in ih:
-                line = _RX_STRIP.sub("", line.strip())
+        for line in raw.splitlines():
+            line = _RX_STRIP.sub("", line.strip())
 
-                if line.startswith("["):
-                    section_lower = line.lower()
-                    # Use exact matching so custom sections like [Pipeline_Data] are not mangled.
-                    in_data = section_lower in _BCL_DATA
+            if line.startswith("["):
+                section_lower = line.lower()
+                # Use exact matching so custom sections like [Pipeline_Data] are not mangled.
+                in_data = section_lower in _BCL_DATA
 
-                    # Normalise only the two standard BCLConvert section names.
-                    # Match exact canonical names (case-insensitive) so arbitrary
-                    # custom sections like [Pipeline_Settings] are left untouched.
-                    if section_lower in _BCL_SETTINGS:
-                        line = "[BCLConvert_Settings]"
-                    elif section_lower in _BCL_DATA:
-                        line = "[BCLConvert_Data]"
+                # Normalise only the two standard BCLConvert section names.
+                if section_lower in _BCL_SETTINGS:
+                    line = "[BCLConvert_Settings]"
+                elif section_lower in _BCL_DATA:
+                    line = "[BCLConvert_Data]"
 
-                    oh.write(line + "\n")
-                    continue
+                out.append(line + "\n")
+                continue
 
-                if self.experiment_id and line.lower().startswith("experimentname"):
-                    cols = line.split(",")
-                    if len(cols) >= 2:
-                        self.experiment_name = cols[1].strip()
-                        cols[1] = self.experiment_id
-                        line = ",".join(cols)
+            if self.experiment_id and line.lower().startswith("experimentname"):
+                cols = line.split(",")
+                if len(cols) >= 2:
+                    self.experiment_name = cols[1].strip()
+                    cols[1] = self.experiment_id
+                    line = ",".join(cols)
 
-                if in_data:
-                    line = _RX_NO_WS.sub("", line)
+            if in_data:
+                line = _RX_NO_WS.sub("", line)
 
-                if line:
-                    oh.write(line + "\n")
-                else:
-                    oh.write("\n")
+            out.append((line + "\n") if line else "\n")
 
-        os.rename(self.path, backup_path)
-        os.rename(tmp_path, self.path)
-        return self.path
+        return "".join(out)
 
-    def read(self) -> None:
-        """Read the file and bucket lines by section into ``self.raw``."""
+    def read(self, content: str | None = None) -> None:
+        """Read and bucket lines by section into ``self.raw``.
+
+        Parameters
+        ----------
+        content:
+            Pre-cleaned content string. When provided the file on disk is
+            not read; pass the return value of :meth:`clean` here.
+        """
         section_dict: dict[str, list[str]] = {s: [] for s in DEFAULT_SECTIONS}
         section_list: list[str] = []
         curr: str | None = None
 
-        with open(self.path, encoding="utf-8-sig") as fh:
+        fh_ctx: io.IOBase
+        if content is not None:
+            fh_ctx = io.StringIO(content)
+        else:
+            fh_ctx = open(self.path, encoding="utf-8-sig")
+
+        with fh_ctx as fh:
             for line in fh:
                 line_clean = _RX_STRIP.sub("", line)
 
@@ -462,18 +511,18 @@ class SampleSheetV2:
         # Full dict — includes custom sections — used by parse_custom_section
         self._section_dict = section_dict
 
-        self.raw      = SheetInfo(**{s: section_dict.get(s, []) for s in DEFAULT_SECTIONS})
+        self.raw = SheetInfo(**{s: section_dict.get(s, []) for s in DEFAULT_SECTIONS})
         self.sections = section_list
 
     def parse_header(self) -> None:
         """Parse the ``[Header]`` section."""
         header: dict[str, str] = {}
-        custom: set[str]       = set()
+        custom: set[str] = set()
 
         for line in self.raw.header:
             parts = line.split(",", 2)
             if len(parts) >= 2:
-                key   = parts[0].strip()
+                key = parts[0].strip()
                 value = parts[1].strip()
                 header[key] = value
                 if key.startswith("Custom_") or key not in STANDARD_HEADER:
@@ -483,9 +532,9 @@ class SampleSheetV2:
         if missing:
             raise ValueError(f"Missing required [Header] fields: {missing}")
 
-        self.header             = header
+        self.header = header
         self.custom_fields["header"] = custom
-        self.experiment_name    = header.get("ExperimentName") or header.get("RunName")
+        self.experiment_name = header.get("ExperimentName") or header.get("RunName")
         self.instrument_platform = header.get("InstrumentPlatform")
 
         if self.experiment_id:
@@ -507,13 +556,13 @@ class SampleSheetV2:
     def parse_settings(self) -> None:
         """Parse the ``[BCLConvert_Settings]`` section."""
         settings: dict[str, str] = {}
-        adapters: list[str]      = []
-        custom: set[str]         = set()
+        adapters: list[str] = []
+        custom: set[str] = set()
 
         for line in self.raw.bclconvert_settings:
             parts = line.split(",", 2)
             if len(parts) >= 2:
-                key   = parts[0].strip()
+                key = parts[0].strip()
                 value = parts[1].strip()
                 settings[key] = value
 
@@ -523,10 +572,10 @@ class SampleSheetV2:
                 if key.startswith("Custom_") or key not in STANDARD_SETTINGS:
                     custom.add(key)
 
-        self.settings               = settings
-        self.adapters               = adapters
+        self.settings = settings
+        self.adapters = adapters
         self.custom_fields["settings"] = custom
-        self.software_version       = settings.get("SoftwareVersion")
+        self.software_version = settings.get("SoftwareVersion")
 
     def parse_data(self) -> None:
         """Parse the ``[BCLConvert_Data]`` section."""
@@ -535,10 +584,7 @@ class SampleSheetV2:
             raise ValueError("Empty [BCLConvert_Data] section.")
 
         columns = [c.strip() for c in lines[0].split(",")]
-        custom  = {
-            c for c in columns
-            if c.startswith("Custom_") or c not in STANDARD_DATA_COLUMNS
-        }
+        custom = {c for c in columns if c.startswith("Custom_") or c not in STANDARD_DATA_COLUMNS}
 
         missing = REQUIRED_DATA_COLUMNS - set(columns)
         if missing:
@@ -551,12 +597,11 @@ class SampleSheetV2:
                 logger.warning(f"Skipping malformed BCLConvert_Data line: {line!r}")
                 continue
             record = {k: v.strip() for k, v in zip(columns, values, strict=False) if k}
-            record = {k: v for k, v in record.items() if v}
             records.append(record)
 
-        self.columns                = columns
-        self.records                = records
-        self.custom_fields["data"]  = custom
+        self.columns = columns
+        self.records = records
+        self.custom_fields["data"] = custom
 
     def parse_cloud_data(self) -> None:
         """Parse the optional ``[Cloud_Data]`` section."""
@@ -623,9 +668,7 @@ class SampleSheetV2:
         # raises ValueError if [Cloud_Settings] is absent
         """
         if not self._section_dict:
-            raise RuntimeError(
-                "Sample sheet has not been read yet — call parse() or read() first."
-            )
+            raise RuntimeError("Sample sheet has not been read yet — call parse() or read() first.")
 
         key = section_name.lower()
 
@@ -646,9 +689,7 @@ class SampleSheetV2:
         for line in self._section_dict[key]:
             parts = line.split(",", 1)
             if len(parts) < 2 or not parts[0].strip():
-                logger.warning(
-                    f"Skipping malformed line in [{section_name}]: {line!r}"
-                )
+                logger.warning(f"Skipping malformed line in [{section_name}]: {line!r}")
                 continue
             result[parts[0].strip()] = parts[1].strip()
 
@@ -685,9 +726,9 @@ class SampleSheetV2:
         if not override_str:
             return ReadStructure()
 
-        segments     = override_str.strip().split(";")
+        segments = override_str.strip().split(";")
         read_struct: dict[str, int] = {}
-        umi_length   = 0
+        umi_length = 0
         umi_location: str | None = None
 
         for i, segment in enumerate(segments, start=1):
@@ -696,9 +737,9 @@ class SampleSheetV2:
             if m:
                 idx_len, umi_len = int(m.group(1)), int(m.group(2))
                 read_struct[f"index{i}_length"] = idx_len
-                read_struct[f"index{i}_umi"]    = umi_len
+                read_struct[f"index{i}_umi"] = umi_len
                 if umi_len > umi_length:
-                    umi_length   = umi_len
+                    umi_length = umi_len
                     umi_location = f"index{i}"
                 continue
 
@@ -711,7 +752,7 @@ class SampleSheetV2:
                 if code == "U":
                     read_struct[f"read{i}_umi"] = length
                     if length > umi_length:
-                        umi_length   = length
+                        umi_length = length
                         umi_location = f"read{i}"
 
                 elif code == "Y":

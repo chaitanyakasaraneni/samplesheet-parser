@@ -41,20 +41,23 @@ from samplesheet_parser.index_utils import normalize_index_lengths
 from samplesheet_parser.merger import MergeResult, SampleSheetMerger
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
+from samplesheet_parser.protocol import SampleSheetParser
 from samplesheet_parser.splitter import SampleSheetSplitter, SplitResult
-from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
+from samplesheet_parser.validators import SampleSheetValidator, ValidationResult, hamming_distance
 from samplesheet_parser.writer import SampleSheetWriter
 
 __all__ = [
     "SampleSheetV1",
     "SampleSheetV2",
     "SampleSheetFactory",
+    "SampleSheetParser",
     "SampleSheetVersion",
     "IndexType",
     "InstrumentPlatform",
     "UMILocation",
     "SampleSheetValidator",
     "ValidationResult",
+    "hamming_distance",
     "SampleSheetConverter",
     "SampleSheetDiff",
     "DiffResult",

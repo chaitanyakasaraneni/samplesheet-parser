@@ -26,15 +26,16 @@ Chaitanya Kasaraneni
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
+
+logger = logging.getLogger(__name__)
 
 # Characters unsafe in filenames across Windows/macOS/Linux
 _UNSAFE_FILENAME_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f\s]+')

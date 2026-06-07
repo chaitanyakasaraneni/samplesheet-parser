@@ -65,8 +65,7 @@ class TestSampleSheetV2Parsing:
     def test_parse_data_missing_required_columns(self, tmp_path):
         p = tmp_path / "missing_index.csv"
         p.write_text(
-            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n"
-            "[BCLConvert_Data]\nSample_ID\nS1\n"
+            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n" "[BCLConvert_Data]\nSample_ID\nS1\n"
         )
         sheet = SampleSheetV2(str(p))
         with pytest.raises(ValueError, match="Missing required .*columns"):
@@ -120,19 +119,21 @@ class TestSampleSheetV2Samples:
 
     def test_clean_standardizes_sections_and_overrides_name(self, tmp_path):
         p = tmp_path / "dirty_v2.csv"
-        p.write_text(
+        original = (
             "[Header]\nFileFormatVersion,2\nExperimentName,OldName\n\n"
             "[settings]\nAdapterRead1,CTGTCTCTTATACACATCT\n\n"
             "[data]\nSample_ID,Index\nS1, AT T AC T CG \n"
         )
+        p.write_text(original)
         sheet = SampleSheetV2(str(p), experiment_id="NewName")
-        sheet.clean()
-        content = p.read_text()
-        assert "ExperimentName,NewName" in content
-        assert "[BCLConvert_Settings]" in content
-        assert "[BCLConvert_Data]" in content
-        assert "ATTACTCG" in content
-        assert (tmp_path / "dirty_v2.csv.backup").exists()
+        cleaned = sheet.clean()
+        # clean() returns the cleaned string — source file is unchanged
+        assert "ExperimentName,NewName" in cleaned
+        assert "[BCLConvert_Settings]" in cleaned
+        assert "[BCLConvert_Data]" in cleaned
+        assert "ATTACTCG" in cleaned
+        assert p.read_text() == original
+        assert not (tmp_path / "dirty_v2.csv.backup").exists()
 
 
 class TestSampleSheetV2IndexType:
@@ -176,7 +177,7 @@ class TestOverrideCyclesDecoding:
         rs = sheet.get_read_structure()
         assert isinstance(rs, ReadStructure)
         assert rs.umi_length == 9
-        assert rs.umi_location == "index2"   # Y151;I10U9;I10;Y151 → segment 2 = index2
+        assert rs.umi_location == "index2"  # Y151;I10U9;I10;Y151 → segment 2 = index2
         assert rs.read_structure["index2_umi"] == 9
 
     def test_read_structure_template_lengths(self, v2_minimal):
@@ -250,6 +251,7 @@ class TestSampleSheetV2Equality:
 
     def test_equal_sheets(self, v2_minimal, tmp_path):
         import shutil
+
         copy = str(tmp_path / "copy.csv")
         shutil.copy(v2_minimal, copy)
         s1 = SampleSheetV2(v2_minimal)
@@ -273,6 +275,7 @@ class TestSampleSheetV2Equality:
 # ---------------------------------------------------------------------------
 # Edge-case parsing coverage
 # ---------------------------------------------------------------------------
+
 
 class TestSampleSheetV2EdgeCases:
 
@@ -351,10 +354,7 @@ class TestSampleSheetV2EdgeCases:
     def test_empty_bclconvert_data_raises(self, tmp_path):
         """Line 535: parse() raises when [BCLConvert_Data] section is completely empty."""
         p = tmp_path / "v2.csv"
-        p.write_text(
-            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
-            "[BCLConvert_Data]\n"
-        )
+        p.write_text("[Header]\nFileFormatVersion,2\nRunName,T\n\n" "[BCLConvert_Data]\n")
         sheet = SampleSheetV2(str(p))
         with pytest.raises(ValueError, match=r"BCLConvert_Data"):
             sheet.parse()
@@ -391,6 +391,7 @@ class TestSampleSheetV2EdgeCases:
 # Custom section tests
 # ---------------------------------------------------------------------------
 
+
 class TestSampleSheetV2ParseCustomSection:
     """Tests for parse_custom_section() on V2 sheets."""
 
@@ -418,8 +419,9 @@ class TestSampleSheetV2ParseCustomSection:
         """Section name is matched case-insensitively."""
         sheet = SampleSheetV2(v2_with_cloud_settings)
         sheet.parse()
-        assert sheet.parse_custom_section("cloud_settings") == \
-               sheet.parse_custom_section("CLOUD_SETTINGS")
+        assert sheet.parse_custom_section("cloud_settings") == sheet.parse_custom_section(
+            "CLOUD_SETTINGS"
+        )
 
     def test_missing_section_returns_empty_dict(self, v2_minimal):
         """Absent section with required=False (default) returns {}."""
@@ -539,9 +541,7 @@ class TestSampleSheetV2RequiredSections:
         with pytest.raises(ValueError, match="Cloud_Settings"):
             sheet.parse(do_clean=False, required_sections=["Cloud_Settings"])
 
-    def test_multiple_required_sections_all_present(
-        self, v2_with_multiple_custom_sections
-    ):
+    def test_multiple_required_sections_all_present(self, v2_with_multiple_custom_sections):
         """All required sections present — no error raised."""
         sheet = SampleSheetV2(v2_with_multiple_custom_sections, clean=False)
         sheet.parse(

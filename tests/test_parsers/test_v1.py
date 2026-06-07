@@ -96,7 +96,7 @@ class TestSampleSheetV1Parsing:
         sheet = SampleSheetV1(str(p))
         sheet.parse()
         assert sheet.adapter_read1 == "CTGTCTCTTATACACATCT"
-        assert sheet.adapter_read2 == ""   # must NOT default to Adapter value
+        assert sheet.adapter_read2 == ""  # must NOT default to Adapter value
         assert sheet.adapters == ["CTGTCTCTTATACACATCT"]
 
     def test_parse_adapters_per_read_bclconvert_alias(self, tmp_path):
@@ -185,17 +185,19 @@ class TestSampleSheetV1Parsing:
 
     def test_clean_overrides_experiment_name_and_strips_ws(self, tmp_path):
         p = tmp_path / "dirty.csv"
-        p.write_text(
+        original = (
             "[Header]\nIEMFileVersion,5\nExperiment Name,OldName\n\n"
             "[Data]\nLane,Sample_ID,index\n"
             "1, Sample 1 , AT T AC T CG \n"
         )
+        p.write_text(original)
         sheet = SampleSheetV1(str(p), experiment_id="NewName")
-        sheet.clean()
-        content = p.read_text()
-        assert "Experiment Name,NewName" in content
-        assert "ATTACTCG" in content
-        assert (tmp_path / "dirty.csv.backup").exists()
+        cleaned = sheet.clean()
+        # clean() returns the cleaned string — source file is unchanged
+        assert "Experiment Name,NewName" in cleaned
+        assert "ATTACTCG" in cleaned
+        assert p.read_text() == original
+        assert not (tmp_path / "dirty.csv.backup").exists()
 
 
 class TestSampleSheetV1Samples:
@@ -281,6 +283,7 @@ class TestSampleSheetV1Equality:
 
     def test_equal_sheets(self, v1_minimal, tmp_path):
         import shutil
+
         copy_path = str(tmp_path / "copy.csv")
         shutil.copy(v1_minimal, copy_path)
 
@@ -307,15 +310,13 @@ class TestSampleSheetV1Equality:
 # Edge-case parsing coverage
 # ---------------------------------------------------------------------------
 
+
 class TestSampleSheetV1EdgeCases:
 
     def test_required_section_error_raises_value_error(self, tmp_path):
         """Lines 249-250, 603: completely empty [Data] section triggers required-section error."""
         p = tmp_path / "empty_data.csv"
-        p.write_text(
-            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
-            "[Data]\n"
-        )
+        p.write_text("[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n" "[Data]\n")
         sheet = SampleSheetV1(str(p))
         with pytest.raises(ValueError, match=r"\[Data\]"):
             sheet.parse(do_clean=False)
@@ -359,8 +360,7 @@ class TestSampleSheetV1EdgeCases:
         """Line 548: experiment_id replaces experiment_name when they differ."""
         p = tmp_path / "exp_id.csv"
         p.write_text(
-            "[Header]\nIEMFileVersion,5\n\n"
-            "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
+            "[Header]\nIEMFileVersion,5\n\n" "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
         )
         sheet = SampleSheetV1(str(p), experiment_id="OverrideName")
         sheet.parse()
@@ -377,6 +377,7 @@ class TestSampleSheetV1EdgeCases:
 # ---------------------------------------------------------------------------
 # Custom section tests
 # ---------------------------------------------------------------------------
+
 
 class TestSampleSheetV1ParseCustomSection:
     """Tests for parse_custom_section() — the new non-standard section API."""
@@ -445,9 +446,7 @@ class TestSampleSheetV1ParseCustomSection:
         assert cloud["GeneratedVersion"] == "3.9.14"
         assert cloud["UploadToBaseSpace"] == "1"
 
-    def test_custom_section_does_not_interfere_with_standard_parsing(
-        self, v1_with_custom_section
-    ):
+    def test_custom_section_does_not_interfere_with_standard_parsing(self, v1_with_custom_section):
         """Standard [Data] and [Header] parse correctly alongside custom sections."""
         sheet = SampleSheetV1(v1_with_custom_section)
         sheet.parse()
@@ -498,9 +497,7 @@ class TestSampleSheetV1RequiredSections:
         sheet.parse(do_clean=False, required_sections=["Manifests", "Cloud_Settings"])
         assert sheet.records is not None
 
-    def test_multiple_required_sections_one_missing_raises(
-        self, v1_with_multiple_custom_sections
-    ):
+    def test_multiple_required_sections_one_missing_raises(self, v1_with_multiple_custom_sections):
         """One of several required sections missing — ValueError raised."""
         sheet = SampleSheetV1(v1_with_multiple_custom_sections, clean=False)
         with pytest.raises(ValueError, match="Pipeline_Settings"):

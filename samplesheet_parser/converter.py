@@ -54,9 +54,8 @@ Examples
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
-
-from loguru import logger
 
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
@@ -68,6 +67,8 @@ from samplesheet_parser.instruments import (
 )
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Field mappings
@@ -267,7 +268,11 @@ class SampleSheetConverter:
             raise ValueError("Source sheet is already V1. No conversion needed.")
 
         sheet = self._sheet
-        assert isinstance(sheet, SampleSheetV2)
+        if not isinstance(sheet, SampleSheetV2):
+            raise TypeError(
+                f"Expected SampleSheetV2 for V2 \N{RIGHTWARDS ARROW} V1 conversion, "
+                f"got {type(sheet).__name__!r}."
+            )
 
         # Resolve workflow up front. Prefer InstrumentPlatform; fall back
         # to InstrumentType (some V2 sheets only declare the latter).

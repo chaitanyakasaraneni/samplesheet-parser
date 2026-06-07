@@ -35,9 +35,6 @@ class SampleSheetParser(Protocol):
     header:
         Parsed key/value pairs from the ``[Header]`` section, or ``None``
         before :meth:`parse` is called.
-    records:
-        Raw per-row dicts from the data section (``[Data]`` / ``[BCLConvert_Data]``).
-        ``None`` before :meth:`parse` is called; V2 returns ``[]`` on empty data.
     adapters:
         Adapter sequences parsed from the settings section.  Empty list if
         no adapters are configured.
@@ -47,18 +44,13 @@ class SampleSheetParser(Protocol):
     columns:
         Column names from the data section header row, or ``None`` before
         :meth:`parse` is called.
-    settings:
-        Key/value pairs from the settings section (``[Settings]`` /
-        ``[BCLConvert_Settings]``), or ``None`` before :meth:`parse`.
     """
 
     path: str
     header: dict[str, str] | None
-    records: list[dict[str, str]] | None
     adapters: list[str]
     sections: list[str]
     columns: list[str] | None
-    settings: dict[str, str] | None
 
     def parse(
         self,

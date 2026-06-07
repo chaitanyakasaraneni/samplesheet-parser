@@ -32,18 +32,27 @@ Examples
 >>> factory = SampleSheetFactory()
 >>> sheet = factory.create_parser("SampleSheet.csv")
 >>> print(factory.version)   # SampleSheetVersion.V2
+>>>
+>>> # Register a custom parser for a hypothetical V3 format
+>>> def _is_v3(path):
+...     with open(path) as fh:
+...         return "FileFormatVersion,3" in fh.read(512)
+>>> SampleSheetFactory.register(_is_v3, MyV3Parser, SampleSheetVersion.V2)
 """
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-
-from loguru import logger
 
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
+from samplesheet_parser.protocol import SampleSheetParser
+
+logger = logging.getLogger(__name__)
 
 
 class SampleSheetFactory:
@@ -66,9 +75,50 @@ class SampleSheetFactory:
     >>> print(sheet.samples())
     """
 
+    # Class-level registry: (detector_fn, parser_class, version) tuples, LIFO.
+    _registry: list[tuple[Callable[[Path], bool], type[Any], SampleSheetVersion]] = []
+
     def __init__(self) -> None:
         self.version: SampleSheetVersion | None = None
-        self.parser: SampleSheetV1 | SampleSheetV2 | None = None
+        self.parser: SampleSheetParser | None = None
+
+    # ------------------------------------------------------------------
+    # Class-level registration
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def register(
+        cls,
+        detector: Callable[[Path], bool],
+        parser_class: type[Any],
+        version: SampleSheetVersion,
+    ) -> None:
+        """Register a custom format detector and parser.
+
+        Registered detectors are tried before the built-in V1/V2 detection,
+        in LIFO order — the most recently registered detector wins when
+        multiple detectors match.
+
+        Parameters
+        ----------
+        detector:
+            Callable that receives the file :class:`~pathlib.Path` and returns
+            ``True`` if *parser_class* should handle this file.
+        parser_class:
+            Parser class to instantiate when *detector* returns ``True``.
+        version:
+            :class:`~samplesheet_parser.SampleSheetVersion` to record for
+            this format.
+        """
+        cls._registry.insert(0, (detector, parser_class, version))
+        logger.debug(
+            f"Registered custom parser {parser_class.__name__!r} " f"for version {version.value!r}."
+        )
+
+    @classmethod
+    def clear_registry(cls) -> None:
+        """Remove all custom registrations (useful in tests)."""
+        cls._registry.clear()
 
     # ------------------------------------------------------------------
     # Public API
@@ -81,7 +131,7 @@ class SampleSheetFactory:
         clean: bool = True,
         experiment_id: str | None = None,
         parse: bool | None = None,
-    ) -> SampleSheetV1 | SampleSheetV2:
+    ) -> SampleSheetParser:
         """Detect the sample sheet format and return the appropriate parser.
 
         The returned parser shares the same interface:
@@ -104,7 +154,7 @@ class SampleSheetFactory:
 
         Returns
         -------
-        SampleSheetV1 | SampleSheetV2
+        SampleSheetParser
             The version-appropriate parser instance.
 
         Raises
@@ -119,12 +169,27 @@ class SampleSheetFactory:
             raise FileNotFoundError(f"Sample sheet not found: {path}")
 
         logger.info(f"Detecting sample sheet format for: {path}")
-        detected = self._detect_version(path)
-
-        self.version = detected
         kwargs: dict[str, Any] = dict(clean=clean, experiment_id=experiment_id, parse=parse)
 
-        parser: SampleSheetV1 | SampleSheetV2
+        # Try registered custom detectors first (LIFO order).
+        for detector, parser_class, ver in self._registry:
+            try:
+                if detector(path):
+                    logger.info(
+                        f"Custom detector matched — using {parser_class.__name__!r} "
+                        f"(version={ver.value!r})"
+                    )
+                    self.version = ver
+                    parser: SampleSheetParser = parser_class(path, **kwargs)
+                    self.parser = parser
+                    return parser
+            except Exception as exc:
+                logger.debug(f"Custom detector {detector!r} raised {exc!r} for {path} — skipping.")
+
+        # Built-in V1/V2 detection.
+        detected = self._detect_version(path)
+        self.version = detected
+
         if detected == SampleSheetVersion.V2:
             logger.info("Detected BCLConvert V2 format — using SampleSheetV2")
             parser = SampleSheetV2(path, **kwargs)
@@ -154,10 +219,9 @@ class SampleSheetFactory:
         if self.parser is None:
             raise RuntimeError("Call create_parser() before get_umi_length().")
 
-        if self.version == SampleSheetVersion.V2:
-            return self.parser.get_umi_length()  # type: ignore[union-attr]
+        if self.version == SampleSheetVersion.V2 and isinstance(self.parser, SampleSheetV2):
+            return self.parser.get_umi_length()
 
-        # V1: UMI length is occasionally stored as IndexUMILength in [Header]
         if isinstance(self.parser, SampleSheetV1):
             if self.parser.header:
                 try:

@@ -22,8 +22,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from samplesheet_parser.parsers.v1 import SampleSheetV1
-from samplesheet_parser.parsers.v2 import SampleSheetV2
+from samplesheet_parser.protocol import SampleSheetParser
 
 logger = logging.getLogger(__name__)
 
@@ -204,7 +203,7 @@ class SampleSheetValidator:
 
     def validate(
         self,
-        sheet: SampleSheetV1 | SampleSheetV2,
+        sheet: SampleSheetParser,
         *,
         min_hamming_distance: int = MIN_HAMMING_DISTANCE,
     ) -> ValidationResult:
@@ -426,7 +425,7 @@ class SampleSheetValidator:
 
     def _check_adapters(
         self,
-        sheet: SampleSheetV1 | SampleSheetV2,
+        sheet: SampleSheetParser,
         result: ValidationResult,
     ) -> None:
         """Warn if no adapters are configured, or if adapters are non-standard."""

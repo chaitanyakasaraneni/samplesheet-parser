@@ -29,14 +29,15 @@ Examples
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from loguru import logger
-
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Field normalisation map
@@ -46,15 +47,15 @@ from samplesheet_parser.factory import SampleSheetFactory
 
 _FIELD_ALIASES: dict[str, str] = {
     # index
-    "index":          "Index",
-    "i7_index_id":    "I7_Index_ID",
+    "index": "Index",
+    "i7_index_id": "I7_Index_ID",
     # index2
-    "index2":         "Index2",
-    "i5_index_id":    "I5_Index_ID",
+    "index2": "Index2",
+    "i5_index_id": "I5_Index_ID",
     # project
     "sample_project": "Sample_Project",
     # name
-    "sample_name":    "Sample_Name",
+    "sample_name": "Sample_Name",
 }
 
 # Fields to skip when comparing samples — these are metadata that differ
@@ -64,18 +65,20 @@ _FIELD_ALIASES: dict[str, str] = {
 #   I7_Index_ID / I5_Index_ID — index name columns; V2 stores index values only
 #   Sample_Name  — V1 carries a display name; V2 omits it
 #   Sample_Plate / Sample_Well / Description — IEM metadata not present in V2
-_SKIP_FIELDS: frozenset[str] = frozenset({
-    "experiment_name",
-    "run_name",
-    "iem_version",
-    # V1 IEM metadata columns absent from V2
-    "I7_Index_ID",
-    "I5_Index_ID",
-    "Sample_Name",
-    "Sample_Plate",
-    "Sample_Well",
-    "Description",
-})
+_SKIP_FIELDS: frozenset[str] = frozenset(
+    {
+        "experiment_name",
+        "run_name",
+        "iem_version",
+        # V1 IEM metadata columns absent from V2
+        "I7_Index_ID",
+        "I5_Index_ID",
+        "Sample_Name",
+        "Sample_Plate",
+        "Sample_Well",
+        "Description",
+    }
+)
 
 
 def _normalise_key(k: str) -> str:
@@ -96,7 +99,7 @@ def _normalise_record(record: dict[str, str]) -> dict[str, str]:
 def _sample_key(record: dict[str, str]) -> tuple[str, str]:
     """Return a ``(lane, sample_id)`` tuple for keying samples."""
     lane = record.get("Lane") or record.get("lane") or "1"
-    sid  = record.get("Sample_ID") or record.get("sample_id") or ""
+    sid = record.get("Sample_ID") or record.get("sample_id") or ""
     return (lane.strip(), sid.strip())
 
 
@@ -104,13 +107,15 @@ def _sample_key(record: dict[str, str]) -> tuple[str, str]:
 # Result dataclasses
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class HeaderChange:
     """A single key/value change in the header or settings section."""
-    field:     str
+
+    field: str
     old_value: str | None
     new_value: str | None
-    section:   str = "header"  # "header" | "reads" | "settings"
+    section: str = "header"  # "header" | "reads" | "settings"
 
     def __str__(self) -> str:
         old = repr(self.old_value) if self.old_value is not None else "—"
@@ -121,9 +126,10 @@ class HeaderChange:
 @dataclass
 class SampleChange:
     """A set of field-level changes for a single sample."""
-    lane:      str
+
+    lane: str
     sample_id: str
-    changes:   dict[str, tuple[str | None, str | None]] = field(default_factory=dict)
+    changes: dict[str, tuple[str | None, str | None]] = field(default_factory=dict)
     # changes maps field_name → (old_value, new_value)
 
     def __str__(self) -> str:
@@ -155,21 +161,19 @@ class DiffResult:
     sample_changes:
         Per-sample field-level diffs for samples present in both sheets.
     """
-    source_version:  SampleSheetVersion
-    target_version:  SampleSheetVersion
-    header_changes:  list[HeaderChange]  = field(default_factory=list)
-    samples_added:   list[dict[str, str]] = field(default_factory=list)
+
+    source_version: SampleSheetVersion
+    target_version: SampleSheetVersion
+    header_changes: list[HeaderChange] = field(default_factory=list)
+    samples_added: list[dict[str, str]] = field(default_factory=list)
     samples_removed: list[dict[str, str]] = field(default_factory=list)
-    sample_changes:  list[SampleChange]  = field(default_factory=list)
+    sample_changes: list[SampleChange] = field(default_factory=list)
 
     @property
     def has_changes(self) -> bool:
         """``True`` if any difference was detected."""
         return bool(
-            self.header_changes
-            or self.samples_added
-            or self.samples_removed
-            or self.sample_changes
+            self.header_changes or self.samples_added or self.samples_removed or self.sample_changes
         )
 
     def summary(self) -> str:
@@ -180,9 +184,7 @@ class DiffResult:
                 f"({self.source_version.value} → {self.target_version.value})."
             )
 
-        parts: list[str] = [
-            f"Diff ({self.source_version.value} → {self.target_version.value}):"
-        ]
+        parts: list[str] = [f"Diff ({self.source_version.value} → {self.target_version.value}):"]
         if self.header_changes:
             parts.append(f"  {len(self.header_changes)} header/settings change(s)")
         if self.samples_added:
@@ -192,9 +194,7 @@ class DiffResult:
         if self.samples_removed:
             ids = ", ".join(r.get("Sample_ID", "?") for r in self.samples_removed[:5])
             tail = (
-                f" … +{len(self.samples_removed) - 5} more"
-                if len(self.samples_removed) > 5
-                else ""
+                f" … +{len(self.samples_removed) - 5} more" if len(self.samples_removed) > 5 else ""
             )
             parts.append(f"  {len(self.samples_removed)} sample(s) removed: {ids}{tail}")
         if self.sample_changes:
@@ -223,6 +223,7 @@ class DiffResult:
 # ---------------------------------------------------------------------------
 # Diff engine
 # ---------------------------------------------------------------------------
+
 
 class SampleSheetDiff:
     """
@@ -348,8 +349,8 @@ class SampleSheetDiff:
 
     def _diff_settings(self, result: DiffResult) -> None:
         """Diff the [Settings] / [BCLConvert_Settings] section."""
-        old_s = self._old.settings or {}
-        new_s = self._new.settings or {}
+        old_s = getattr(self._old, "settings", None) or {}
+        new_s = getattr(self._new, "settings", None) or {}
 
         all_keys = set(old_s) | set(new_s)
         for key in sorted(all_keys):
@@ -367,8 +368,8 @@ class SampleSheetDiff:
 
     def _diff_samples(self, result: DiffResult) -> None:
         """Diff the [Data] / [BCLConvert_Data] records."""
-        old_records = self._old.records or []
-        new_records = self._new.records or []
+        old_records = getattr(self._old, "records", None) or []
+        new_records = getattr(self._new, "records", None) or []
 
         # Build lookup dicts keyed on (lane, sample_id)
         old_map: dict[tuple[str, str], dict[str, str]] = {
