@@ -5,6 +5,7 @@ All public classes are importable directly from the top-level package:
 ```python
 from samplesheet_parser import (
     SampleSheetFactory,
+    SampleSheetParser,
     SampleSheetV1,
     SampleSheetV2,
     SampleSheetConverter,
@@ -15,6 +16,7 @@ from samplesheet_parser import (
     SampleSheetSplitter,
     SampleSheetFilter,
     normalize_index_lengths,
+    hamming_distance,
 )
 ```
 
@@ -24,19 +26,37 @@ from samplesheet_parser import (
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `create_parser(path, *, clean, experiment_id, parse)` | `SampleSheetV1 \| SampleSheetV2` | Auto-detect format and return the appropriate parser |
+| `create_parser(path, *, clean, experiment_id, parse)` | `SampleSheetParser` | Auto-detect format and return the appropriate parser |
 | `get_umi_length()` | `int` | UMI length from the current parser |
+| `register(detector, parser_class, version)` | `None` | Register a custom format detector; tried before built-in detection in LIFO order |
+| `clear_registry()` | `None` | Remove all custom registrations (useful in tests) |
 | `.version` | `SampleSheetVersion \| None` | Detected format version |
+
+---
+
+## SampleSheetParser Protocol
+
+`SampleSheetParser` is a `runtime_checkable` structural protocol satisfied by both `SampleSheetV1` and `SampleSheetV2`. Use it as a type hint wherever either parser is accepted, or implement it in a third-party parser and register it with the factory.
+
+```python
+from samplesheet_parser import SampleSheetParser
+
+isinstance(sheet, SampleSheetParser)   # True for V1 and V2 instances
+```
 
 ---
 
 ## SampleSheetV1 / SampleSheetV2 (shared interface)
 
+Both parsers satisfy `SampleSheetParser` and expose:
+
 | Method / attribute | Returns | Description |
 |---|---|---|
 | `parse(do_clean=True)` | `None` | Parse all sections |
-| `samples()` | `list[dict]` | One record per unique sample |
+| `clean()` | `str` | Return cleaned content as a string — source file is **never** modified |
+| `samples()` | `list[dict]` | One record per unique `(sample_id, lane)` pair |
 | `index_type()` | `str` | `"dual"`, `"single"`, or `"none"` |
+| `parse_custom_section(name, *, required=False)` | `dict[str, str]` | Parse any non-standard section as key/value pairs |
 | `.adapters` | `list[str]` | Adapter sequences |
 | `.experiment_name` | `str \| None` | Run/experiment name |
 
@@ -87,7 +107,7 @@ from samplesheet_parser.instruments import (
 
 | Name | Kind | Description |
 |---|---|---|
-| `Workflow` | `StrEnum` | `Workflow.A` (i5 forward) / `Workflow.B` (i5 RC'd on chip) |
+| `Workflow` | `str, Enum` | `Workflow.A` (i5 forward) / `Workflow.B` (i5 RC'd on chip) |
 | `detect_workflow(name)` | `Workflow \| None` | Classify an instrument name; `None` for unknown or ambiguous (e.g. `NovaSeq 6000`) |
 | `parse_workflow(value)` | `Workflow \| None` | Coerce a CLI string (`"a"` / `"b"`) to `Workflow` |
 | `reverse_complement(seq)` | `str` | Reverse-complement a DNA sequence (preserves `N`, case-preserving) |
@@ -240,6 +260,24 @@ normalize_index_lengths(
 ```
 
 Normalizes index sequence lengths across a list of sample dicts. See [Index Utilities](guide/index_utils.md) for details.
+
+---
+
+## hamming_distance
+
+```python
+from samplesheet_parser import hamming_distance
+```
+
+Computes the Hamming distance between two equal-length index sequences, counting `N` wildcards as matches:
+
+```python
+hamming_distance("ATTACTCG", "ATTACTCG")   # 0
+hamming_distance("ATTACTCG", "ATTACTCC")   # 1
+hamming_distance("ATTNCNCG", "ATTACTCG")   # 0  — N matches anything
+```
+
+Used internally by `SampleSheetValidator` when checking index collision thresholds. Accepts sequences of different lengths (returns `None`) but in practice all samples in a valid sheet have uniform index lengths after normalization.
 
 ---
 
