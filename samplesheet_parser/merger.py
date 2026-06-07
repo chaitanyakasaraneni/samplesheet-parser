@@ -33,19 +33,20 @@ Illumina Experiment Manager User Guide (document # 15031320)
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-from loguru import logger
 
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.factory import SampleSheetFactory
 from samplesheet_parser.validators import (
     MIN_HAMMING_DISTANCE,
     SampleSheetValidator,
-    _hamming_distance,
+    hamming_distance,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Result types
@@ -524,7 +525,7 @@ class SampleSheetMerger:
                     if path_a == path_b:
                         continue
 
-                    dist = _hamming_distance(combined_a, combined_b)
+                    dist = hamming_distance(combined_a, combined_b)
                     if dist < min_distance:
                         result.add_warning(
                             "INDEX_DISTANCE_TOO_LOW",

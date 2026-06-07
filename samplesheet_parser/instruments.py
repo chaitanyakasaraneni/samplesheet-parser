@@ -39,10 +39,10 @@ Chaitanya Kasaraneni
 from __future__ import annotations
 
 import re
-from enum import StrEnum
+from enum import Enum
 
 
-class Workflow(StrEnum):
+class Workflow(str, Enum):
     """i5 orientation workflow for an Illumina instrument."""
 
     A = "a"
@@ -117,16 +117,30 @@ def _normalize(name: str) -> str:
     return _RX_NON_ALNUM.sub("", name.lower())
 
 
-def detect_workflow(instrument: str | None) -> Workflow | None:
+def detect_workflow(
+    instrument: str | None,
+    *,
+    extra_a: frozenset[str] | None = None,
+    extra_b: frozenset[str] | None = None,
+) -> Workflow | None:
     """Classify an instrument name as workflow A or B.
 
     Parameters
     ----------
     instrument:
-        Free-form instrument name. Matches against a normalised form of
+        Free-form instrument name. Matched against a normalised form of
         :data:`WORKFLOW_A_INSTRUMENTS` and :data:`WORKFLOW_B_INSTRUMENTS`
         so spacing, case, and punctuation are ignored
         (``"NovaSeq X Plus"`` ≡ ``"novaseqxplus"``).
+    extra_a:
+        Optional frozenset of additional normalised instrument names to
+        treat as workflow A (forward i5). Useful for new instruments not
+        yet in the built-in tables, without needing a library update.
+        Names are normalised the same way as *instrument* (lowercase,
+        non-alphanumerics stripped) before being added to the lookup set.
+    extra_b:
+        Optional frozenset of additional normalised instrument names to
+        treat as workflow B (RC i5 on chip).
 
     Returns
     -------
@@ -134,10 +148,27 @@ def detect_workflow(instrument: str | None) -> Workflow | None:
         :attr:`Workflow.A` or :attr:`Workflow.B` if the instrument is in
         one of the tables. ``None`` if *instrument* is empty, ambiguous
         (e.g. ``NovaSeq 6000`` — chemistry-dependent), or unrecognised.
+
+    Examples
+    --------
+    >>> detect_workflow("MiSeq")
+    <Workflow.A: 'a'>
+    >>> detect_workflow("NovaSeq X Plus")
+    <Workflow.B: 'b'>
+    >>> detect_workflow("MyCustomSeq", extra_b=frozenset({"mycustomseq"}))
+    <Workflow.B: 'b'>
     """
     if not instrument:
         return None
     key = _normalize(instrument)
+
+    # Caller-supplied overrides take priority over built-in tables so that
+    # new instruments can be handled without a library update.
+    if extra_b and key in {_normalize(n) for n in extra_b}:
+        return Workflow.B
+    if extra_a and key in {_normalize(n) for n in extra_a}:
+        return Workflow.A
+
     if key in WORKFLOW_A_INSTRUMENTS:
         return Workflow.A
     if key in WORKFLOW_B_INSTRUMENTS:

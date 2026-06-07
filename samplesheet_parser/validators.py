@@ -17,14 +17,15 @@ Examples
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from loguru import logger
-
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -50,18 +51,19 @@ MIN_HAMMING_DISTANCE: int = 3
 #: Standard Illumina adapter sequences (subset; not exhaustive).
 #: Full sequences from: https://support.illumina.com/bulletins/2016/12/what-sequences-do-i-use-for-adapter-trimming.html
 KNOWN_ADAPTERS = {
-    "CTGTCTCTTATACACATCT",              # Nextera transposase / TruSight
-    "AGATCGGAAGAGC",                    # TruSeq universal prefix (matches both R1/R2)
-    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA", # TruSeq Read 1 (i7 adapter, full)
-    "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT", # TruSeq Read 2 (i5 adapter, full)
-    "AATGATACGGCGACCACCGAG",            # P5
-    "CAAGCAGAAGACGGCATACGAG",           # P7
+    "CTGTCTCTTATACACATCT",  # Nextera transposase / TruSight
+    "AGATCGGAAGAGC",  # TruSeq universal prefix (matches both R1/R2)
+    "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",  # TruSeq Read 1 (i7 adapter, full)
+    "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",  # TruSeq Read 2 (i5 adapter, full)
+    "AATGATACGGCGACCACCGAG",  # P5
+    "CAAGCAGAAGACGGCATACGAG",  # P7
 }
 
 
 # ---------------------------------------------------------------------------
 # Result types
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class ValidationIssue:
@@ -78,8 +80,9 @@ class ValidationIssue:
     context:
         Optional dict with extra detail (e.g. ``{"lane": 1, "sample_id": "S1"}``).
     """
-    level:   str
-    code:    str
+
+    level: str
+    code: str
     message: str
     context: dict[str, Any] = field(default_factory=dict)
 
@@ -102,8 +105,9 @@ class ValidationResult:
     warnings:
         List of warning-level :class:`ValidationIssue` objects.
     """
+
     is_valid: bool = True
-    errors:   list[ValidationIssue] = field(default_factory=list)
+    errors: list[ValidationIssue] = field(default_factory=list)
     warnings: list[ValidationIssue] = field(default_factory=list)
 
     def add_error(self, code: str, message: str, **context: Any) -> None:
@@ -118,10 +122,12 @@ class ValidationResult:
     def to_dict(self) -> dict[str, Any]:
         return {
             "is_valid": self.is_valid,
-            "errors":   [{"code": e.code, "message": e.message, "context": e.context}
-                         for e in self.errors],
-            "warnings": [{"code": w.code, "message": w.message, "context": w.context}
-                         for w in self.warnings],
+            "errors": [
+                {"code": e.code, "message": e.message, "context": e.context} for e in self.errors
+            ],
+            "warnings": [
+                {"code": w.code, "message": w.message, "context": w.context} for w in self.warnings
+            ],
         }
 
     def summary(self) -> str:
@@ -135,7 +141,8 @@ class ValidationResult:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _hamming_distance(a: str, b: str) -> int:
+
+def hamming_distance(a: str, b: str) -> int:
     """Return the Hamming distance between two index sequences.
 
     Sequences of unequal length are compared up to the shorter length —
@@ -148,11 +155,11 @@ def _hamming_distance(a: str, b: str) -> int:
 
     Examples
     --------
-    >>> _hamming_distance("ATTACTCG", "ATTACTCG")
+    >>> hamming_distance("ATTACTCG", "ATTACTCG")
     0
-    >>> _hamming_distance("ATTACTCG", "ATTACTCA")
+    >>> hamming_distance("ATTACTCG", "ATTACTCA")
     1
-    >>> _hamming_distance("ATTACTCG", "GCTAGCTA")
+    >>> hamming_distance("ATTACTCG", "GCTAGCTA")
     6
     """
     length = min(len(a), len(b))
@@ -162,6 +169,7 @@ def _hamming_distance(a: str, b: str) -> int:
 # ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
+
 
 class SampleSheetValidator:
     """
@@ -224,7 +232,7 @@ class SampleSheetValidator:
 
         self._check_empty(samples, result)
         if not samples:
-            return result   # no point continuing
+            return result  # no point continuing
 
         self._check_index_sequences(samples, result)
         self._check_duplicate_indices(samples, result)
@@ -261,7 +269,7 @@ class SampleSheetValidator:
                 if not seq:
                     continue
 
-                sid  = sample.get("sample_id", "?")
+                sid = sample.get("sample_id", "?")
                 lane = sample.get("lane", "?")
 
                 if not VALID_INDEX_RE.match(seq):
@@ -306,7 +314,7 @@ class SampleSheetValidator:
             lane = sample.get("lane")
             idx1 = sample.get("index") or sample.get("Index") or ""
             idx2 = sample.get("index2") or sample.get("Index2") or ""
-            sid  = sample.get("sample_id", "?")
+            sid = sample.get("sample_id", "?")
 
             index_key = f"{idx1}+{idx2}" if idx2 else idx1
 
@@ -362,7 +370,7 @@ class SampleSheetValidator:
             lane = sample.get("lane")
             idx1 = (sample.get("index") or "").upper()
             idx2 = (sample.get("index2") or "").upper()
-            sid  = sample.get("sample_id", "?")
+            sid = sample.get("sample_id", "?")
 
             if not idx1:
                 continue  # no index to compare
@@ -377,7 +385,7 @@ class SampleSheetValidator:
                     sid_a, _, combined_a = entries[i]
                     sid_b, _, combined_b = entries[j]
 
-                    dist = _hamming_distance(combined_a, combined_b)
+                    dist = hamming_distance(combined_a, combined_b)
                     if dist < min_distance:
                         result.add_warning(
                             "INDEX_DISTANCE_TOO_LOW",
@@ -404,7 +412,7 @@ class SampleSheetValidator:
 
         for sample in samples:
             lane = sample.get("lane")
-            sid  = sample.get("sample_id", "")
+            sid = sample.get("sample_id", "")
             bucket = lane_id_map.setdefault(lane, set())
             if sid in bucket:
                 result.add_error(
