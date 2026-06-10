@@ -15,11 +15,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   reading at the first section after `[Header]`, so a V2 sheet that lacked
   `FileFormatVersion` and placed those sections after `[Reads]` was misdetected
   as V1. Detection now reads the full file (sheets are small) before falling
-  back.
+  back, and matches the BCLConvert section names case-insensitively so a sheet
+  using e.g. `[bclconvert_data]` is detected as V2.
 - **Index-free libraries no longer raise `DUPLICATE_INDEX`.** A full-lane
   library where every sample has an empty index was incorrectly flagged as a
   duplicate. Samples with no index are now skipped in the duplicate-index
   check.
+- **Duplicate-index detection is now case-insensitive.** Indexes are
+  upper-cased before comparison, so the same barcode written with different
+  casing is correctly flagged as a duplicate, consistent with the index
+  distance and character checks.
 - **`mypy --strict` passes again.** The `info` CLI command accessed
   V2-only attributes on the parser protocol without narrowing; it now narrows
   with `isinstance`.

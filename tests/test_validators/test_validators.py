@@ -124,6 +124,20 @@ class TestDuplicateIndex:
         assert not result.is_valid
         assert any(e.code == "DUPLICATE_INDEX" for e in result.errors)
 
+    def test_duplicate_index_detected_case_insensitively(self, tmp_path):
+        # The same index in different casing is still a duplicate.
+        p = tmp_path / "dup_case.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n"
+            "1,S1,ATTACTCG\n"
+            "1,S2,attactcg\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        result = SampleSheetValidator().validate(sheet)
+        assert any(e.code == "DUPLICATE_INDEX" for e in result.errors)
+
     def test_index_free_library_is_not_a_duplicate(self, tmp_path):
         # A full-lane, index-free library legitimately has empty indexes for
         # every sample. Sharing an empty index must not raise DUPLICATE_INDEX.

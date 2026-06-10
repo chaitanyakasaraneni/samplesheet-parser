@@ -54,6 +54,20 @@ class TestFormatDetection:
         factory.create_parser(str(p))
         assert factory.version == SampleSheetVersion.V2
 
+    def test_detects_v2_with_lowercase_section_names(self, tmp_path):
+        """Phase 2 detection is case-insensitive: lowercase BCLConvert section
+        names (which the V2 parser also accepts) detect as V2.
+        """
+        p = tmp_path / "lowercase_sections.csv"
+        p.write_text(
+            "[Header]\nRunName,Test\n\n"
+            "[reads]\nRead1Cycles,151\n\n"
+            "[bclconvert_data]\nLane,Sample_ID,Index\n1,S1,ATTACTCG\n"
+        )
+        factory = SampleSheetFactory()
+        factory.create_parser(str(p))
+        assert factory.version == SampleSheetVersion.V2
+
     def test_raises_file_not_found(self, tmp_path):
         factory = SampleSheetFactory()
         with pytest.raises(FileNotFoundError):

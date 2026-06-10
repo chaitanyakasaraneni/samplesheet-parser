@@ -348,8 +348,10 @@ class SampleSheetValidator:
 
         for sample in samples:
             lane = sample.get("lane")
-            idx1 = sample.get("index") or sample.get("Index") or ""
-            idx2 = sample.get("index2") or sample.get("Index2") or ""
+            # Upper-case so casing differences do not hide a real duplicate,
+            # matching the case-insensitive index distance and character checks.
+            idx1 = (sample.get("index") or sample.get("Index") or "").upper()
+            idx2 = (sample.get("index2") or sample.get("Index2") or "").upper()
             sid = sample.get("sample_id", "?")
 
             index_key = f"{idx1}+{idx2}" if idx2 else idx1

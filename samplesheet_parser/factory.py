@@ -295,9 +295,11 @@ class SampleSheetFactory:
                 return SampleSheetVersion.V1
 
         # --- Phase 2: scan for BCLConvert section names ----------------
-        # Use the already-read content - no second file open needed.
-        content = "".join(full_content)
-        if "[BCLConvert_Settings]" in content or "[BCLConvert_Data]" in content:
+        # Use the already-read content - no second file open needed. Compare
+        # case-insensitively because the V2 parser normalises section names
+        # that way, so e.g. "[bclconvert_data]" must also detect as V2.
+        content_lower = "".join(full_content).lower()
+        if "[bclconvert_settings]" in content_lower or "[bclconvert_data]" in content_lower:
             logger.debug("Discriminator: BCLConvert section names → V2")
             return SampleSheetVersion.V2
 
