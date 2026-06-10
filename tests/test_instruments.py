@@ -1,4 +1,4 @@
-"""Tests for samplesheet_parser.instruments — workflow detection & i5 RC."""
+"""Tests for samplesheet_parser.instruments - workflow detection & i5 RC."""
 
 # mypy: disable-error-code="misc"
 # `@pytest.fixture` and `@pytest.mark.parametrize` are typed as `Any` when

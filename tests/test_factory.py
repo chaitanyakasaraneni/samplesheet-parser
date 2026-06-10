@@ -1,4 +1,4 @@
-"""Tests for SampleSheetFactory — format detection and parser delegation."""
+"""Tests for SampleSheetFactory - format detection and parser delegation."""
 
 import pytest
 
@@ -30,13 +30,43 @@ class TestFormatDetection:
     def test_defaults_to_v1_when_no_indicators(self, tmp_path):
         """Sheet with no version markers → defaults to V1."""
         p = tmp_path / "ambiguous.csv"
-        p.write_text(
-            "[Header]\nExperiment Name,Test\n\n"
-            "[Data]\nSample_ID,index\nS1,ATCACG\n"
-        )
+        p.write_text("[Header]\nExperiment Name,Test\n\n" "[Data]\nSample_ID,index\nS1,ATCACG\n")
         factory = SampleSheetFactory()
         factory.create_parser(str(p))
         assert factory.version == SampleSheetVersion.V1
+
+    def test_detects_v2_when_header_lacks_version_marker(self, tmp_path):
+        """A [Header] without FileFormatVersion, followed by [Reads] and then
+        the BCLConvert sections, is still detected as V2.
+
+        This is the Phase 2 fallback: the BCLConvert sections appear after an
+        intervening [Reads] section, so detection must scan the whole file,
+        not just the lines up to the first section after [Header].
+        """
+        p = tmp_path / "header_no_marker.csv"
+        p.write_text(
+            "[Header]\nRunName,Test\n\n"
+            "[Reads]\nRead1Cycles,151\nRead2Cycles,151\n\n"
+            "[BCLConvert_Settings]\nAdapterRead1,CTGTCTCTTATACACATCT\n\n"
+            "[BCLConvert_Data]\nLane,Sample_ID,Index\n1,S1,ATTACTCG\n"
+        )
+        factory = SampleSheetFactory()
+        factory.create_parser(str(p))
+        assert factory.version == SampleSheetVersion.V2
+
+    def test_detects_v2_with_lowercase_section_names(self, tmp_path):
+        """Phase 2 detection is case-insensitive: lowercase BCLConvert section
+        names (which the V2 parser also accepts) detect as V2.
+        """
+        p = tmp_path / "lowercase_sections.csv"
+        p.write_text(
+            "[Header]\nRunName,Test\n\n"
+            "[reads]\nRead1Cycles,151\n\n"
+            "[bclconvert_data]\nLane,Sample_ID,Index\n1,S1,ATTACTCG\n"
+        )
+        factory = SampleSheetFactory()
+        factory.create_parser(str(p))
+        assert factory.version == SampleSheetVersion.V2
 
     def test_raises_file_not_found(self, tmp_path):
         factory = SampleSheetFactory()
@@ -115,3 +145,41 @@ class TestFactoryRepr:
         r = repr(factory)
         assert "SampleSheetV2" in r
         assert "V2" in r
+
+
+class TestCustomRegistration:
+    """The class-level detector registry used to add third-party parsers."""
+
+    def teardown_method(self):
+        # The registry is process-global; reset it so registrations made here
+        # do not leak into other tests.
+        SampleSheetFactory.clear_registry()
+
+    def test_registered_detector_selects_its_parser(self, v1_minimal):
+        # A custom detector that always matches takes precedence over the
+        # built-in V1/V2 detection, even on a file that is otherwise V1.
+        SampleSheetFactory.register(lambda _p: True, SampleSheetV2, SampleSheetVersion.V2)
+        factory = SampleSheetFactory()
+        sheet = factory.create_parser(v1_minimal)
+        assert factory.version == SampleSheetVersion.V2
+        assert isinstance(sheet, SampleSheetV2)
+
+    def test_failing_detector_is_skipped(self, v1_minimal):
+        # A detector that raises is logged and skipped, so detection falls
+        # through to the built-in logic (v1_minimal is a V1 sheet).
+        def _boom(_path):
+            raise RuntimeError("detector blew up")
+
+        SampleSheetFactory.register(_boom, SampleSheetV2, SampleSheetVersion.V2)
+        factory = SampleSheetFactory()
+        sheet = factory.create_parser(v1_minimal)
+        assert factory.version == SampleSheetVersion.V1
+        assert isinstance(sheet, SampleSheetV1)
+
+    def test_clear_registry_removes_detectors(self, v1_minimal):
+        SampleSheetFactory.register(lambda _p: True, SampleSheetV2, SampleSheetVersion.V2)
+        SampleSheetFactory.clear_registry()
+        factory = SampleSheetFactory()
+        sheet = factory.create_parser(v1_minimal)
+        assert factory.version == SampleSheetVersion.V1
+        assert isinstance(sheet, SampleSheetV1)

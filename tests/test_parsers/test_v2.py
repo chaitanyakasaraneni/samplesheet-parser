@@ -127,7 +127,7 @@ class TestSampleSheetV2Samples:
         p.write_text(original)
         sheet = SampleSheetV2(str(p), experiment_id="NewName")
         cleaned = sheet.clean()
-        # clean() returns the cleaned string — source file is unchanged
+        # clean() returns the cleaned string - source file is unchanged
         assert "ExperimentName,NewName" in cleaned
         assert "[BCLConvert_Settings]" in cleaned
         assert "[BCLConvert_Data]" in cleaned
@@ -218,6 +218,33 @@ class TestOverrideCyclesDecoding:
 
         # Empty string
         r = sheet._parse_override_cycles("")
+        assert r.umi_length == 0
+
+    def test_override_cycles_masked_and_template(self, v2_minimal):
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        r = sheet._parse_override_cycles("N5Y146;I8;I8;Y151")
+        assert r.read_structure["read1_masked"] == 5
+        assert r.read_structure["read1_template"] == 146
+        assert r.read_structure["index2_length"] == 8
+
+    def test_override_cycles_malformed_segment_warns_and_best_effort(self, v2_minimal, caplog):
+        """A malformed segment is logged and only valid tokens are decoded."""
+        import logging
+
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        with caplog.at_level(logging.WARNING):
+            r = sheet._parse_override_cycles("Y151;I10X;I10;Y151")
+        # The bad "X" token is skipped, but "I10" is still decoded.
+        assert any("Malformed OverrideCycles" in rec.message for rec in caplog.records)
+        assert r.read_structure["index2_length"] == 10
+
+    def test_override_cycles_blank_segment_skipped(self, v2_minimal):
+        sheet = SampleSheetV2(v2_minimal)
+        sheet.parse()
+        # Trailing ";" leaves an empty segment that should be ignored cleanly.
+        r = sheet._parse_override_cycles("Y151;I8;I8;Y151;")
         assert r.umi_length == 0
 
 
@@ -495,7 +522,7 @@ class TestSampleSheetV2ParseCustomSection:
 
     def test_malformed_lines_in_custom_section_are_skipped(self, tmp_path):
         """Lines with a missing key (empty first field) are skipped; valid lines returned.
-        Uses Cloud_Settings — a V2 DEFAULT_SECTION — to ensure parse_custom_section
+        Uses Cloud_Settings - a V2 DEFAULT_SECTION - to ensure parse_custom_section
         reads it correctly today without needing non-default section support."""
         p = tmp_path / "malformed_custom.csv"
         p.write_text(
@@ -534,7 +561,7 @@ class TestSampleSheetV2RequiredSections:
 
         v2_minimal has no [Cloud_Settings] section. Before the self.sections
         fix, the required check used _section_dict.keys() which is pre-seeded
-        with all DEFAULT_SECTIONS — so this would silently pass. Now it must
+        with all DEFAULT_SECTIONS - so this would silently pass. Now it must
         raise because self.sections only contains sections actually in the file.
         """
         sheet = SampleSheetV2(v2_minimal, clean=False)
@@ -542,7 +569,7 @@ class TestSampleSheetV2RequiredSections:
             sheet.parse(do_clean=False, required_sections=["Cloud_Settings"])
 
     def test_multiple_required_sections_all_present(self, v2_with_multiple_custom_sections):
-        """All required sections present — no error raised."""
+        """All required sections present - no error raised."""
         sheet = SampleSheetV2(v2_with_multiple_custom_sections, clean=False)
         sheet.parse(
             do_clean=False,
@@ -551,7 +578,7 @@ class TestSampleSheetV2RequiredSections:
         assert sheet.records is not None
 
     def test_multiple_required_sections_one_missing_raises(self, v2_with_cloud_settings):
-        """One of several required sections missing — ValueError raised."""
+        """One of several required sections missing - ValueError raised."""
         sheet = SampleSheetV2(v2_with_cloud_settings, clean=False)
         with pytest.raises(ValueError, match="Pipeline_Settings"):
             sheet.parse(

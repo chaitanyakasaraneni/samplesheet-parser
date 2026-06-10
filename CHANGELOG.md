@@ -8,7 +8,56 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Fixed
+
+- **Format auto-detection now scans the whole file.** The V2 fallback that
+  looks for `[BCLConvert_Settings]` / `[BCLConvert_Data]` previously stopped
+  reading at the first section after `[Header]`, so a V2 sheet that lacked
+  `FileFormatVersion` and placed those sections after `[Reads]` was misdetected
+  as V1. Detection now reads the full file (sheets are small) before falling
+  back, and matches the BCLConvert section names case-insensitively so a sheet
+  using e.g. `[bclconvert_data]` is detected as V2.
+- **Index-free libraries no longer raise `DUPLICATE_INDEX`.** A full-lane
+  library where every sample has an empty index was incorrectly flagged as a
+  duplicate. Samples with no index are now skipped in the duplicate-index
+  check.
+- **Duplicate-index detection is now case-insensitive.** Indexes are
+  upper-cased before comparison, so the same barcode written with different
+  casing is correctly flagged as a duplicate, consistent with the index
+  distance and character checks.
+- **`mypy --strict` passes again.** The `info` CLI command accessed
+  V2-only attributes on the parser protocol without narrowing; it now narrows
+  with `isinstance`.
+- **CLI no longer emits Typer deprecation warnings.** Removed the deprecated
+  `is_flag=True` from the `--version` option, clearing the warnings that were
+  raised on every CLI invocation.
+
+### Changed
+
+- **Index distance checking is now a sum of per-index distances.** For dual
+  index sheets the validator adds the I7 mismatch count to the I5 mismatch
+  count instead of comparing the two indexes concatenated into one string.
+  The result is the same for uniform-length indexes but correct when samples
+  use different index lengths, and it keeps I7 and I5 positions aligned. The
+  `INDEX_DISTANCE_TOO_LOW` message now refers to a "combined distance" and the
+  `index_a` / `index_b` context values use an `I7+I5` separator.
+- **`N` is treated as a wildcard in collision detection.** Index distance
+  checks now treat an `N` cycle as matching any base, so two indexes that
+  differ only at an `N` are reported as colliding. The pure `hamming_distance`
+  helper is unchanged.
+
+### Added
+
+- **`index_collision_distance(a, b)`** public helper: the wildcard-aware,
+  per-index distance the validator uses for collision detection.
+
+### Documentation
+
+- Formalised the `OverrideCycles` grammar in `SampleSheetV2._parse_override_cycles`,
+  documented how a `U` token is attributed to an index versus a read, clarified
+  that `umi_length` is the largest single UMI segment (not the sum), and made
+  malformed segments log a warning and decode on a best-effort basis instead of
+  being silently dropped.
 
 ---
 

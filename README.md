@@ -313,20 +313,27 @@ The detector reads only as much of the file as needed — stopping after `[Heade
 | `NO_ADAPTERS` | warning | No adapter sequences configured |
 | `ADAPTER_MISMATCH` | warning | Adapter is non-standard |
 
-### Hamming distance checking
+### Index distance checking
 
 Indexes that are too similar cause read bleed-through between samples during
-demultiplexing — a common cause of low-quality runs that is not caught by a
-simple duplicate check. The validator computes the Hamming distance between
-every pair of indexes within each lane and warns when the distance falls below
-the recommended minimum of 3.
+demultiplexing, a common cause of low-quality runs that a simple duplicate
+check does not catch. For every pair of samples within a lane the validator
+computes a combined distance and warns when it falls below the recommended
+minimum of 3.
 
-For dual-index sheets, the I7 and I5 sequences are combined before comparison,
-so a pair that is close on I7 but well-separated on I5 (as most dual-index
-kits are designed) is not incorrectly flagged.
+For dual-index sheets the combined distance is the sum of the per-index
+mismatch counts: the I7 distance plus the I5 distance. This equals the minimum
+number of sequencing errors needed to read one sample's barcodes as another's
+across both index reads, and summing per index (rather than concatenating the
+two indexes into one string) keeps the I7 and I5 positions aligned even when
+samples use different index lengths. So a pair that is close on I7 but
+well-separated on I5, as most dual-index kits are designed, is not flagged.
+
+Each per-index distance treats an `N` cycle as a wildcard that matches any
+base, so two indexes that differ only at an `N` are reported as colliding.
 
 ```python
-# Custom threshold — stricter than the default of 3
+# Custom threshold: stricter than the default of 3
 from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
 
 samples = sheet.samples()

@@ -8,10 +8,10 @@ from enum import Enum
 class SampleSheetVersion(str, Enum):
     """Illumina sample sheet format version.
 
-    V1 — Illumina Experiment Manager (IEM) format, used with bcl2fastq.
+    V1 - Illumina Experiment Manager (IEM) format, used with bcl2fastq.
          Identified by ``IEMFileVersion`` in the [Header] section.
 
-    V2 — BCLConvert format, used with BCLConvert and required for
+    V2 - BCLConvert format, used with BCLConvert and required for
          NovaSeq X series instruments.
          Identified by ``FileFormatVersion`` in the [Header] section,
          or by the presence of ``[BCLConvert_Settings]`` / ``[BCLConvert_Data]``
@@ -25,9 +25,9 @@ class SampleSheetVersion(str, Enum):
 class IndexType(str, Enum):
     """Sequencing index configuration.
 
-    SINGLE — I7 index only (single-index libraries).
-    DUAL   — I7 + I5 indexes (dual-index libraries, standard for modern workflows).
-    NONE   — No index (rare; full-lane libraries).
+    SINGLE - I7 index only (single-index libraries).
+    DUAL   - I7 + I5 indexes (dual-index libraries, standard for modern workflows).
+    NONE   - No index (rare; full-lane libraries).
     """
 
     SINGLE = "single"

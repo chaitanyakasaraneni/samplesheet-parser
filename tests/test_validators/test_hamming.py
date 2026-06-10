@@ -22,6 +22,7 @@ from samplesheet_parser.validators import (
     SampleSheetValidator,
     ValidationResult,
     hamming_distance,
+    index_collision_distance,
 )
 
 # ---------------------------------------------------------------------------
@@ -68,11 +69,11 @@ class TestHammingDistance:
         assert hamming_distance("ATTACTCG", "GCTAGCTA") == 6
 
     def test_unequal_length_uses_shorter(self):
-        # "ATTACTCG" vs "ATTACTCGAT" — first 8 chars match → distance 0
+        # "ATTACTCG" vs "ATTACTCGAT" - first 8 chars match → distance 0
         assert hamming_distance("ATTACTCG", "ATTACTCGAT") == 0
 
     def test_unequal_length_with_mismatch(self):
-        # "ATTACTCG" vs "GTTACTCGAT" — first char differs → distance 1
+        # "ATTACTCG" vs "GTTACTCGAT" - first char differs → distance 1
         assert hamming_distance("ATTACTCG", "GTTACTCGAT") == 1
 
     def test_empty_strings(self):
@@ -126,7 +127,7 @@ Lane,Sample_ID,Index,Sample_Project
         assert _distance_warnings(result) == []
 
     def test_distance_2_triggers_warning(self, tmp_path):
-        # ATTACTCG vs ATTACTAA — 2 mismatches, below threshold of 3
+        # ATTACTCG vs ATTACTAA - 2 mismatches, below threshold of 3
         sheet = _write(
             tmp_path,
             "close.csv",
@@ -189,7 +190,7 @@ Lane,Sample_ID,Index,Sample_Project
         assert warnings[0].context["distance"] == 1
 
     def test_distance_exactly_3_no_warning(self, tmp_path):
-        # ATTACTCG vs GTTAAACG — exactly 3 mismatches (positions 0, 4, 5)
+        # ATTACTCG vs GTTAAACG - exactly 3 mismatches (positions 0, 4, 5)
         sheet = _write(
             tmp_path,
             "dist3.csv",
@@ -251,7 +252,7 @@ Lane,Sample_ID,Index,Sample_Project
         assert flagged == {"S1", "S3"}
 
     def test_multiple_close_pairs_all_reported(self, tmp_path):
-        # S1≈S2 (dist 1) and S3≈S4 (dist 1) — two separate warnings
+        # S1≈S2 (dist 1) and S3≈S4 (dist 1) - two separate warnings
         sheet = _write(
             tmp_path,
             "multi.csv",
@@ -283,14 +284,14 @@ Lane,Sample_ID,Index,Sample_Project
 
 
 # ---------------------------------------------------------------------------
-# V2 dual-index sheets — combined index comparison
+# V2 dual-index sheets - combined index comparison
 # ---------------------------------------------------------------------------
 
 
 class TestV2DualIndex:
     def test_close_i7_rescued_by_i5(self, tmp_path):
-        # I7: ATTACTCG vs ATTACTCA (dist 1 — too close alone)
-        # I5: TATAGCCT vs GCTAGCTA (dist 6 — very different)
+        # I7: ATTACTCG vs ATTACTCA (dist 1 - too close alone)
+        # I5: TATAGCCT vs GCTAGCTA (dist 6 - very different)
         # Combined: dist = 1 + 6 = 7 → should NOT warn
         sheet = _write(
             tmp_path,
@@ -385,9 +386,10 @@ Lane,Sample_ID,Index,Index2,Sample_Project
         )
         result = _validate(sheet)
         w = _distance_warnings(result)[0]
-        # index_a and index_b in context should be the combined strings
-        assert len(w.context["index_a"]) == 16  # 8 + 8
-        assert len(w.context["index_b"]) == 16
+        # index_a and index_b in context are the I7+I5 combined strings,
+        # shown with a "+" separator to match the duplicate-index format.
+        assert w.context["index_a"] == "ATTACTCG+TATAGCCT"
+        assert w.context["index_b"] == "ATTACTCA+TATAGCCA"
 
 
 # ---------------------------------------------------------------------------
@@ -397,7 +399,7 @@ Lane,Sample_ID,Index,Index2,Sample_Project
 
 class TestMultiLane:
     def test_close_indexes_in_different_lanes_no_warning(self, tmp_path):
-        # S1 in lane 1 and S2 in lane 2 have identical indexes — valid
+        # S1 in lane 1 and S2 in lane 2 have identical indexes - valid
         # because they demultiplex independently per lane
         sheet = _write(
             tmp_path,
@@ -589,12 +591,12 @@ Lane,Sample_ID,Index,Sample_Project
         parsed = SampleSheetFactory().create_parser(sheet, parse=True, clean=False)
         samples = parsed.samples()
 
-        # Default threshold (3) — no warning
+        # Default threshold (3) - no warning
         result_default = ValidationResult()
         SampleSheetValidator()._check_index_distances(samples, result_default, min_distance=3)
         assert _distance_warnings(result_default) == []
 
-        # Stricter threshold (4) — should warn
+        # Stricter threshold (4) - should warn
         result_strict = ValidationResult()
         SampleSheetValidator()._check_index_distances(samples, result_strict, min_distance=4)
         assert len(_distance_warnings(result_strict)) == 1
@@ -700,7 +702,7 @@ Lane,Sample_ID,Index,Sample_Project
         assert not result.is_valid
 
     def test_warning_does_not_invalidate_result(self, tmp_path):
-        # INDEX_DISTANCE_TOO_LOW is a warning — is_valid should stay True
+        # INDEX_DISTANCE_TOO_LOW is a warning - is_valid should stay True
         sheet = _write(
             tmp_path,
             "warn_valid.csv",
@@ -755,3 +757,120 @@ Lane,Sample_ID,Index,Sample_Project
         result = _validate(sheet)
         w = _distance_warnings(result)[0]
         assert "bleed" in w.message.lower() or "distance" in w.message.lower()
+
+
+# ---------------------------------------------------------------------------
+# N as a wildcard in collision detection
+# ---------------------------------------------------------------------------
+
+
+class TestNWildcard:
+    def test_collision_distance_treats_n_as_match(self):
+        # Pure Hamming counts the N position; collision distance does not.
+        assert hamming_distance("ATTACTCG", "ATTACTCN") == 1
+        assert index_collision_distance("ATTACTCG", "ATTACTCN") == 0
+
+    def test_collision_distance_n_in_either_position(self):
+        assert index_collision_distance("ATTACTCG", "NTTACTCG") == 0
+        assert index_collision_distance("NTTACTCG", "ATTACTCG") == 0
+
+    def test_collision_distance_counts_real_mismatches(self):
+        assert index_collision_distance("ATTACTCG", "ATTACTAA") == 2
+
+    def test_n_index_pair_is_flagged_as_too_low(self, tmp_path):
+        # The two indexes differ only at an N, which is a wildcard, so their
+        # collision distance is 0 and the pair must be flagged.
+        sheet = _write(
+            tmp_path,
+            "n_wildcard.csv",
+            """\
+[Header]
+FileFormatVersion,2
+RunName,TestRun
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,8
+Index2Cycles,0
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Sample_Project
+1,S1,ATTACTCG,Proj
+1,S2,ATTACTCN,Proj
+""",
+        )
+        result = _validate(sheet)
+        warnings = _distance_warnings(result)
+        assert len(warnings) == 1
+        assert warnings[0].context["distance"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Dual-index combined distance is the sum of per-index distances
+# ---------------------------------------------------------------------------
+
+
+class TestDualIndexSum:
+    def test_combined_distance_is_sum_of_both_indexes(self, tmp_path):
+        # I7 differs by 1, I5 differs by 1, combined distance is 2, which is
+        # below the default threshold of 3 and must warn.
+        sheet = _write(
+            tmp_path,
+            "dual_sum.csv",
+            """\
+[Header]
+FileFormatVersion,2
+RunName,TestRun
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,8
+Index2Cycles,8
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,S1,ATTACTCG,TATAGCCT,Proj
+1,S2,ATTACTCA,TATAGCCA,Proj
+""",
+        )
+        result = _validate(sheet)
+        warnings = _distance_warnings(result)
+        assert len(warnings) == 1
+        assert warnings[0].context["distance"] == 2
+
+    def test_well_separated_on_one_index_still_sums(self, tmp_path):
+        # I7 is identical (distance 0) but I5 is well separated (distance >= 3),
+        # so the combined distance clears the threshold and there is no warning.
+        sheet = _write(
+            tmp_path,
+            "dual_one_far.csv",
+            """\
+[Header]
+FileFormatVersion,2
+RunName,TestRun
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,8
+Index2Cycles,8
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,S1,ATTACTCG,TATAGCCT,Proj
+1,S2,ATTACTCG,GCTAGCTA,Proj
+""",
+        )
+        result = _validate(sheet)
+        assert _distance_warnings(result) == []

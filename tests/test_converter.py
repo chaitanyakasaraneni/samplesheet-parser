@@ -264,7 +264,7 @@ class TestV1ToV2:
         assert sample["index2"] == "TATAGCCT"
 
     def test_no_reads_section(self, v1_no_reads: str, tmp_path: Path) -> None:
-        """V1 with no [Reads] should convert without error — empty [Reads] in V2."""
+        """V1 with no [Reads] should convert without error - empty [Reads] in V2."""
         out = tmp_path / "output_v2.csv"
         SampleSheetConverter(v1_no_reads).to_v2(out)
         sheet = SampleSheetV2(str(out))
@@ -578,7 +578,7 @@ class TestConverterEdgeCases:
 
 
 # ---------------------------------------------------------------------------
-# TestI5Orientation — issue #30
+# TestI5Orientation - issue #30
 # ---------------------------------------------------------------------------
 
 
@@ -744,7 +744,7 @@ class TestI5OrientationWorkflowOverride:
         assert v2.samples()[0]["index2"] == "AGGCTATA"
 
     def test_workflow_a_override_blocks_rc_on_workflow_b_instrument(self, tmp_path: Path) -> None:
-        """Explicit override wins over auto-detection — useful for chemistry overrides."""
+        """Explicit override wins over auto-detection - useful for chemistry overrides."""
         p = _write_v1(tmp_path, "in.csv", "NovaSeq X Plus", index2="TATAGCCT")
         out = tmp_path / "out.csv"
         SampleSheetConverter(p, workflow="a").to_v2(out)
@@ -771,7 +771,7 @@ class TestI5OrientationFailureModes:
 
     def test_unknown_instrument_with_index2_raises(self, tmp_path: Path) -> None:
         """A dual-index sheet with no detectable instrument must NOT silently
-        pass i5 through — that is the exact silent-misassignment bug."""
+        pass i5 through - that is the exact silent-misassignment bug."""
         p = _write_v1(tmp_path, "in.csv", instrument=None, index2="TATAGCCT")
         out = tmp_path / "out.csv"
         with pytest.raises(ValueError, match="cannot determine i5 orientation"):

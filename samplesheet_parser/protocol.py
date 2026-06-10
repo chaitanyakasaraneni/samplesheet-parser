@@ -2,7 +2,7 @@
 Structural protocol for Illumina sample sheet parsers.
 
 Any class that implements the methods and attributes below is a valid
-``SampleSheetParser`` — no inheritance required.  The protocol lets third
+``SampleSheetParser`` - no inheritance required.  The protocol lets third
 parties add new format parsers (e.g. a V3 BCLConvert format) and register
 them with :class:`~samplesheet_parser.factory.SampleSheetFactory` without
 modifying library internals.

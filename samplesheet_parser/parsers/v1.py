@@ -77,7 +77,7 @@ STANDARD_HEADER_KEYS = {
     "Date",
     "Workflow",
     "Application",  # e.g. "FASTQ Only"
-    "Instrument Type",  # e.g. "MiSeq" — note: NextSeq/MiniSeq auto-RC index2
+    "Instrument Type",  # e.g. "MiSeq" - note: NextSeq/MiniSeq auto-RC index2
     "Assay",  # LP kit identifier, irrelevant to sequencer
     "Index Adapters",  # Illumina index set name, irrelevant to sequencer
     "Chemistry",  # "Amplicon" = dual index, "Default" = no/single index
@@ -88,7 +88,7 @@ STANDARD_HEADER_KEYS = {
 STANDARD_SETTINGS_KEYS = {
     "ReverseComplement",  # 1 = reverse-complement R2 (Nextera Mate Pair), 0 = all others
     "Adapter",  # Read 1 adapter (legacy single-key form)
-    "AdapterRead2",  # Read 2 adapter — used alongside Adapter key per IEM spec
+    "AdapterRead2",  # Read 2 adapter - used alongside Adapter key per IEM spec
     "AdapterRead1",  # Explicit Read 1 adapter (BCLConvert V1-mode alias)
 }
 
@@ -141,7 +141,7 @@ class SampleSheetV1:
     Notes
     -----
     The ``[Manifests]`` section is read and preserved but not
-    interpreted — it is instrument-specific metadata rarely needed
+    interpreted - it is instrument-specific metadata rarely needed
     downstream.
 
     Custom sections (any section not in the standard list) are stored
@@ -163,7 +163,7 @@ class SampleSheetV1:
         self.path: str = str(path)
         self.experiment_id: str | None = experiment_id
 
-        # Parsed attributes — populated by parse()
+        # Parsed attributes - populated by parse()
         self.raw: SheetInfo = SheetInfo()
         self._section_dict: dict[str, list[str]] = {}
         self.sections: list[str] = []  # populated by read(); sections actually in the file
@@ -233,7 +233,7 @@ class SampleSheetV1:
 
         # Validate caller-specified required sections up front, before any
         # other parsing, so the error is clean and actionable.
-        # Use self.sections (sections actually encountered in the file) — not
+        # Use self.sections (sections actually encountered in the file) - not
         # _section_dict.keys() which is pre-populated with DEFAULT_SECTIONS.
         if required_sections:
             present = set(self.sections)
@@ -243,14 +243,14 @@ class SampleSheetV1:
                         f"Required section [{section}] is missing from the sample sheet."
                     )
 
-        # Required sections — raise on failure
+        # Required sections - raise on failure
         for name, method in [("Header", self.parse_header), ("Data", self.parse_data)]:
             try:
                 method()
             except Exception as exc:
                 raise ValueError(f"Invalid sample sheet. Error parsing [{name}]: {exc}") from exc
 
-        # Optional sections — warn on failure
+        # Optional sections - warn on failure
         for name, method in [
             ("Reads", self.parse_reads),
             ("Settings", self.parse_settings),
@@ -269,7 +269,7 @@ class SampleSheetV1:
     ) -> dict[str, str]:
         """Parse a non-standard section as a key-value dict.
 
-        Handles any section not covered by the built-in parsers — e.g.
+        Handles any section not covered by the built-in parsers - e.g.
         ``[Manifests]``, ``[Cloud_Settings]``, or any lab-specific section
         added by downstream tools.
 
@@ -312,7 +312,7 @@ class SampleSheetV1:
         # raises ValueError
         """
         if not self._section_dict:
-            raise RuntimeError("Sample sheet has not been read yet — call parse() or read() first.")
+            raise RuntimeError("Sample sheet has not been read yet - call parse() or read() first.")
 
         key = section_name.lower()
 
@@ -324,7 +324,7 @@ class SampleSheetV1:
                 raise ValueError(
                     f"Required section [{section_name}] is missing from the sample sheet."
                 )
-            logger.debug(f"Section [{section_name}] not found — returning empty dict.")
+            logger.debug(f"Section [{section_name}] not found - returning empty dict.")
             return {}
 
         result: dict[str, str] = {}
@@ -577,7 +577,7 @@ class SampleSheetV1:
         #   "AdapterRead2" = Read 2 adapter (explicitly separate key)
         #   "AdapterRead1" = BCLConvert V1-mode alias for Adapter (lower precedence)
         #
-        # Note: adapter_read2 does NOT fall back to Adapter — a sheet with only
+        # Note: adapter_read2 does NOT fall back to Adapter - a sheet with only
         # Adapter configured is Read-1-only trimming, not symmetric trimming.
         self.adapter_read1 = settings.get("AdapterRead1") or settings.get("Adapter", "")
         self.adapter_read2 = settings.get("AdapterRead2", "")

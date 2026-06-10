@@ -45,7 +45,7 @@ Examples
 --------
 >>> from samplesheet_parser import SampleSheetConverter
 >>>
->>> # V1 → V2 — workflow auto-detected from [Header] Instrument Type
+>>> # V1 → V2 - workflow auto-detected from [Header] Instrument Type
 >>> SampleSheetConverter("SampleSheet_v1.csv").to_v2("SampleSheet_v2.csv")
 >>>
 >>> # V2 → V1 with explicit workflow override (e.g. NovaSeq 6000 v1.5)
@@ -74,7 +74,7 @@ logger = logging.getLogger(__name__)
 # Field mappings
 # ---------------------------------------------------------------------------
 
-# V2-only fields that have no V1 equivalent — dropped on V2 → V1
+# V2-only fields that have no V1 equivalent - dropped on V2 → V1
 _V2_ONLY_SETTINGS: set[str] = {
     "OverrideCycles",
     "FastqCompressionFormat",
@@ -128,7 +128,7 @@ class SampleSheetConverter:
     >>> conv = SampleSheetConverter("SampleSheet_v2.csv")
     >>> conv.to_v1("SampleSheet_v1.csv")  # emits warnings for dropped fields
 
-    >>> # NovaSeq 6000 with v1.5 chemistry — must override (ambiguous)
+    >>> # NovaSeq 6000 with v1.5 chemistry - must override (ambiguous)
     >>> SampleSheetConverter("SampleSheet.csv", workflow="b").to_v2("out.csv")
     """
 
@@ -178,7 +178,7 @@ class SampleSheetConverter:
                 f"got {type(sheet).__name__!r}."
             )
 
-        # Resolve workflow before writing any output — fail fast if the
+        # Resolve workflow before writing any output - fail fast if the
         # sheet has a non-empty Index2 column and we cannot tell whether
         # to RC it. See _needs_i5_rc().
         needs_rc = self._needs_i5_rc(
@@ -220,7 +220,7 @@ class SampleSheetConverter:
             lines.append(f"AdapterRead1,{sheet.adapter_read1}")
         if sheet.adapter_read2:
             lines.append(f"AdapterRead2,{sheet.adapter_read2}")
-        # Emit empty OverrideCycles — caller should fill in if using UMIs or custom cycle counts
+        # Emit empty OverrideCycles - caller should fill in if using UMIs or custom cycle counts
         lines.append("OverrideCycles,")
         lines.append("")
 
@@ -305,7 +305,7 @@ class SampleSheetConverter:
             lines.append(f"Description,{run_desc}")
 
         # Preserve instrument so the workflow signal survives a round trip.
-        # V2 may declare InstrumentType, InstrumentPlatform, or both —
+        # V2 may declare InstrumentType, InstrumentPlatform, or both -
         # prefer the more specific InstrumentType when present.
         v2_instrument = (sheet.header.get("InstrumentType") if sheet.header else None) or (
             sheet.header.get("InstrumentPlatform") if sheet.header else None
@@ -371,7 +371,7 @@ class SampleSheetConverter:
         # Warn about dropped fields
         # Check cloud_data first so the warning fires even when it is the only lossy part
         if sheet.cloud_data:
-            dropped.append("[Cloud_Data] section (entire section — no V1 equivalent)")
+            dropped.append("[Cloud_Data] section (entire section - no V1 equivalent)")
         if dropped:
             logger.warning(
                 f"V2 → V1 conversion dropped {len(dropped)} field(s) with no V1 equivalent:"
@@ -450,7 +450,7 @@ class SampleSheetConverter:
         result = []
         for col in v2_columns:
             if col in _V2_ONLY_DATA_COLUMNS:
-                continue  # drop silently — already warned above
+                continue  # drop silently - already warned above
             mapped = mapping.get(col, col)
             result.append(mapped)
         return result
@@ -502,7 +502,7 @@ class SampleSheetConverter:
           1. Explicit ``workflow=`` constructor override wins.
           2. Otherwise auto-detect from *instrument*.
           3. If detection fails and any record carries a non-empty
-             ``index2_key``, raise ``ValueError`` — silently passing the
+             ``index2_key``, raise ``ValueError`` - silently passing the
              i5 through would produce a wrong sheet for workflow-B
              instruments.
           4. If no Index2 values are present, return ``False`` (no-op).
@@ -534,7 +534,7 @@ class SampleSheetConverter:
                 f"samplesheet_parser.instruments for the full instrument table."
             )
 
-        # No Index2 to convert — silent pass-through is safe.
+        # No Index2 to convert - silent pass-through is safe.
         logger.debug(f"{direction}: no Index2 values, skipping workflow detection.")
         return False
 

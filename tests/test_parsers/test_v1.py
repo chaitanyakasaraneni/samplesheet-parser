@@ -85,7 +85,7 @@ class TestSampleSheetV1Parsing:
         assert sheet.reverse_complement == 0
 
     def test_parse_adapters_read1_only_no_default_for_read2(self, tmp_path):
-        """Adapter key alone must NOT default adapter_read2 — Read1-only trimming."""
+        """Adapter key alone must NOT default adapter_read2 - Read1-only trimming."""
         p = tmp_path / "read1_trim_only.csv"
         content_str = (
             "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
@@ -115,7 +115,7 @@ class TestSampleSheetV1Parsing:
         assert sheet.adapters == ["CTGTCTCTTATACACATCT", "AGATCGGAAGAGC"]
 
     def test_parse_adapters_read1_only(self, tmp_path):
-        """AdapterRead1 only — adapter_read2 should be empty string."""
+        """AdapterRead1 only - adapter_read2 should be empty string."""
         p = tmp_path / "read1_only.csv"
         content_str = (
             "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
@@ -154,7 +154,7 @@ class TestSampleSheetV1Parsing:
         assert len(sheet.records) == 1
 
     def test_parse_no_reads_section(self, v1_no_reads):
-        # Should not raise — [Reads] is optional
+        # Should not raise - [Reads] is optional
         sheet = SampleSheetV1(v1_no_reads)
         sheet.parse()
         assert sheet.read_lengths == []
@@ -193,7 +193,7 @@ class TestSampleSheetV1Parsing:
         p.write_text(original)
         sheet = SampleSheetV1(str(p), experiment_id="NewName")
         cleaned = sheet.clean()
-        # clean() returns the cleaned string — source file is unchanged
+        # clean() returns the cleaned string - source file is unchanged
         assert "Experiment Name,NewName" in cleaned
         assert "ATTACTCG" in cleaned
         assert p.read_text() == original
@@ -213,7 +213,7 @@ class TestSampleSheetV1Samples:
 
         I7_Index_ID / I5_Index_ID are in STANDARD_DATA_COLUMNS so they are
         excluded from the non-standard column loop in samples(). They are
-        therefore not present in the output dict under any casing — this is
+        therefore not present in the output dict under any casing - this is
         the documented post-refactor behaviour.
         """
         sheet = SampleSheetV1(v1_minimal)
@@ -223,7 +223,7 @@ class TestSampleSheetV1Samples:
         for key in ("sample_id", "sample_name", "index", "index2", "sample_project"):
             assert key in s, f"Missing normalized key: {key}"
         # I7/I5 index ID columns are in STANDARD_DATA_COLUMNS and are not
-        # re-keyed into the normalized output — assert neither form appears.
+        # re-keyed into the normalized output - assert neither form appears.
         assert "I7_Index_ID" not in s, (
             "I7_Index_ID should not appear in samples() output "
             "(it is in STANDARD_DATA_COLUMNS but not re-keyed by samples())"
@@ -380,7 +380,7 @@ class TestSampleSheetV1EdgeCases:
 
 
 class TestSampleSheetV1ParseCustomSection:
-    """Tests for parse_custom_section() — the new non-standard section API."""
+    """Tests for parse_custom_section() - the new non-standard section API."""
 
     def test_manifests_section_returns_key_value_dict(self, v1_with_manifests):
         """[Manifests] section is parsed into a key-value dict."""
@@ -477,7 +477,7 @@ class TestSampleSheetV1ParseCustomSection:
 
 
 class TestSampleSheetV1RequiredSections:
-    """Tests for parse(required_sections=[...]) — enforcing section presence."""
+    """Tests for parse(required_sections=[...]) - enforcing section presence."""
 
     def test_required_section_present_does_not_raise(self, v1_with_manifests):
         """parse() with a required section that exists should complete normally."""
@@ -492,13 +492,13 @@ class TestSampleSheetV1RequiredSections:
             sheet.parse(do_clean=False, required_sections=["Cloud_Settings"])
 
     def test_multiple_required_sections_all_present(self, v1_with_multiple_custom_sections):
-        """All required sections present — no error raised."""
+        """All required sections present - no error raised."""
         sheet = SampleSheetV1(v1_with_multiple_custom_sections, clean=False)
         sheet.parse(do_clean=False, required_sections=["Manifests", "Cloud_Settings"])
         assert sheet.records is not None
 
     def test_multiple_required_sections_one_missing_raises(self, v1_with_multiple_custom_sections):
-        """One of several required sections missing — ValueError raised."""
+        """One of several required sections missing - ValueError raised."""
         sheet = SampleSheetV1(v1_with_multiple_custom_sections, clean=False)
         with pytest.raises(ValueError, match="Pipeline_Settings"):
             sheet.parse(

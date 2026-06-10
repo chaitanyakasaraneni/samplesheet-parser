@@ -154,9 +154,12 @@ class ReadStructure:
     Attributes
     ----------
     umi_length:
-        Total UMI length in bases. ``0`` if no UMI is present.
+        Length in bases of the single largest UMI segment. ``0`` if no UMI
+        is present. This is the per-segment UMI length, not the sum across
+        segments: ``U5Y146;I8;I8;U5Y146`` reports ``5``, not ``10``. The full
+        per-segment breakdown is available in ``read_structure``.
     umi_location:
-        Which segment contains the UMI (e.g. ``"index1"``, ``"read1"``).
+        Which segment contains the largest UMI (e.g. ``"index1"``, ``"read1"``).
         ``None`` if no UMI.
     read_structure:
         Detailed per-segment breakdown:
@@ -205,8 +208,8 @@ class SampleSheetV2:
 
     Notes
     -----
-    Custom columns — any column in ``[BCLConvert_Data]`` whose name is not in
-    :attr:`STANDARD_DATA_COLUMNS` or does not start with ``Custom_`` — are
+    Custom columns - any column in ``[BCLConvert_Data]`` whose name is not in
+    :attr:`STANDARD_DATA_COLUMNS` or does not start with ``Custom_`` - are
     automatically detected and preserved in the parsed records. Access them
     via ``sheet.custom_fields["data"]``.
     """
@@ -240,7 +243,7 @@ class SampleSheetV2:
         self.instrument_platform: str | None = None
         self.software_version: str | None = None
 
-        # Full section dict — includes custom sections — used by parse_custom_section
+        # Full section dict - includes custom sections - used by parse_custom_section
         self._section_dict: dict[str, list[str]] = {}
 
         # Custom field tracking
@@ -508,7 +511,7 @@ class SampleSheetV2:
 
                 section_dict[curr].append(stripped)
 
-        # Full dict — includes custom sections — used by parse_custom_section
+        # Full dict - includes custom sections - used by parse_custom_section
         self._section_dict = section_dict
 
         self.raw = SheetInfo(**{s: section_dict.get(s, []) for s in DEFAULT_SECTIONS})
@@ -628,7 +631,7 @@ class SampleSheetV2:
     ) -> dict[str, str]:
         """Parse a non-standard section as a key-value dict.
 
-        Handles any section not covered by the built-in parsers — e.g.
+        Handles any section not covered by the built-in parsers - e.g.
         ``[Cloud_Settings]``, ``[Cloud_Data]``, or any lab-specific section
         added by downstream tools.
 
@@ -668,7 +671,7 @@ class SampleSheetV2:
         # raises ValueError if [Cloud_Settings] is absent
         """
         if not self._section_dict:
-            raise RuntimeError("Sample sheet has not been read yet — call parse() or read() first.")
+            raise RuntimeError("Sample sheet has not been read yet - call parse() or read() first.")
 
         key = section_name.lower()
 
@@ -682,7 +685,7 @@ class SampleSheetV2:
                 raise ValueError(
                     f"Required section [{section_name}] is missing from the sample sheet."
                 )
-            logger.debug(f"Section [{section_name}] not found — returning empty dict.")
+            logger.debug(f"Section [{section_name}] not found - returning empty dict.")
             return {}
 
         result: dict[str, str] = {}
@@ -698,6 +701,12 @@ class SampleSheetV2:
     # ------------------------------------------------------------------
     # OverrideCycles decoder
     # ------------------------------------------------------------------
+
+    # Grammar for a single OverrideCycles segment: one or more (code, count)
+    # tokens with no separators, e.g. "Y151", "I10U9", "U5Y146". A whole
+    # OverrideCycles string is several such segments joined by ";".
+    _OC_TOKEN = re.compile(r"([YIUN])(\d+)")
+    _OC_SEGMENT = re.compile(r"(?:[YIUN]\d+)+")
 
     def _parse_override_cycles(self, override_str: str) -> ReadStructure:
         """Decode an Illumina OverrideCycles string.
@@ -715,13 +724,32 @@ class SampleSheetV2:
 
         Notes
         -----
-        The OverrideCycles format is documented in the BCLConvert User
-        Guide. Supported cycle type codes:
+        The OverrideCycles format is documented in the BCLConvert User Guide.
+        Grammar (one segment per read, segments joined by ";")::
 
-        - ``Y`` — template read
-        - ``I`` — index
-        - ``U`` — UMI
-        - ``N`` — masked (skipped) bases
+            override   := segment (";" segment)*
+            segment    := token+
+            token      := code count
+            code       := "Y" | "I" | "U" | "N"
+            count      := one or more digits
+
+        Supported cycle type codes:
+
+        - ``Y`` -- template read
+        - ``I`` -- index
+        - ``U`` -- UMI
+        - ``N`` -- masked (skipped) bases
+
+        A ``U`` inside a segment that also contains an ``I`` is treated as an
+        index UMI (e.g. ``I10U9`` is a 10 bp index with a trailing 9 bp UMI);
+        otherwise it is a read UMI. ``umi_length`` is the single largest UMI
+        token, not the sum across segments.
+
+        Malformed input is handled defensively: any segment that does not match
+        the grammar above is logged at warning level, and only the recognised
+        ``code count`` tokens within it are decoded. Unrecognised text is
+        skipped rather than raising, so a slightly malformed sheet still yields
+        a best-effort structure.
         """
         if not override_str:
             return ReadStructure()
@@ -732,35 +760,43 @@ class SampleSheetV2:
         umi_location: str | None = None
 
         for i, segment in enumerate(segments, start=1):
-            # Pattern like I10U9 — index immediately followed by UMI
-            m = re.match(r"I(\d+)U(\d+)", segment)
-            if m:
-                idx_len, umi_len = int(m.group(1)), int(m.group(2))
-                read_struct[f"index{i}_length"] = idx_len
-                read_struct[f"index{i}_umi"] = umi_len
-                if umi_len > umi_length:
-                    umi_length = umi_len
-                    umi_location = f"index{i}"
+            segment = segment.strip()
+            if not segment:
                 continue
 
-            # General case — iterate over (TypeCode, Length) pairs
-            components = re.findall(r"([A-Z])(\d+)", segment)
+            # Flag any segment that is not a clean run of code/count tokens.
+            # Recognised tokens are still decoded below on a best-effort basis.
+            if not self._OC_SEGMENT.fullmatch(segment):
+                logger.warning(
+                    f"Malformed OverrideCycles segment {segment!r} in "
+                    f"{override_str!r}; decoding recognised tokens only."
+                )
 
-            for _j, (code, length_str) in enumerate(components):
+            tokens = self._OC_TOKEN.findall(segment)
+            segment_has_index = any(code == "I" for code, _ in tokens)
+
+            for code, length_str in tokens:
                 length = int(length_str)
 
-                if code == "U":
-                    read_struct[f"read{i}_umi"] = length
-                    if length > umi_length:
-                        umi_length = length
-                        umi_location = f"read{i}"
-
-                elif code == "Y":
+                if code == "Y":
                     if f"read{i}_template" not in read_struct:
                         read_struct[f"read{i}_template"] = length
 
                 elif code == "I":
                     read_struct[f"index{i}_length"] = length
+
+                elif code == "U":
+                    # A UMI alongside an index is an index UMI; otherwise it
+                    # belongs to the template read for this segment.
+                    if segment_has_index:
+                        read_struct[f"index{i}_umi"] = length
+                        location = f"index{i}"
+                    else:
+                        read_struct[f"read{i}_umi"] = length
+                        location = f"read{i}"
+                    if length > umi_length:
+                        umi_length = length
+                        umi_location = location
 
                 elif code == "N":
                     read_struct[f"read{i}_masked"] = length

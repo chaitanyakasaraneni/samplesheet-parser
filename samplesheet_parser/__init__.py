@@ -5,8 +5,8 @@ samplesheet-parser
 Format-agnostic parser for Illumina SampleSheet.csv files.
 
 Supports:
-  - Illumina Experiment Manager (IEM) V1 format  — bcl2fastq era
-  - BCLConvert V2 format                          — NovaSeq X / modern era
+  - Illumina Experiment Manager (IEM) V1 format  - bcl2fastq era
+  - BCLConvert V2 format                          - NovaSeq X / modern era
 
 Quickstart
 ----------
@@ -43,7 +43,12 @@ from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 from samplesheet_parser.protocol import SampleSheetParser
 from samplesheet_parser.splitter import SampleSheetSplitter, SplitResult
-from samplesheet_parser.validators import SampleSheetValidator, ValidationResult, hamming_distance
+from samplesheet_parser.validators import (
+    SampleSheetValidator,
+    ValidationResult,
+    hamming_distance,
+    index_collision_distance,
+)
 from samplesheet_parser.writer import SampleSheetWriter
 
 __all__ = [
@@ -58,6 +63,7 @@ __all__ = [
     "SampleSheetValidator",
     "ValidationResult",
     "hamming_distance",
+    "index_collision_distance",
     "SampleSheetConverter",
     "SampleSheetDiff",
     "DiffResult",

@@ -8,6 +8,7 @@ from samplesheet_parser.index_utils import normalize_index_lengths
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_samples(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
     """Build minimal V1-style sample dicts from (index, index2) pairs."""
     return [
@@ -28,6 +29,7 @@ def _make_v2_samples(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
 # Basic behaviour
 # ---------------------------------------------------------------------------
 
+
 class TestNormalizeEmpty:
 
     def test_empty_input_returns_empty(self) -> None:
@@ -39,8 +41,8 @@ class TestNormalizeTrim:
     def test_trim_i7_to_shortest(self) -> None:
         samples = _make_samples([("ATTACTCG", "TATAGCCT"), ("TCCGGAGAGG", "ATAGAGGC")])
         result = normalize_index_lengths(samples, strategy="trim")
-        assert result[0]["index"] == "ATTACTCG"   # already shortest (8)
-        assert result[1]["index"] == "TCCGGAGA"   # trimmed from 10 → 8
+        assert result[0]["index"] == "ATTACTCG"  # already shortest (8)
+        assert result[1]["index"] == "TCCGGAGA"  # trimmed from 10 → 8
 
     def test_trim_i5_to_shortest(self) -> None:
         samples = _make_samples([("ATTACTCG", "TATAGCCT"), ("TCCGGAGA", "ATAGAGGCTA")])
@@ -87,6 +89,7 @@ class TestNormalizePad:
 # V2-style key detection
 # ---------------------------------------------------------------------------
 
+
 class TestKeyDetection:
 
     def test_detects_v2_keys_automatically(self) -> None:
@@ -109,6 +112,7 @@ class TestKeyDetection:
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestEdgeCases:
 
@@ -157,7 +161,7 @@ class TestEdgeCases:
             {"sample_id": "S2", "index": None, "Index": "TCCGGAGAGG"},
         ]
         result = normalize_index_lengths(samples, strategy="trim")
-        # 'Index' was correctly detected — trimmed to 8
+        # 'Index' was correctly detected - trimmed to 8
         assert result[1]["Index"] == "TCCGGAGA"
         # 'index' key untouched (all None)
         assert result[0]["index"] is None

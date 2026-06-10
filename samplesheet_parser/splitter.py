@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 # Characters unsafe in filenames across Windows/macOS/Linux
 _UNSAFE_FILENAME_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f\s]+')
 
-# Raw record keys that are standard sample fields — not extra columns
+# Raw record keys that are standard sample fields - not extra columns
 _STANDARD_SAMPLE_KEYS: frozenset[str] = frozenset(
     {
         "lane",
@@ -236,7 +236,7 @@ class SampleSheetSplitter:
             groups.setdefault(key, []).append(record)
 
         if not groups:
-            result.warnings.append("No samples found in input sheet — no files written.")
+            result.warnings.append("No samples found in input sheet - no files written.")
             return result
 
         if unassigned_count:
@@ -289,7 +289,7 @@ class SampleSheetSplitter:
                 )
 
             if writer.sample_count == 0:
-                result.warnings.append(f"Group '{group_key}' produced no valid samples — skipping.")
+                result.warnings.append(f"Group '{group_key}' produced no valid samples - skipping.")
                 continue
 
             filename = f"{prefix}{_safe_filename(group_key)}{suffix}"

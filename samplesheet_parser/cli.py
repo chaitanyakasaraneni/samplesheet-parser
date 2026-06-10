@@ -6,9 +6,9 @@ Entry point: ``samplesheet`` (configured in ``pyproject.toml``).
 Commands
 --------
 info        Show a quick summary of a sample sheet.
-validate    Validate a sheet — exit 0 if clean, exit 1 if errors.
+validate    Validate a sheet - exit 0 if clean, exit 1 if errors.
 convert     Convert between V1 and V2 formats.
-diff        Diff two sheets — exit 1 if changes detected.
+diff        Diff two sheets - exit 1 if changes detected.
 merge       Merge multiple project sheets into one combined sheet.
 split       Split a combined sheet into per-project or per-lane files.
 filter      Extract a subset of samples by project, lane, or sample ID.
@@ -99,7 +99,6 @@ if _TYPER_AVAILABLE:
                 help="Show version and exit.",
                 callback=_version_callback,
                 is_eager=True,
-                is_flag=True,
             ),
         ] = False,
     ) -> None:
@@ -179,6 +178,7 @@ if _TYPER_AVAILABLE:
         """
         from samplesheet_parser.factory import SampleSheetFactory
         from samplesheet_parser.parsers.v1 import SampleSheetV1
+        from samplesheet_parser.parsers.v2 import SampleSheetV2
 
         _validate_fmt(fmt)
         if not path.exists():
@@ -201,10 +201,12 @@ if _TYPER_AVAILABLE:
         adapters: list[str] = getattr(sheet, "adapters", []) or []
         experiment_name: str | None = getattr(sheet, "experiment_name", None)
 
+        read_lengths: list[str] = []
+        instrument: str | None = None
         if isinstance(sheet, SampleSheetV1):
             read_lengths = [str(r) for r in (sheet.read_lengths or [])]
             instrument = sheet.instrument_type
-        else:
+        elif isinstance(sheet, SampleSheetV2):
             reads_dict = sheet.reads or {}
             read_lengths = [
                 str(reads_dict[k]) for k in ("Read1Cycles", "Read2Cycles") if k in reads_dict
@@ -720,7 +722,7 @@ if _TYPER_AVAILABLE:
     ) -> None:
         """Extract a subset of samples from a sheet by project, lane, or sample ID.
 
-        Multiple criteria are ANDed — a sample must match all provided
+        Multiple criteria are ANDed - a sample must match all provided
         criteria.  ``--sample-id`` supports glob patterns (e.g. ``'CTRL_*'``).
 
         Exits 0 if at least one sample matched.

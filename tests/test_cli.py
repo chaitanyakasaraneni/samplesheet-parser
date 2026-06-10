@@ -149,7 +149,7 @@ Lane,Sample_ID,Index,Index2,Sample_Project
 1,SampleC2,TAAGTTGGGT,TGGAACGCTA,ProjectC
 """
 
-# V1 sheet with same samples as _V1_A but SampleA1 has a different index —
+# V1 sheet with same samples as _V1_A but SampleA1 has a different index -
 # used to trigger sample_changes in diff text output (lines 301-305)
 _V1_A_FIELD_CHANGED = """\
 [Header]
@@ -173,7 +173,7 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 1,SampleA2,SampleA2,D702,TCCGGAGA,D502,ATAGAGGC,ProjectA
 """
 
-# V1 sheet with different samples/indexes from _V1_A — used to trigger
+# V1 sheet with different samples/indexes from _V1_A - used to trigger
 # samples_added / samples_removed / sample_changes in diff text output
 _V1_A_MODIFIED = """\
 [Header]
@@ -446,7 +446,7 @@ class TestCLIValidate:
         assert data["version"] == "V2"
 
     def test_validate_does_not_create_backup_file(self, tmp_path: Path) -> None:
-        """validate must be read-only — clean=False ensures no .backup is created."""
+        """validate must be read-only - clean=False ensures no .backup is created."""
         p = _write(tmp_path, "sheet.csv", _V1_A)
         result = runner.invoke(app, ["validate", str(p)])
         assert result.exit_code == 0
@@ -890,7 +890,7 @@ class TestCLIMerge:
 
 
 # ---------------------------------------------------------------------------
-# _validate_fmt — unknown format exits 2 on all commands that accept --format
+# _validate_fmt - unknown format exits 2 on all commands that accept --format
 # ---------------------------------------------------------------------------
 
 
@@ -972,7 +972,7 @@ Lane,Sample_ID,Index
 
 
 # ---------------------------------------------------------------------------
-# CLI — split
+# CLI - split
 # ---------------------------------------------------------------------------
 
 
@@ -1073,7 +1073,7 @@ class TestCLISplit:
 
 
 # ---------------------------------------------------------------------------
-# CLI — filter
+# CLI - filter
 # ---------------------------------------------------------------------------
 
 

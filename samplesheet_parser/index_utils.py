@@ -53,13 +53,13 @@ def normalize_index_lengths(
     Parameters
     ----------
     samples:
-        Output of ``sheet.samples()``.  Not modified in place — the
+        Output of ``sheet.samples()``.  Not modified in place - the
         function returns new dicts with the index values replaced.
     strategy:
-        ``"trim"`` — trim all indexes to the length of the shortest
+        ``"trim"`` - trim all indexes to the length of the shortest
         sequence in *samples* (default).
 
-        ``"pad"``  — pad all indexes to the length of the longest
+        ``"pad"``  - pad all indexes to the length of the longest
         sequence using ``"N"`` wildcard characters.
     index1_key:
         Override the dict key for the primary index (I7).  Auto-detected
