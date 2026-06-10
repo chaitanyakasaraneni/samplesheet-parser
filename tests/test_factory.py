@@ -131,3 +131,41 @@ class TestFactoryRepr:
         r = repr(factory)
         assert "SampleSheetV2" in r
         assert "V2" in r
+
+
+class TestCustomRegistration:
+    """The class-level detector registry used to add third-party parsers."""
+
+    def teardown_method(self):
+        # The registry is process-global; reset it so registrations made here
+        # do not leak into other tests.
+        SampleSheetFactory.clear_registry()
+
+    def test_registered_detector_selects_its_parser(self, v1_minimal):
+        # A custom detector that always matches takes precedence over the
+        # built-in V1/V2 detection, even on a file that is otherwise V1.
+        SampleSheetFactory.register(lambda _p: True, SampleSheetV2, SampleSheetVersion.V2)
+        factory = SampleSheetFactory()
+        sheet = factory.create_parser(v1_minimal)
+        assert factory.version == SampleSheetVersion.V2
+        assert isinstance(sheet, SampleSheetV2)
+
+    def test_failing_detector_is_skipped(self, v1_minimal):
+        # A detector that raises is logged and skipped, so detection falls
+        # through to the built-in logic (v1_minimal is a V1 sheet).
+        def _boom(_path):
+            raise RuntimeError("detector blew up")
+
+        SampleSheetFactory.register(_boom, SampleSheetV2, SampleSheetVersion.V2)
+        factory = SampleSheetFactory()
+        sheet = factory.create_parser(v1_minimal)
+        assert factory.version == SampleSheetVersion.V1
+        assert isinstance(sheet, SampleSheetV1)
+
+    def test_clear_registry_removes_detectors(self, v1_minimal):
+        SampleSheetFactory.register(lambda _p: True, SampleSheetV2, SampleSheetVersion.V2)
+        SampleSheetFactory.clear_registry()
+        factory = SampleSheetFactory()
+        sheet = factory.create_parser(v1_minimal)
+        assert factory.version == SampleSheetVersion.V1
+        assert isinstance(sheet, SampleSheetV1)

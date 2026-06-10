@@ -220,10 +220,12 @@ class SampleSheetValidator:
     * **MISSING_INDEX2**       - Sheet has an ``Index2`` / ``index2`` column but
                                  one or more samples have it empty.
     * **DUPLICATE_SAMPLE_ID**  - ``Sample_ID`` appears more than once per lane.
-    * **INDEX_DISTANCE_TOO_LOW** - Two indexes in the same lane have a Hamming
-                                 distance below :data:`MIN_HAMMING_DISTANCE`
-                                 (default 3), risking demultiplexing bleed-through
-                                 (warning only).
+    * **INDEX_DISTANCE_TOO_LOW** - Two samples in the same lane have a combined
+                                 index distance (I7 plus I5 mismatches, with N
+                                 treated as a wildcard) below
+                                 :data:`MIN_HAMMING_DISTANCE` (default 3),
+                                 risking demultiplexing bleed-through
+                                 (warning only). See :meth:`_check_index_distances`.
     * **NO_ADAPTERS**          - ``[Settings]`` / ``[BCLConvert_Settings]`` has
                                  no adapter sequences (warning only).
     * **ADAPTER_MISMATCH**     - Adapter does not match any known Illumina
