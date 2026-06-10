@@ -1,4 +1,4 @@
-"""Tests for SampleSheetFactory — format detection and parser delegation."""
+"""Tests for SampleSheetFactory - format detection and parser delegation."""
 
 import pytest
 
@@ -30,13 +30,29 @@ class TestFormatDetection:
     def test_defaults_to_v1_when_no_indicators(self, tmp_path):
         """Sheet with no version markers → defaults to V1."""
         p = tmp_path / "ambiguous.csv"
-        p.write_text(
-            "[Header]\nExperiment Name,Test\n\n"
-            "[Data]\nSample_ID,index\nS1,ATCACG\n"
-        )
+        p.write_text("[Header]\nExperiment Name,Test\n\n" "[Data]\nSample_ID,index\nS1,ATCACG\n")
         factory = SampleSheetFactory()
         factory.create_parser(str(p))
         assert factory.version == SampleSheetVersion.V1
+
+    def test_detects_v2_when_header_lacks_version_marker(self, tmp_path):
+        """A [Header] without FileFormatVersion, followed by [Reads] and then
+        the BCLConvert sections, is still detected as V2.
+
+        This is the Phase 2 fallback: the BCLConvert sections appear after an
+        intervening [Reads] section, so detection must scan the whole file,
+        not just the lines up to the first section after [Header].
+        """
+        p = tmp_path / "header_no_marker.csv"
+        p.write_text(
+            "[Header]\nRunName,Test\n\n"
+            "[Reads]\nRead1Cycles,151\nRead2Cycles,151\n\n"
+            "[BCLConvert_Settings]\nAdapterRead1,CTGTCTCTTATACACATCT\n\n"
+            "[BCLConvert_Data]\nLane,Sample_ID,Index\n1,S1,ATTACTCG\n"
+        )
+        factory = SampleSheetFactory()
+        factory.create_parser(str(p))
+        assert factory.version == SampleSheetVersion.V2
 
     def test_raises_file_not_found(self, tmp_path):
         factory = SampleSheetFactory()

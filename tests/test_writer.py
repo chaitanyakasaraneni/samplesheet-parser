@@ -29,6 +29,7 @@ from samplesheet_parser.writer import SampleSheetWriter
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _write_fixture(tmp_path: Path, name: str, content: str) -> Path:
     p = tmp_path / name
     p.write_text(textwrap.dedent(content).lstrip())
@@ -37,6 +38,7 @@ def _write_fixture(tmp_path: Path, name: str, content: str) -> Path:
 
 def _parse(path: Path):
     from samplesheet_parser.factory import SampleSheetFactory
+
     return SampleSheetFactory().create_parser(path, parse=True, clean=False)
 
 
@@ -68,8 +70,9 @@ def _writer_v1() -> SampleSheetWriter:
 
 
 # ---------------------------------------------------------------------------
-# V2 — from scratch
+# V2 - from scratch
 # ---------------------------------------------------------------------------
+
 
 class TestWriteV2FromScratch:
     def test_write_creates_file(self, tmp_path):
@@ -192,8 +195,9 @@ class TestWriteV2FromScratch:
 
 
 # ---------------------------------------------------------------------------
-# V1 — from scratch
+# V1 - from scratch
 # ---------------------------------------------------------------------------
+
 
 class TestWriteV1FromScratch:
     def test_write_creates_file(self, tmp_path):
@@ -274,7 +278,7 @@ class TestWriteV1FromScratch:
 
     def test_default_workflow_written(self, tmp_path):
         w = SampleSheetWriter(version=SampleSheetVersion.V1)
-        w.set_header(run_name="Run")   # no workflow set
+        w.set_header(run_name="Run")  # no workflow set
         w.set_reads(read1=76)
         w.set_adapter("CTGTCTCTTATACACATCT")
         w.add_sample("S1", index="ATTACTCG")
@@ -285,6 +289,7 @@ class TestWriteV1FromScratch:
 # ---------------------------------------------------------------------------
 # add_sample / remove_sample / update_sample
 # ---------------------------------------------------------------------------
+
 
 class TestSampleManagement:
     def test_add_sample_increments_count(self):
@@ -371,8 +376,9 @@ class TestSampleManagement:
 
 
 # ---------------------------------------------------------------------------
-# CSV safety — _validate_field
+# CSV safety - _validate_field
 # ---------------------------------------------------------------------------
+
 
 class TestCSVSafety:
     def test_comma_in_sample_id_raises(self):
@@ -423,8 +429,9 @@ class TestCSVSafety:
 
 
 # ---------------------------------------------------------------------------
-# CSV safety — set_header / set_adapter / set_setting / update_sample
+# CSV safety - set_header / set_adapter / set_setting / update_sample
 # ---------------------------------------------------------------------------
+
 
 class TestCSVSafetyConfiguration:
     def test_comma_in_run_name_raises(self):
@@ -495,6 +502,7 @@ class TestCSVSafetyConfiguration:
 # Extra columns
 # ---------------------------------------------------------------------------
 
+
 class TestExtraColumns:
     def test_extra_column_in_header(self, tmp_path):
         w = SampleSheetWriter(version=SampleSheetVersion.V2)
@@ -523,7 +531,7 @@ class TestExtraColumns:
         content = w.to_string()
         # S2 row should have an empty trailing field
         lines = content.splitlines()
-        data_lines = lines[lines.index("[BCLConvert_Data]") + 2:]
+        data_lines = lines[lines.index("[BCLConvert_Data]") + 2 :]
         s2_line = next(line for line in data_lines if line.startswith("1,S2,"))
         assert s2_line.endswith(",")
 
@@ -531,6 +539,7 @@ class TestExtraColumns:
 # ---------------------------------------------------------------------------
 # write() validation
 # ---------------------------------------------------------------------------
+
 
 class TestValidationOnWrite:
     def test_empty_sheet_raises(self, tmp_path):
@@ -566,8 +575,9 @@ class TestValidationOnWrite:
 
 
 # ---------------------------------------------------------------------------
-# from_sheet() — V2 round-trip
+# from_sheet() - V2 round-trip
 # ---------------------------------------------------------------------------
+
 
 class TestFromSheetV2:
     def test_round_trip_sample_count(self, tmp_path):
@@ -629,8 +639,9 @@ class TestFromSheetV2:
 
 
 # ---------------------------------------------------------------------------
-# from_sheet() — V1 round-trip
+# from_sheet() - V1 round-trip
 # ---------------------------------------------------------------------------
+
 
 class TestFromSheetV1:
     def test_round_trip_sample_count(self, tmp_path):
@@ -664,6 +675,7 @@ class TestFromSheetV1:
 # Cross-format: from_sheet V1 → write V2
 # ---------------------------------------------------------------------------
 
+
 class TestCrossFormatWrite:
     def test_v1_to_v2_via_writer(self, tmp_path):
         src = tmp_path / "v1.csv"
@@ -674,6 +686,7 @@ class TestCrossFormatWrite:
         writer2.write(out, validate=False)
         parsed = _parse(out)
         from samplesheet_parser.parsers.v2 import SampleSheetV2
+
         assert isinstance(parsed, SampleSheetV2)
 
     def test_v1_to_v2_sample_ids_preserved(self, tmp_path):
@@ -695,12 +708,14 @@ class TestCrossFormatWrite:
         writer2.write(out, validate=False)
         parsed = _parse(out)
         from samplesheet_parser.parsers.v1 import SampleSheetV1
+
         assert isinstance(parsed, SampleSheetV1)
 
 
 # ---------------------------------------------------------------------------
 # Coverage gap tests
 # ---------------------------------------------------------------------------
+
 
 class TestWriterV2OptionalHeaderFields:
 

@@ -2,9 +2,9 @@
 Format-detection factory for Illumina sample sheets.
 
 The factory inspects the ``[Header]`` section and section names of a
-``SampleSheet.csv`` to select the correct parser — :class:`SampleSheetV1`
+``SampleSheet.csv`` to select the correct parser - :class:`SampleSheetV1`
 for classic IEM / bcl2fastq files and :class:`SampleSheetV2` for
-BCLConvert files — without requiring the caller to know the format
+BCLConvert files - without requiring the caller to know the format
 upfront.
 
 Detection logic
@@ -65,7 +65,7 @@ class SampleSheetFactory:
 
     Parameters
     ----------
-    None — the factory is stateless until :meth:`create_parser` is called.
+    None - the factory is stateless until :meth:`create_parser` is called.
 
     Examples
     --------
@@ -76,6 +76,10 @@ class SampleSheetFactory:
     """
 
     # Class-level registry: (detector_fn, parser_class, version) tuples, LIFO.
+    # This is process-global shared state: registering a parser affects every
+    # SampleSheetFactory instance in the process, and registration is not
+    # synchronised, so register custom parsers at import or startup rather than
+    # concurrently from worker threads. Call clear_registry() to reset it.
     _registry: list[tuple[Callable[[Path], bool], type[Any], SampleSheetVersion]] = []
 
     def __init__(self) -> None:
@@ -96,7 +100,7 @@ class SampleSheetFactory:
         """Register a custom format detector and parser.
 
         Registered detectors are tried before the built-in V1/V2 detection,
-        in LIFO order — the most recently registered detector wins when
+        in LIFO order - the most recently registered detector wins when
         multiple detectors match.
 
         Parameters
@@ -135,9 +139,9 @@ class SampleSheetFactory:
         """Detect the sample sheet format and return the appropriate parser.
 
         The returned parser shares the same interface:
-        - :meth:`parse` — load and parse all sections
-        - :meth:`samples` — return a list of sample records
-        - :meth:`index_type` — return ``"dual"``, ``"single"``, or ``"none"``
+        - :meth:`parse` - load and parse all sections
+        - :meth:`samples` - return a list of sample records
+        - :meth:`index_type` - return ``"dual"``, ``"single"``, or ``"none"``
 
         Parameters
         ----------
@@ -176,7 +180,7 @@ class SampleSheetFactory:
             try:
                 if detector(path):
                     logger.info(
-                        f"Custom detector matched — using {parser_class.__name__!r} "
+                        f"Custom detector matched - using {parser_class.__name__!r} "
                         f"(version={ver.value!r})"
                     )
                     self.version = ver
@@ -184,17 +188,17 @@ class SampleSheetFactory:
                     self.parser = parser
                     return parser
             except Exception as exc:
-                logger.debug(f"Custom detector {detector!r} raised {exc!r} for {path} — skipping.")
+                logger.debug(f"Custom detector {detector!r} raised {exc!r} for {path} - skipping.")
 
         # Built-in V1/V2 detection.
         detected = self._detect_version(path)
         self.version = detected
 
         if detected == SampleSheetVersion.V2:
-            logger.info("Detected BCLConvert V2 format — using SampleSheetV2")
+            logger.info("Detected BCLConvert V2 format - using SampleSheetV2")
             parser = SampleSheetV2(path, **kwargs)
         else:
-            logger.info("Detected IEM V1 format — using SampleSheetV1")
+            logger.info("Detected IEM V1 format - using SampleSheetV1")
             parser = SampleSheetV1(path, **kwargs)
 
         self.parser = parser
@@ -237,10 +241,14 @@ class SampleSheetFactory:
     def _detect_version(self, path: Path) -> SampleSheetVersion:
         """Inspect the file and return the appropriate SampleSheetVersion.
 
-        Reads only as much of the file as needed:
+        Detection runs in three phases:
         1. Scan [Header] for FileFormatVersion / IEMFileVersion.
-        2. If undetermined, scan the full file for BCLConvert section names.
+        2. If undetermined, scan the whole file for BCLConvert section names.
         3. Default to V1.
+
+        The full file is read once up front. Sample sheets are small (a few
+        KB), so this is cheap, and it guarantees Phase 2 sees BCLConvert
+        sections that appear after intervening sections such as [Reads].
 
         Parameters
         ----------
@@ -252,9 +260,10 @@ class SampleSheetFactory:
         SampleSheetVersion
             Detected version enum value.
         """
-        # --- Phase 1: check [Header] section only ----------------------
-        # Read lines until we leave the [Header] section (hit a new section
-        # or EOF). Avoids loading the entire file for the common case.
+        # --- Phase 1: collect [Header] lines and the full file content ---
+        # header_lines collects only lines inside the [Header] section.
+        # full_content accumulates every line so Phase 2 can scan the whole
+        # file, not just the part read before the header ends.
         header_lines: list[str] = []
         full_content: list[str] = []
 
@@ -269,8 +278,9 @@ class SampleSheetFactory:
                     continue
 
                 if stripped.startswith("[") and in_header:
-                    # Leaving the header section
-                    break
+                    # Left the header section; keep reading for Phase 2.
+                    in_header = False
+                    continue
 
                 if in_header and stripped:
                     header_lines.append(stripped)
@@ -285,14 +295,14 @@ class SampleSheetFactory:
                 return SampleSheetVersion.V1
 
         # --- Phase 2: scan for BCLConvert section names ----------------
-        # Use the already-read content — no second file open needed.
+        # Use the already-read content - no second file open needed.
         content = "".join(full_content)
         if "[BCLConvert_Settings]" in content or "[BCLConvert_Data]" in content:
             logger.debug("Discriminator: BCLConvert section names → V2")
             return SampleSheetVersion.V2
 
         # --- Phase 3: default to V1 ------------------------------------
-        logger.debug("No discriminator found — defaulting to V1")
+        logger.debug("No discriminator found - defaulting to V1")
         return SampleSheetVersion.V1
 
     # ------------------------------------------------------------------

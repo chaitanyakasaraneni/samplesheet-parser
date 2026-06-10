@@ -110,17 +110,17 @@ class MergeResult:
     def add_conflict(self, code: str, message: str, **context: Any) -> None:
         self.has_conflicts = True
         self.conflicts.append(MergeConflict("error", code, message, dict(context)))
-        logger.error(f"Merge conflict — {code}: {message}")
+        logger.error(f"Merge conflict - {code}: {message}")
 
     def add_warning(self, code: str, message: str, **context: Any) -> None:
         self.warnings.append(MergeConflict("warning", code, message, dict(context)))
-        logger.warning(f"Merge warning — {code}: {message}")
+        logger.warning(f"Merge warning - {code}: {message}")
 
     def summary(self) -> str:
         """Return a human-readable one-line summary."""
         status = "FAIL" if self.has_conflicts else "OK"
         return (
-            f"{status} — {len(self.conflicts)} conflict(s), "
+            f"{status} - {len(self.conflicts)} conflict(s), "
             f"{len(self.warnings)} warning(s), "
             f"{self.sample_count} sample(s) merged"
         )
@@ -137,7 +137,7 @@ class MergeResult:
 _PRE_MERGE_CONFLICT_CODES: frozenset[str] = frozenset(
     {
         "INDEX_COLLISION",  # covered by _check_index_collisions
-        "DUPLICATE_INDEX",  # same root cause — validator sees result of collision
+        "DUPLICATE_INDEX",  # same root cause - validator sees result of collision
     }
 )
 
@@ -158,15 +158,15 @@ class SampleSheetMerger:
 
     Checks performed at merge time
     --------------------------------
-    * **INDEX_COLLISION**       — Same lane + index (or index pair) appears
+    * **INDEX_COLLISION**       - Same lane + index (or index pair) appears
                                   in more than one input sheet → error.
-    * **INDEX_DISTANCE_TOO_LOW** — Two indexes across sheets in the same lane
+    * **INDEX_DISTANCE_TOO_LOW** - Two indexes across sheets in the same lane
                                   have Hamming distance < 3 → warning.
-    * **READ_LENGTH_CONFLICT**  — Input sheets specify different read lengths
+    * **READ_LENGTH_CONFLICT**  - Input sheets specify different read lengths
                                   → error.
-    * **ADAPTER_CONFLICT**      — Input sheets specify different adapter
+    * **ADAPTER_CONFLICT**      - Input sheets specify different adapter
                                   sequences → warning.
-    * **MIXED_FORMAT**          — Input sheets are a mix of V1 and V2; all
+    * **MIXED_FORMAT**          - Input sheets are a mix of V1 and V2; all
                                   are auto-converted to the target format →
                                   warning (not an error).
 
@@ -189,7 +189,7 @@ class SampleSheetMerger:
     >>> merger.add("ProjectB/SampleSheet.csv")
     >>> result = merger.merge("combined.csv")
     >>> print(result.summary())
-    OK — 0 conflict(s), 1 warning(s), 48 samples merged
+    OK - 0 conflict(s), 1 warning(s), 48 samples merged
     """
 
     def __init__(
@@ -266,7 +266,7 @@ class SampleSheetMerger:
             two sheets are registered.
         """
         if not self._paths:
-            raise ValueError("No input sheets registered — call add() first.")
+            raise ValueError("No input sheets registered - call add() first.")
         if len(self._paths) < 2:
             raise ValueError(
                 "At least two input sheets are required for a merge. "
@@ -289,7 +289,7 @@ class SampleSheetMerger:
         # ── 3. Abort early if hard conflicts found ───────────────────────
         if result.has_conflicts and abort_on_conflicts:
             logger.error(
-                f"Merge aborted — {len(result.conflicts)} conflict(s) found. "
+                f"Merge aborted - {len(result.conflicts)} conflict(s) found. "
                 "Fix errors before merging."
             )
             return result
@@ -311,7 +311,7 @@ class SampleSheetMerger:
         return result
 
     # ------------------------------------------------------------------
-    # Internal — parsing
+    # Internal - parsing
     # ------------------------------------------------------------------
 
     def _parse_all(
@@ -353,7 +353,7 @@ class SampleSheetMerger:
         return parsed
 
     # ------------------------------------------------------------------
-    # Internal — conflict checks
+    # Internal - conflict checks
     # ------------------------------------------------------------------
 
     def _check_read_lengths(
@@ -386,7 +386,7 @@ class SampleSheetMerger:
             key = ",".join(str(rl) for rl in lengths) if lengths else "<NO_READS>"
             if key not in length_map:
                 length_map[key] = (lengths, p)
-            # else: same key — no conflict, do nothing
+            # else: same key - no conflict, do nothing
 
         if len(length_map) > 1:
             detail = "; ".join(
@@ -440,8 +440,8 @@ class SampleSheetMerger:
         """Error if two sheets place the same index in the same lane.
 
         Uses ``sheet.records`` (raw per-row dicts) rather than
-        ``sheet.samples()`` so that multi-lane sheets — where the same
-        ``Sample_ID`` appears in multiple lanes — are not silently
+        ``sheet.samples()`` so that multi-lane sheets - where the same
+        ``Sample_ID`` appears in multiple lanes - are not silently
         de-duplicated before the collision check.  Falls back to
         ``sheet.samples()`` for any parser that doesn't expose ``.records``.
         """
@@ -459,7 +459,7 @@ class SampleSheetMerger:
                 sid = raw_sid or "?"
                 key = f"{idx1}+{idx2}" if idx2 else idx1
 
-                # Silently skip incomplete rows — _build_writer will emit
+                # Silently skip incomplete rows - _build_writer will emit
                 # INCOMPLETE_SAMPLE_RECORD for them; no collision warning here.
                 # Mirror _build_writer()'s required-field criteria.
                 if not idx1 or not raw_sid:
@@ -493,7 +493,7 @@ class SampleSheetMerger:
         """Warn if indexes from different sheets are too similar (Hamming).
 
         Uses ``sheet.records`` (raw per-row dicts) for the same reason as
-        :meth:`_check_index_collisions` — to avoid losing multi-lane rows
+        :meth:`_check_index_collisions` - to avoid losing multi-lane rows
         that ``sheet.samples()`` de-duplicates by ``Sample_ID``.
         """
         # Build per-lane list of (sample_id, combined_index, source_path)
@@ -520,7 +520,7 @@ class SampleSheetMerger:
                     sid_a, combined_a, path_a = entries[i]
                     sid_b, combined_b, path_b = entries[j]
 
-                    # Skip pairs from the same sheet — intra-sheet distance
+                    # Skip pairs from the same sheet - intra-sheet distance
                     # is already checked by SampleSheetValidator
                     if path_a == path_b:
                         continue
@@ -546,7 +546,7 @@ class SampleSheetMerger:
                         )
 
     # ------------------------------------------------------------------
-    # Internal — building the merged writer
+    # Internal - building the merged writer
     # ------------------------------------------------------------------
 
     def _build_writer(
@@ -590,11 +590,11 @@ class SampleSheetMerger:
         writer = SampleSheetWriter.from_sheet(primary, version=self.target_version)
 
         # Keys that belong in [Header]/[BCLConvert_Settings] or are handled
-        # explicitly below — must not leak into [Data]/[BCLConvert_Data] as
+        # explicitly below - must not leak into [Data]/[BCLConvert_Data] as
         # extra per-sample columns.
         _STANDARD_SAMPLE_KEYS: frozenset[str] = frozenset(
             {
-                # core sample fields (lowercase — V1/V2 shared interface)
+                # core sample fields (lowercase - V1/V2 shared interface)
                 "sample_id",
                 "sample_name",
                 "lane",
@@ -631,8 +631,8 @@ class SampleSheetMerger:
         )
 
         # Add samples from all other sheets.
-        # Use per-row records (not samples()) so multi-lane sheets — where the
-        # same Sample_ID appears in multiple lanes — are not de-duplicated
+        # Use per-row records (not samples()) so multi-lane sheets - where the
+        # same Sample_ID appears in multiple lanes - are not de-duplicated
         # before being written to the merged output.
         for p, sheet in parsed[1:]:
             logger.debug(f"Adding samples from {p.name}")

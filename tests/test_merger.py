@@ -189,6 +189,7 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 # Happy path
 # ---------------------------------------------------------------------------
 
+
 class TestMergerHappyPath:
 
     def test_two_clean_v1_sheets_no_conflicts(self, tmp_path: Path) -> None:
@@ -261,6 +262,7 @@ class TestMergerHappyPath:
 # Mixed V1 / V2 input
 # ---------------------------------------------------------------------------
 
+
 class TestMergerMixedFormat:
 
     def test_mixed_input_produces_mixed_format_warning(self, tmp_path: Path) -> None:
@@ -280,8 +282,8 @@ class TestMergerMixedFormat:
         assert result.output_path.exists()
 
     def test_mixed_input_sample_count(self, tmp_path: Path) -> None:
-        a = _write(tmp_path, "a.csv", _V1_A)   # 2 samples
-        c = _write(tmp_path, "c.csv", _V2_C)   # 2 samples
+        a = _write(tmp_path, "a.csv", _V1_A)  # 2 samples
+        c = _write(tmp_path, "c.csv", _V2_C)  # 2 samples
         result = SampleSheetMerger().add(a).add(c).merge(tmp_path / "out.csv")
 
         assert result.sample_count == 4
@@ -291,6 +293,7 @@ class TestMergerMixedFormat:
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "out.csv"
         from samplesheet_parser.enums import SampleSheetVersion
+
         SampleSheetMerger(target_version=SampleSheetVersion.V2).add(a).add(b).merge(out)
 
         assert "FileFormatVersion" in out.read_text()
@@ -300,14 +303,16 @@ class TestMergerMixedFormat:
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "out.csv"
         from samplesheet_parser.enums import SampleSheetVersion
+
         SampleSheetMerger(target_version=SampleSheetVersion.V1).add(a).add(b).merge(out)
 
         assert "IEMFileVersion" in out.read_text()
 
 
 # ---------------------------------------------------------------------------
-# Conflict detection — INDEX_COLLISION
+# Conflict detection - INDEX_COLLISION
 # ---------------------------------------------------------------------------
+
 
 class TestMergerIndexCollision:
 
@@ -377,14 +382,15 @@ class TestMergerIndexCollision:
 
 
 # ---------------------------------------------------------------------------
-# Conflict detection — READ_LENGTH_CONFLICT
+# Conflict detection - READ_LENGTH_CONFLICT
 # ---------------------------------------------------------------------------
+
 
 class TestMergerReadLengthConflict:
 
     def test_different_read_lengths_is_conflict(self, tmp_path: Path) -> None:
-        a = _write(tmp_path, "a.csv", _V1_A)              # 151/151
-        b = _write(tmp_path, "b.csv", _V1_B_DIFF_READ)   # 76/76
+        a = _write(tmp_path, "a.csv", _V1_A)  # 151/151
+        b = _write(tmp_path, "b.csv", _V1_B_DIFF_READ)  # 76/76
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
 
         assert result.has_conflicts
@@ -401,8 +407,9 @@ class TestMergerReadLengthConflict:
 
 
 # ---------------------------------------------------------------------------
-# Warning detection — ADAPTER_CONFLICT
+# Warning detection - ADAPTER_CONFLICT
 # ---------------------------------------------------------------------------
+
 
 class TestMergerAdapterConflict:
 
@@ -435,6 +442,7 @@ class TestMergerAdapterConflict:
 # Usage errors
 # ---------------------------------------------------------------------------
 
+
 class TestMergerUsageErrors:
 
     def test_no_paths_raises_value_error(self, tmp_path: Path) -> None:
@@ -457,14 +465,13 @@ class TestMergerUsageErrors:
 
 
 # ---------------------------------------------------------------------------
-# Warning detection — INDEX_DISTANCE_TOO_LOW (cross-sheet Hamming)
+# Warning detection - INDEX_DISTANCE_TOO_LOW (cross-sheet Hamming)
 # ---------------------------------------------------------------------------
+
 
 class TestMergerIndexDistance:
 
-    def test_close_indexes_across_sheets_produce_distance_warning(
-        self, tmp_path: Path
-    ) -> None:
+    def test_close_indexes_across_sheets_produce_distance_warning(self, tmp_path: Path) -> None:
         """Indexes within Hamming distance < 3 across sheets → warning."""
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B_CLOSE_INDEX)
@@ -474,7 +481,7 @@ class TestMergerIndexDistance:
         assert "INDEX_DISTANCE_TOO_LOW" in codes
 
     def test_distance_warning_is_not_a_hard_error(self, tmp_path: Path) -> None:
-        """INDEX_DISTANCE_TOO_LOW is a warning — merge should still succeed."""
+        """INDEX_DISTANCE_TOO_LOW is a warning - merge should still succeed."""
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B_CLOSE_INDEX)
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
@@ -496,7 +503,7 @@ class TestMergerIndexDistance:
     def test_well_separated_indexes_no_distance_warning(self, tmp_path: Path) -> None:
         """Sheets with well-separated indexes should not trigger the warning."""
         a = _write(tmp_path, "a.csv", _V1_A)
-        b = _write(tmp_path, "b.csv", _V1_B)   # indexes are far apart
+        b = _write(tmp_path, "b.csv", _V1_B)  # indexes are far apart
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
 
         codes = [w.code for w in result.warnings]
@@ -504,8 +511,9 @@ class TestMergerIndexDistance:
 
 
 # ---------------------------------------------------------------------------
-# Read-only parsing — clean=False on source files
+# Read-only parsing - clean=False on source files
 # ---------------------------------------------------------------------------
+
 
 class TestMergerReadOnlyParsing:
 
@@ -534,7 +542,7 @@ class TestMergerReadOnlyParsing:
 
 
 # ---------------------------------------------------------------------------
-# INCOMPLETE_SAMPLE_RECORD — structured warning for skipped samples
+# INCOMPLETE_SAMPLE_RECORD - structured warning for skipped samples
 # ---------------------------------------------------------------------------
 
 # A V1 sheet where one sample row is missing its Index column value
@@ -602,9 +610,7 @@ class TestMergerIncompleteRecord:
         assert "missing_fields" in w.context
         assert "Index" in w.context["missing_fields"]
 
-    def test_complete_samples_still_merged_when_one_row_incomplete(
-        self, tmp_path: Path
-    ) -> None:
+    def test_complete_samples_still_merged_when_one_row_incomplete(self, tmp_path: Path) -> None:
         """Valid samples from the same sheet must still appear in merged output."""
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_MISSING_INDEX_ROW)
@@ -619,14 +625,15 @@ class TestMergerIncompleteRecord:
 
 
 # ---------------------------------------------------------------------------
-# ADAPTER_CONFLICT — warning references primary sheet as the actual source
+# ADAPTER_CONFLICT - warning references primary sheet as the actual source
 # ---------------------------------------------------------------------------
+
 
 class TestMergerAdapterConflictMessage:
 
     def test_adapter_conflict_warning_names_primary_sheet(self, tmp_path: Path) -> None:
         """Warning message must reference parsed[0] (the sheet whose adapters are used)."""
-        a = _write(tmp_path, "a.csv", _V1_A)             # primary — adapters kept
+        a = _write(tmp_path, "a.csv", _V1_A)  # primary - adapters kept
         b = _write(tmp_path, "b.csv", _V1_B_DIFF_ADAPTER)
 
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
@@ -648,11 +655,11 @@ class TestMergerAdapterConflictMessage:
 
 
 # ---------------------------------------------------------------------------
-# Multi-lane collision detection — uses sheet.records not sheet.samples()
+# Multi-lane collision detection - uses sheet.records not sheet.samples()
 # ---------------------------------------------------------------------------
 
 # Two sheets where the SAME Sample_ID appears in multiple lanes with
-# different indexes — sheet.samples() would de-duplicate these to one row
+# different indexes - sheet.samples() would de-duplicate these to one row
 # and miss the cross-sheet collision in lane 2.
 _V1_MULTILANE_A = """\
 [Header]
@@ -675,7 +682,7 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 2,SampleA,SampleA,D702,CGATGTTT,D502,AAACATCG,ProjectA
 """
 
-# Sheet B uses the same index as sheet A lane-2 in lane 2 — collision
+# Sheet B uses the same index as sheet A lane-2 in lane 2 - collision
 _V1_MULTILANE_B = """\
 [Header]
 IEMFileVersion,5
@@ -706,31 +713,41 @@ class TestMergerMultiLaneRecords:
         a = _write(tmp_path, "a.csv", _V1_MULTILANE_A)
         b = _write(tmp_path, "b.csv", _V1_MULTILANE_B)
 
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv",
-            abort_on_conflicts=False,
+        result = (
+            SampleSheetMerger()
+            .add(a)
+            .add(b)
+            .merge(
+                tmp_path / "out.csv",
+                abort_on_conflicts=False,
+            )
         )
 
         codes = [c.code for c in result.conflicts]
         assert "INDEX_COLLISION" in codes
 
     def test_non_colliding_lane_does_not_error(self, tmp_path: Path) -> None:
-        """Lane 1 has distinct indexes — only lane 2 should collide."""
+        """Lane 1 has distinct indexes - only lane 2 should collide."""
         a = _write(tmp_path, "a.csv", _V1_MULTILANE_A)
         b = _write(tmp_path, "b.csv", _V1_MULTILANE_B)
 
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv",
-            abort_on_conflicts=False,
+        result = (
+            SampleSheetMerger()
+            .add(a)
+            .add(b)
+            .merge(
+                tmp_path / "out.csv",
+                abort_on_conflicts=False,
+            )
         )
-        # Exactly one collision (lane 2) — lane 1 is fine
+        # Exactly one collision (lane 2) - lane 1 is fine
         collisions = [c for c in result.conflicts if c.code == "INDEX_COLLISION"]
         assert len(collisions) == 1
         assert collisions[0].context.get("lane") in (2, "2")
 
 
 # ---------------------------------------------------------------------------
-# Primary sheet pre-scan — INCOMPLETE_SAMPLE_RECORD for primary records
+# Primary sheet pre-scan - INCOMPLETE_SAMPLE_RECORD for primary records
 # ---------------------------------------------------------------------------
 
 _V1_PRIMARY_MISSING_INDEX = """\
@@ -757,9 +774,7 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 
 class TestMergerPrimaryPreScan:
 
-    def test_incomplete_record_in_primary_sheet_emits_warning(
-        self, tmp_path: Path
-    ) -> None:
+    def test_incomplete_record_in_primary_sheet_emits_warning(self, tmp_path: Path) -> None:
         """A row in parsed[0] that is missing Index must produce
         INCOMPLETE_SAMPLE_RECORD, not be silently dropped."""
         a = _write(tmp_path, "a.csv", _V1_PRIMARY_MISSING_INDEX)
@@ -778,14 +793,10 @@ class TestMergerPrimaryPreScan:
 
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
 
-        w = next(
-            w for w in result.warnings if w.code == "INCOMPLETE_SAMPLE_RECORD"
-        )
+        w = next(w for w in result.warnings if w.code == "INCOMPLETE_SAMPLE_RECORD")
         assert w.context["sheet"] == str(a)
 
-    def test_valid_primary_records_still_appear_in_output(
-        self, tmp_path: Path
-    ) -> None:
+    def test_valid_primary_records_still_appear_in_output(self, tmp_path: Path) -> None:
         """SampleP1 (valid) must be in output; SampleP2 (no index) must not."""
         a = _write(tmp_path, "a.csv", _V1_PRIMARY_MISSING_INDEX)
         b = _write(tmp_path, "b.csv", _V1_B)
@@ -796,9 +807,7 @@ class TestMergerPrimaryPreScan:
         assert "SampleP1" in content
         assert "SampleP2" not in content
 
-    def test_merge_does_not_abort_due_to_incomplete_primary_record(
-        self, tmp_path: Path
-    ) -> None:
+    def test_merge_does_not_abort_due_to_incomplete_primary_record(self, tmp_path: Path) -> None:
         """An incomplete primary record is a warning, not a hard conflict."""
         a = _write(tmp_path, "a.csv", _V1_PRIMARY_MISSING_INDEX)
         b = _write(tmp_path, "b.csv", _V1_B)
@@ -810,7 +819,7 @@ class TestMergerPrimaryPreScan:
 
 
 # ---------------------------------------------------------------------------
-# Multi-lane secondary sheets — _build_writer must preserve all lane rows
+# Multi-lane secondary sheets - _build_writer must preserve all lane rows
 # ---------------------------------------------------------------------------
 
 # Sheet where SampleC appears in both lane 1 and lane 2 with different indexes
@@ -839,7 +848,7 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 class TestMergerSecondaryMultiLane:
 
     def test_both_lane_rows_appear_in_merged_output(self, tmp_path: Path) -> None:
-        """Secondary sheet with SampleC in lanes 1 and 2 — both rows must be
+        """Secondary sheet with SampleC in lanes 1 and 2 - both rows must be
         written.  If _build_writer uses sheet.samples() the second lane entry
         is de-duplicated and lost."""
         a = _write(tmp_path, "a.csv", _V1_A)
@@ -848,17 +857,18 @@ class TestMergerSecondaryMultiLane:
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
         content = (result.output_path or tmp_path / "out.csv").read_text()
 
-        # Both index values must appear — if only one lane was written, one
+        # Both index values must appear - if only one lane was written, one
         # of these assertions will fail.
-        assert "TAGGCATG" in content   # lane 1 index
-        assert "CTCTCTAC" in content   # lane 2 index
+        assert "TAGGCATG" in content  # lane 1 index
+        assert "CTCTCTAC" in content  # lane 2 index
 
     def test_sample_count_reflects_all_lane_rows(self, tmp_path: Path) -> None:
-        result = SampleSheetMerger().add(
-            _write(tmp_path, "a.csv", _V1_A)
-        ).add(
-            _write(tmp_path, "b.csv", _V1_MULTILANE_SECONDARY)
-        ).merge(tmp_path / "out.csv")
+        result = (
+            SampleSheetMerger()
+            .add(_write(tmp_path, "a.csv", _V1_A))
+            .add(_write(tmp_path, "b.csv", _V1_MULTILANE_SECONDARY))
+            .merge(tmp_path / "out.csv")
+        )
 
         # _V1_A has 2 samples; _V1_MULTILANE_SECONDARY contributes 2 rows
         # (same Sample_ID, different lanes). Total > 2 confirms no de-dup.
@@ -866,8 +876,9 @@ class TestMergerSecondaryMultiLane:
 
 
 # ---------------------------------------------------------------------------
-# _validate_merged — parse/validation exceptions become structured conflicts
+# _validate_merged - parse/validation exceptions become structured conflicts
 # ---------------------------------------------------------------------------
+
 
 class TestMergerValidateMergedExceptionHandling:
 
@@ -891,9 +902,7 @@ class TestMergerValidateMergedExceptionHandling:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
 
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv", validate=True
-        )
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv", validate=True)
 
         codes = [c.code for c in result.conflicts]
         assert "MERGE_VALIDATION_ERROR" in codes
@@ -912,16 +921,15 @@ class TestMergerValidateMergedExceptionHandling:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
 
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv", validate=True
-        )
+        result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv", validate=True)
 
         assert result.has_conflicts
 
 
 # ---------------------------------------------------------------------------
-# _check_read_lengths — fixed key order prevents false READ_LENGTH_CONFLICT
+# _check_read_lengths - fixed key order prevents false READ_LENGTH_CONFLICT
 # ---------------------------------------------------------------------------
+
 
 class TestMergerReadLengthKeyOrder:
 
@@ -939,7 +947,7 @@ class TestMergerReadLengthKeyOrder:
 
 
 # ---------------------------------------------------------------------------
-# Sample metadata preservation — Sample_Name/Description/Plate/Well from records
+# Sample metadata preservation - Sample_Name/Description/Plate/Well from records
 # ---------------------------------------------------------------------------
 
 _V1_WITH_METADATA = """\
@@ -971,12 +979,15 @@ class TestMergerMetadataPreservation:
     def test_sample_name_preserved_from_records(self, tmp_path: Path) -> None:
         """Sample_Name from sheet.records must appear in V1 merged output."""
         from samplesheet_parser.enums import SampleSheetVersion
+
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_WITH_METADATA)
 
         result = (
             SampleSheetMerger(target_version=SampleSheetVersion.V1)
-            .add(a).add(b).merge(tmp_path / "out.csv")
+            .add(a)
+            .add(b)
+            .merge(tmp_path / "out.csv")
         )
         content = (result.output_path or tmp_path / "out.csv").read_text()
 
@@ -984,12 +995,15 @@ class TestMergerMetadataPreservation:
 
     def test_description_preserved_from_records(self, tmp_path: Path) -> None:
         from samplesheet_parser.enums import SampleSheetVersion
+
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_WITH_METADATA)
 
         result = (
             SampleSheetMerger(target_version=SampleSheetVersion.V1)
-            .add(a).add(b).merge(tmp_path / "out.csv")
+            .add(a)
+            .add(b)
+            .merge(tmp_path / "out.csv")
         )
         content = (result.output_path or tmp_path / "out.csv").read_text()
 
@@ -997,12 +1011,15 @@ class TestMergerMetadataPreservation:
 
     def test_sample_plate_preserved_from_records(self, tmp_path: Path) -> None:
         from samplesheet_parser.enums import SampleSheetVersion
+
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_WITH_METADATA)
 
         result = (
             SampleSheetMerger(target_version=SampleSheetVersion.V1)
-            .add(a).add(b).merge(tmp_path / "out.csv")
+            .add(a)
+            .add(b)
+            .merge(tmp_path / "out.csv")
         )
         content = (result.output_path or tmp_path / "out.csv").read_text()
 
@@ -1010,7 +1027,7 @@ class TestMergerMetadataPreservation:
 
 
 # ---------------------------------------------------------------------------
-# _check_adapters — both-sheets guard (primary has no adapters → no warning)
+# _check_adapters - both-sheets guard (primary has no adapters → no warning)
 # ---------------------------------------------------------------------------
 
 _V1_NO_ADAPTER = """\
@@ -1035,9 +1052,9 @@ class TestMergerAdapterBothGuard:
 
     def test_no_conflict_when_primary_has_no_adapters(self, tmp_path: Path) -> None:
         """Primary sheet has no adapters; secondary has adapters.
-        Should NOT produce ADAPTER_CONFLICT — nothing to conflict against."""
-        a = _write(tmp_path, "a.csv", _V1_NO_ADAPTER)   # primary — no adapter
-        b = _write(tmp_path, "b.csv", _V1_B)             # secondary — has adapter
+        Should NOT produce ADAPTER_CONFLICT - nothing to conflict against."""
+        a = _write(tmp_path, "a.csv", _V1_NO_ADAPTER)  # primary - no adapter
+        b = _write(tmp_path, "b.csv", _V1_B)  # secondary - has adapter
 
         result = SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv")
 
@@ -1056,7 +1073,7 @@ class TestMergerAdapterBothGuard:
 
 
 # ---------------------------------------------------------------------------
-# _check_read_lengths — sentinel catches missing-reads vs present-reads
+# _check_read_lengths - sentinel catches missing-reads vs present-reads
 # ---------------------------------------------------------------------------
 
 _V1_NO_READS_SECTION = """\
@@ -1077,11 +1094,11 @@ class TestMergerReadLengthSentinel:
 
     def test_missing_reads_vs_present_reads_is_conflict(self, tmp_path: Path) -> None:
         """One sheet has [Reads] (151/151), other has none → READ_LENGTH_CONFLICT."""
-        a = _write(tmp_path, "a.csv", _V1_A)             # has [Reads] 151/151
+        a = _write(tmp_path, "a.csv", _V1_A)  # has [Reads] 151/151
         b = _write(tmp_path, "b.csv", _V1_NO_READS_SECTION)  # no [Reads]
 
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv", abort_on_conflicts=False
+        result = (
+            SampleSheetMerger().add(a).add(b).merge(tmp_path / "out.csv", abort_on_conflicts=False)
         )
 
         codes = [c.code for c in result.conflicts]
@@ -1102,11 +1119,12 @@ class TestMergerReadLengthSentinel:
 
 
 # ---------------------------------------------------------------------------
-# Coverage — branches missing from codecov report
+# Coverage - branches missing from codecov report
 # ---------------------------------------------------------------------------
 
+
 class TestMergerAllFilesFail:
-    """Line 247: if not parsed: return result — all inputs fail to parse."""
+    """Line 247: if not parsed: return result - all inputs fail to parse."""
 
     def test_all_parse_failures_returns_empty_result(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -1171,8 +1189,8 @@ class TestMergerAbortAfterPostMergeValidation:
         b = _write(tmp_path, "b.csv", _V1_B)
         out = tmp_path / "out.csv"
 
-        result = SampleSheetMerger().add(a).add(b).merge(
-            out, validate=True, abort_on_conflicts=True
+        result = (
+            SampleSheetMerger().add(a).add(b).merge(out, validate=True, abort_on_conflicts=True)
         )
 
         # Output must not be written because abort_on_conflicts=True
@@ -1193,8 +1211,11 @@ class TestMergerAbortAfterPostMergeValidation:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
 
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv", validate=True, abort_on_conflicts=True
+        result = (
+            SampleSheetMerger()
+            .add(a)
+            .add(b)
+            .merge(tmp_path / "out.csv", validate=True, abort_on_conflicts=True)
         )
 
         codes = [c.code for c in result.conflicts]
@@ -1254,8 +1275,11 @@ class TestMergerIncompleteRecords:
         """Lines 541-542: primary sheet record missing Sample_ID/Index gets a warning."""
         a = _write(tmp_path, "a.csv", _V1_WITH_INCOMPLETE_RECORD)
         b = _write(tmp_path, "b.csv", _V1_B)
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv", validate=False, abort_on_conflicts=False
+        result = (
+            SampleSheetMerger()
+            .add(a)
+            .add(b)
+            .merge(tmp_path / "out.csv", validate=False, abort_on_conflicts=False)
         )
         codes = [w.code for w in result.warnings]
         assert "INCOMPLETE_SAMPLE_RECORD" in codes
@@ -1264,8 +1288,11 @@ class TestMergerIncompleteRecords:
         """Lines 596-597: secondary sheet record missing Sample_ID/Index gets a warning."""
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_WITH_INCOMPLETE_SECONDARY)
-        result = SampleSheetMerger().add(a).add(b).merge(
-            tmp_path / "out.csv", validate=False, abort_on_conflicts=False
+        result = (
+            SampleSheetMerger()
+            .add(a)
+            .add(b)
+            .merge(tmp_path / "out.csv", validate=False, abort_on_conflicts=False)
         )
         codes = [w.code for w in result.warnings]
         assert "INCOMPLETE_SAMPLE_RECORD" in codes

@@ -163,7 +163,7 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Tests — split by project
+# Tests - split by project
 # ---------------------------------------------------------------------------
 
 
@@ -229,7 +229,7 @@ def test_split_by_project_v1_input(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — split by lane
+# Tests - split by lane
 # ---------------------------------------------------------------------------
 
 
@@ -258,7 +258,7 @@ def test_split_by_lane_each_file_contains_correct_samples(tmp_path: Path) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Tests — unassigned samples
+# Tests - unassigned samples
 # ---------------------------------------------------------------------------
 
 
@@ -282,7 +282,7 @@ def test_split_custom_unassigned_label(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — incomplete records
+# Tests - incomplete records
 # ---------------------------------------------------------------------------
 
 _V2_MISSING_INDEX = """\
@@ -351,7 +351,7 @@ def test_split_group_all_incomplete_skipped(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — empty input
+# Tests - empty input
 # ---------------------------------------------------------------------------
 
 
@@ -365,7 +365,7 @@ def test_split_empty_sheet_returns_warning_no_files(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — target version override
+# Tests - target version override
 # ---------------------------------------------------------------------------
 
 
@@ -383,7 +383,7 @@ def test_split_target_version_v1_from_v2_input(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — filename customisation
+# Tests - filename customisation
 # ---------------------------------------------------------------------------
 
 
@@ -407,7 +407,7 @@ def test_split_custom_suffix(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — output directory creation
+# Tests - output directory creation
 # ---------------------------------------------------------------------------
 
 
@@ -420,7 +420,7 @@ def test_split_creates_output_directory(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — SplitResult
+# Tests - SplitResult
 # ---------------------------------------------------------------------------
 
 
@@ -443,7 +443,7 @@ def test_split_result_source_version(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — error conditions
+# Tests - error conditions
 # ---------------------------------------------------------------------------
 
 
@@ -458,7 +458,7 @@ def test_split_invalid_by_raises_value_error() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — public import
+# Tests - public import
 # ---------------------------------------------------------------------------
 
 

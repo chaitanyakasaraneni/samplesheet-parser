@@ -30,11 +30,10 @@ jobs:
         run: ruff check samplesheet_parser/
 
       - name: Type check with mypy
-        run: mypy samplesheet_parser/ --ignore-missing-imports
-        continue-on-error: true
+        run: mypy samplesheet_parser/ --strict --ignore-missing-imports
 
       - name: Run tests
-        run: pytest tests/ -v --cov=samplesheet_parser --cov-report=xml
+        run: pytest tests/ -v -W error::DeprecationWarning --cov=samplesheet_parser --cov-report=xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

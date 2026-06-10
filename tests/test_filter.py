@@ -88,7 +88,7 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 
 
 # ---------------------------------------------------------------------------
-# Tests — filter by project
+# Tests - filter by project
 # ---------------------------------------------------------------------------
 
 
@@ -126,7 +126,7 @@ def test_filter_by_project_v1_input(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — filter by lane
+# Tests - filter by lane
 # ---------------------------------------------------------------------------
 
 
@@ -157,7 +157,7 @@ def test_filter_by_lane_excludes_other_lanes(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — filter by sample_id
+# Tests - filter by sample_id
 # ---------------------------------------------------------------------------
 
 
@@ -193,7 +193,7 @@ def test_filter_by_sample_id_glob_wildcard(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — multiple criteria (ANDed)
+# Tests - multiple criteria (ANDed)
 # ---------------------------------------------------------------------------
 
 
@@ -225,7 +225,7 @@ def test_filter_lane_and_sample_id(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — no matches
+# Tests - no matches
 # ---------------------------------------------------------------------------
 
 
@@ -248,7 +248,7 @@ def test_filter_no_match_summary_has_no_output(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — header/settings preservation
+# Tests - header/settings preservation
 # ---------------------------------------------------------------------------
 
 
@@ -266,7 +266,7 @@ def test_filter_preserves_header_and_settings(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — target version override
+# Tests - target version override
 # ---------------------------------------------------------------------------
 
 
@@ -283,7 +283,7 @@ def test_filter_target_version_v1_from_v2_input(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — FilterResult
+# Tests - FilterResult
 # ---------------------------------------------------------------------------
 
 
@@ -323,7 +323,7 @@ def test_filter_result_source_version(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — incomplete records that pass filter criteria
+# Tests - incomplete records that pass filter criteria
 # ---------------------------------------------------------------------------
 
 _V2_INCOMPLETE_MATCH = """\
@@ -354,7 +354,7 @@ def test_filter_incomplete_record_matching_project_skipped(tmp_path: Path) -> No
 
 
 # ---------------------------------------------------------------------------
-# Tests — error conditions
+# Tests - error conditions
 # ---------------------------------------------------------------------------
 
 
@@ -372,7 +372,7 @@ def test_filter_missing_input_raises_file_not_found(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests — public import
+# Tests - public import
 # ---------------------------------------------------------------------------
 
 

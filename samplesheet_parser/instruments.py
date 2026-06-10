@@ -1,8 +1,8 @@
 """
 Illumina instrument workflow classification and i5 orientation helpers.
 
-The two demultiplexers — ``bcl2fastq`` (V1 sheets) and ``BCLConvert``
-(V2 sheets) — disagree on the orientation of index 2 (i5) for some
+The two demultiplexers - ``bcl2fastq`` (V1 sheets) and ``BCLConvert``
+(V2 sheets) - disagree on the orientation of index 2 (i5) for some
 instruments:
 
 * **Workflow A** instruments read i5 in the *forward* orientation. Both
@@ -73,11 +73,11 @@ WORKFLOW_A_INSTRUMENTS: frozenset[str] = frozenset(
 # ``Instrument Type`` strings and V2 ``InstrumentPlatform`` values.
 WORKFLOW_B_INSTRUMENTS: frozenset[str] = frozenset(
     {
-        # NovaSeq X family — V2 sheets typically declare "NovaSeqXSeries"
+        # NovaSeq X family - V2 sheets typically declare "NovaSeqXSeries"
         "novaseqx",
         "novaseqxplus",
         "novaseqxseries",
-        # NextSeq family — V2 sheets sometimes declare the combined
+        # NextSeq family - V2 sheets sometimes declare the combined
         # platform "NextSeq1000/2000", which normalises to "nextseq10002000".
         "nextseq500",
         "nextseq550",
@@ -147,7 +147,7 @@ def detect_workflow(
     Workflow | None
         :attr:`Workflow.A` or :attr:`Workflow.B` if the instrument is in
         one of the tables. ``None`` if *instrument* is empty, ambiguous
-        (e.g. ``NovaSeq 6000`` — chemistry-dependent), or unrecognised.
+        (e.g. ``NovaSeq 6000`` - chemistry-dependent), or unrecognised.
 
     Examples
     --------

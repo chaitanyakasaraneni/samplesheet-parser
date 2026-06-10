@@ -3,7 +3,7 @@ Programmatic writer for Illumina SampleSheet.csv files.
 
 Supports both IEM V1 (bcl2fastq era) and BCLConvert V2 formats.
 Build a sheet from scratch or load an existing parsed sheet, make
-edits, then write to disk — with optional pre-write validation.
+edits, then write to disk - with optional pre-write validation.
 
 Examples
 --------
@@ -133,7 +133,7 @@ class SampleSheetWriter:
 
     Supports both IEM V1 (bcl2fastq) and BCLConvert V2 (NovaSeq X series)
     output formats.  The writer validates the sheet before writing by
-    default — pass ``validate=False`` to :meth:`write` to skip this.
+    default - pass ``validate=False`` to :meth:`write` to skip this.
 
     Parameters
     ----------
@@ -182,7 +182,7 @@ class SampleSheetWriter:
         self._samples: list[_SampleRecord] = []
 
     # ------------------------------------------------------------------
-    # Class method — build from existing parsed sheet
+    # Class method - build from existing parsed sheet
     # ------------------------------------------------------------------
 
     @classmethod
@@ -231,7 +231,7 @@ class SampleSheetWriter:
         return writer
 
     # ------------------------------------------------------------------
-    # Configuration — header
+    # Configuration - header
     # ------------------------------------------------------------------
 
     def set_header(
@@ -296,7 +296,7 @@ class SampleSheetWriter:
         return self
 
     # ------------------------------------------------------------------
-    # Configuration — reads
+    # Configuration - reads
     # ------------------------------------------------------------------
 
     def set_reads(
@@ -333,7 +333,7 @@ class SampleSheetWriter:
         return self
 
     # ------------------------------------------------------------------
-    # Configuration — settings / adapters
+    # Configuration - settings / adapters
     # ------------------------------------------------------------------
 
     def set_adapter(
@@ -661,7 +661,7 @@ class SampleSheetWriter:
             or if no samples have been added.
         """
         if not self._samples:
-            raise ValueError("Cannot write an empty sheet — add at least one sample.")
+            raise ValueError("Cannot write an empty sheet - add at least one sample.")
 
         if validate:
             self._validate_before_write()
@@ -899,7 +899,7 @@ class SampleSheetWriter:
         if not result.is_valid:
             error_lines = "\n".join(f"  {e}" for e in result.errors)
             raise ValueError(
-                f"Sheet failed validation — fix errors before writing:\n" f"{error_lines}"
+                f"Sheet failed validation - fix errors before writing:\n" f"{error_lines}"
             )
 
     def _load_from_v1(self, sheet: SampleSheetV1) -> None:

@@ -26,5 +26,9 @@ repos:
     rev: v1.13.0
     hooks:
       - id: mypy
-        additional_dependencies: [loguru, typer]
-        args: [--ignore-missing-imports]
+        additional_dependencies: [typer]
+        # Type-check the package only, matching CI. Tests are intentionally
+        # exempt (see the tests.* override in pyproject.toml); passing
+        # individual test file paths here would bypass that override.
+        pass_filenames: false
+        args: [--strict, --ignore-missing-imports, samplesheet_parser/]

@@ -4,10 +4,10 @@ Diff engine for Illumina sample sheets.
 Compares two sample sheets (any combination of V1 / V2) and reports
 structured differences across four dimensions:
 
-- **Header** — key/value changes in [Header] / [BCLConvert_Settings]
-- **Reads** — changes in read lengths or cycle counts
-- **Samples added / removed** — keyed on ``Sample_ID`` + ``Lane``
-- **Sample fields changed** — per-sample field-level diffs (index
+- **Header** - key/value changes in [Header] / [BCLConvert_Settings]
+- **Reads** - changes in read lengths or cycle counts
+- **Samples added / removed** - keyed on ``Sample_ID`` + ``Lane``
+- **Sample fields changed** - per-sample field-level diffs (index
   changes, project reassignment, etc.)
 
 The comparison is format-aware: V1 ``index`` is compared against V2
@@ -58,13 +58,13 @@ _FIELD_ALIASES: dict[str, str] = {
     "sample_name": "Sample_Name",
 }
 
-# Fields to skip when comparing samples — these are metadata that differ
+# Fields to skip when comparing samples - these are metadata that differ
 # between formats by design and do not represent meaningful changes.
 #
 # V1-only fields (no V2 equivalent):
-#   I7_Index_ID / I5_Index_ID — index name columns; V2 stores index values only
-#   Sample_Name  — V1 carries a display name; V2 omits it
-#   Sample_Plate / Sample_Well / Description — IEM metadata not present in V2
+#   I7_Index_ID / I5_Index_ID - index name columns; V2 stores index values only
+#   Sample_Name  - V1 carries a display name; V2 omits it
+#   Sample_Plate / Sample_Well / Description - IEM metadata not present in V2
 _SKIP_FIELDS: frozenset[str] = frozenset(
     {
         "experiment_name",
@@ -118,8 +118,8 @@ class HeaderChange:
     section: str = "header"  # "header" | "reads" | "settings"
 
     def __str__(self) -> str:
-        old = repr(self.old_value) if self.old_value is not None else "—"
-        new = repr(self.new_value) if self.new_value is not None else "—"
+        old = repr(self.old_value) if self.old_value is not None else "-"
+        new = repr(self.new_value) if self.new_value is not None else "-"
         return f"[{self.section}] {self.field}: {old} → {new}"
 
 
@@ -135,8 +135,8 @@ class SampleChange:
     def __str__(self) -> str:
         lines = [f"Sample {self.sample_id!r} (lane {self.lane}):"]
         for f, (old, new) in self.changes.items():
-            old_s = repr(old) if old is not None else "—"
-            new_s = repr(new) if new is not None else "—"
+            old_s = repr(old) if old is not None else "-"
+            new_s = repr(new) if new is not None else "-"
             lines.append(f"  {f}: {old_s} → {new_s}")
         return "\n".join(lines)
 

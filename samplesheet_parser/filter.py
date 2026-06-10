@@ -35,7 +35,7 @@ from samplesheet_parser.factory import SampleSheetFactory
 
 logger = logging.getLogger(__name__)
 
-# Raw record keys that are standard sample fields — not extra columns
+# Raw record keys that are standard sample fields - not extra columns
 _STANDARD_SAMPLE_KEYS: frozenset[str] = frozenset(
     {
         "lane",
@@ -144,7 +144,7 @@ class SampleSheetFilter:
     ) -> FilterResult:
         """Write a filtered copy of the sheet to *output_path*.
 
-        Multiple criteria are ANDed — a sample must match **all** provided
+        Multiple criteria are ANDed - a sample must match **all** provided
         criteria to be included.  ``sample_id`` supports glob patterns (e.g.
         ``"CTRL_*"`` or ``"SAMPLE_00[1-3]"``).
 
@@ -235,7 +235,7 @@ class SampleSheetFilter:
             result.matched_count += 1
 
         if result.matched_count == 0:
-            logger.warning("No samples matched the filter criteria — no output written.")
+            logger.warning("No samples matched the filter criteria - no output written.")
             return result
 
         out = writer.write(output_path, validate=validate)

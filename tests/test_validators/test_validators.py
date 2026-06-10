@@ -39,8 +39,7 @@ class TestEmptySamples:
     def test_empty_data_section(self, tmp_path):
         p = tmp_path / "empty.csv"
         p.write_text(
-            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
-            "[Data]\nLane,Sample_ID,index\n"
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n" "[Data]\nLane,Sample_ID,index\n"
         )
         sheet = SampleSheetV1(str(p))
         sheet.parse()
@@ -94,7 +93,7 @@ class TestDuplicateIndex:
             "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
             "[Data]\nLane,Sample_ID,index\n"
             "1,S1,ATTACTCG\n"
-            "1,S2,ATTACTCG\n"   # same index, same lane — error
+            "1,S2,ATTACTCG\n"  # same index, same lane - error
         )
         sheet = SampleSheetV1(str(p))
         sheet.parse()
@@ -108,7 +107,7 @@ class TestDuplicateIndex:
         # This is valid in NovaSeq lane-split mode
         sheet = _valid_v1(v1_multi_lane)
         result = SampleSheetValidator().validate(sheet)
-        # Multi-lane fixture uses unique indexes per lane — should pass
+        # Multi-lane fixture uses unique indexes per lane - should pass
         assert result.is_valid
 
     def test_duplicate_dual_index(self, tmp_path):
@@ -125,6 +124,21 @@ class TestDuplicateIndex:
         assert not result.is_valid
         assert any(e.code == "DUPLICATE_INDEX" for e in result.errors)
 
+    def test_index_free_library_is_not_a_duplicate(self, tmp_path):
+        # A full-lane, index-free library legitimately has empty indexes for
+        # every sample. Sharing an empty index must not raise DUPLICATE_INDEX.
+        p = tmp_path / "no_index.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n"
+            "1,S1,\n"
+            "1,S2,\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        result = SampleSheetValidator().validate(sheet)
+        assert not any(e.code == "DUPLICATE_INDEX" for e in result.errors)
+
 
 class TestDuplicateSampleId:
 
@@ -134,22 +148,23 @@ class TestDuplicateSampleId:
             "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
             "[Data]\nLane,Sample_ID,index\n"
             "1,S1,ATTACTCG\n"
-            "1,S1,TCCGGAGA\n"   # duplicate Sample_ID, same lane
+            "1,S1,TCCGGAGA\n"  # duplicate Sample_ID, same lane
         )
         sheet = SampleSheetV1(str(p))
         sheet.parse()
         result = SampleSheetValidator().validate(sheet)
         # Note: V1 samples() deduplicates by Sample_ID, so the validator
-        # receives only one sample — no duplicate to flag at validation time.
+        # receives only one sample - no duplicate to flag at validation time.
         # The duplicate index should still be caught.
-        assert result is not None   # just confirm it doesn't crash
+        assert result is not None  # just confirm it doesn't crash
 
     def test_duplicate_sample_id_in_same_lane_raises_error(self):
         """Line 402: duplicate Sample_ID in same lane produces DUPLICATE_SAMPLE_ID error."""
         from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
+
         validator = SampleSheetValidator()
         result = ValidationResult()
-        # Provide samples with duplicate (lane, sample_id) — samples() always deduplicates
+        # Provide samples with duplicate (lane, sample_id) - samples() always deduplicates
         # so we call the private method directly with crafted input
         samples = [
             {"lane": "1", "sample_id": "S1"},
@@ -270,6 +285,7 @@ class TestValidationResult:
 
     def test_str_issue(self):
         from samplesheet_parser.validators import ValidationIssue
+
         issue = ValidationIssue("error", "TEST_CODE", "Something went wrong", {"lane": 1})
         s = str(issue)
         assert "[ERROR]" in s
@@ -289,8 +305,6 @@ class TestHammingSkipsNoIndex:
         sheet = SampleSheetV1(str(p))
         sheet.parse()
         result = SampleSheetValidator().validate(sheet)
-        # S2 has no index so it is skipped — no INDEX_DISTANCE_TOO_LOW error
+        # S2 has no index so it is skipped - no INDEX_DISTANCE_TOO_LOW error
         codes = [e.code for e in result.errors]
         assert "INDEX_DISTANCE_TOO_LOW" not in codes
-
-

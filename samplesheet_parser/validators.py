@@ -1,5 +1,5 @@
 """
-Sample sheet validation — index integrity, lane uniqueness, adapter checks.
+Sample sheet validation - index integrity, lane uniqueness, adapter checks.
 
 The :class:`SampleSheetValidator` works with both V1 and V2 parsed sheets
 and produces a structured :class:`ValidationResult` that can be inspected
@@ -131,7 +131,7 @@ class ValidationResult:
 
     def summary(self) -> str:
         return (
-            f"{'PASS' if self.is_valid else 'FAIL'} — "
+            f"{'PASS' if self.is_valid else 'FAIL'} - "
             f"{len(self.errors)} error(s), {len(self.warnings)} warning(s)"
         )
 
@@ -142,10 +142,16 @@ class ValidationResult:
 
 
 def hamming_distance(a: str, b: str) -> int:
-    """Return the Hamming distance between two index sequences.
+    """Return the literal Hamming distance between two index sequences.
 
-    Sequences of unequal length are compared up to the shorter length —
-    a conservative approach matching how the instrument reads cycles.
+    Sequences of unequal length are compared up to the shorter length, a
+    conservative approach matching how the instrument reads cycles.
+
+    This is the pure Hamming distance: every differing position counts,
+    including positions where one sequence has an ``N``. For demultiplexing
+    collision detection an ``N`` should instead be treated as a wildcard that
+    matches any base; the validator uses :func:`index_collision_distance` for
+    that purpose. See :meth:`SampleSheetValidator._check_index_distances`.
 
     Parameters
     ----------
@@ -165,6 +171,35 @@ def hamming_distance(a: str, b: str) -> int:
     return sum(x != y for x, y in zip(a[:length], b[:length], strict=False))
 
 
+def index_collision_distance(a: str, b: str) -> int:
+    """Return the mismatch count between two index reads for collision checks.
+
+    This differs from :func:`hamming_distance` in one way: an ``N`` in either
+    sequence is treated as a wildcard that matches any base, because that is
+    how demultiplexers handle ``N`` cycles. Two indexes that differ only where
+    one carries an ``N`` can therefore collide, and this function scores those
+    positions as matches.
+
+    Sequences of unequal length are compared up to the shorter length.
+
+    Parameters
+    ----------
+    a, b:
+        Uppercase index strings (ACGTN).
+
+    Examples
+    --------
+    >>> index_collision_distance("ATTACTCG", "ATTACTCA")
+    1
+    >>> index_collision_distance("ATTACTCG", "ATTACTCN")
+    0
+    """
+    length = min(len(a), len(b))
+    return sum(
+        1 for x, y in zip(a[:length], b[:length], strict=False) if x != y and x != "N" and y != "N"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
@@ -176,29 +211,29 @@ class SampleSheetValidator:
 
     Checks performed
     ----------------
-    * **EMPTY_SAMPLES**        — No samples found in [Data] / [BCLConvert_Data].
-    * **INVALID_INDEX_CHARS**  — Index sequence contains non-ACGTN characters.
-    * **INDEX_TOO_SHORT**      — Index shorter than :attr:`MIN_INDEX_LENGTH`.
-    * **INDEX_TOO_LONG**       — Index longer than :attr:`MAX_INDEX_LENGTH`.
-    * **DUPLICATE_INDEX**      — Two or more samples in the same lane share an
+    * **EMPTY_SAMPLES**        - No samples found in [Data] / [BCLConvert_Data].
+    * **INVALID_INDEX_CHARS**  - Index sequence contains non-ACGTN characters.
+    * **INDEX_TOO_SHORT**      - Index shorter than :attr:`MIN_INDEX_LENGTH`.
+    * **INDEX_TOO_LONG**       - Index longer than :attr:`MAX_INDEX_LENGTH`.
+    * **DUPLICATE_INDEX**      - Two or more samples in the same lane share an
                                  index (or index pair for dual-index sheets).
-    * **MISSING_INDEX2**       — Sheet has an ``Index2`` / ``index2`` column but
+    * **MISSING_INDEX2**       - Sheet has an ``Index2`` / ``index2`` column but
                                  one or more samples have it empty.
-    * **DUPLICATE_SAMPLE_ID**  — ``Sample_ID`` appears more than once per lane.
-    * **INDEX_DISTANCE_TOO_LOW** — Two indexes in the same lane have a Hamming
+    * **DUPLICATE_SAMPLE_ID**  - ``Sample_ID`` appears more than once per lane.
+    * **INDEX_DISTANCE_TOO_LOW** - Two indexes in the same lane have a Hamming
                                  distance below :data:`MIN_HAMMING_DISTANCE`
                                  (default 3), risking demultiplexing bleed-through
                                  (warning only).
-    * **NO_ADAPTERS**          — ``[Settings]`` / ``[BCLConvert_Settings]`` has
+    * **NO_ADAPTERS**          - ``[Settings]`` / ``[BCLConvert_Settings]`` has
                                  no adapter sequences (warning only).
-    * **ADAPTER_MISMATCH**     — Adapter does not match any known Illumina
+    * **ADAPTER_MISMATCH**     - Adapter does not match any known Illumina
                                  adapter (warning only; custom adapters are valid).
 
     Examples
     --------
     >>> result = SampleSheetValidator().validate(sheet)
     >>> print(result.summary())
-    PASS — 0 error(s), 1 warning(s)
+    PASS - 0 error(s), 1 warning(s)
     """
 
     def validate(
@@ -284,7 +319,7 @@ class SampleSheetValidator:
                     result.add_warning(
                         "INDEX_TOO_SHORT",
                         f"Index '{seq}' is shorter than {MIN_INDEX_LENGTH} bp"
-                        " — verify this is correct.",
+                        " - verify this is correct.",
                         sample_id=sid,
                         lane=lane,
                         field=field_name,
@@ -294,7 +329,7 @@ class SampleSheetValidator:
                     result.add_error(
                         "INDEX_TOO_LONG",
                         f"Index '{seq}' is longer than {MAX_INDEX_LENGTH} bp"
-                        " — likely a data error.",
+                        " - likely a data error.",
                         sample_id=sid,
                         lane=lane,
                         field=field_name,
@@ -317,6 +352,12 @@ class SampleSheetValidator:
 
             index_key = f"{idx1}+{idx2}" if idx2 else idx1
 
+            # Index-free libraries (no I7 and no I5) legitimately share an empty
+            # index, so skip them here. A full-lane library with no barcodes is
+            # not a duplicate-index conflict.
+            if not index_key:
+                continue
+
             bucket = lane_index_map.setdefault(lane, {})
             if index_key in bucket:
                 result.add_error(
@@ -338,18 +379,25 @@ class SampleSheetValidator:
     ) -> None:
         """Warn if any two indexes in the same lane are too similar.
 
-        Computes the Hamming distance between every pair of index sequences
-        within each lane. Pairs with a distance below ``min_distance``
-        (default: :data:`MIN_HAMMING_DISTANCE` = 3) are reported as warnings
-        because they risk read bleed-through during demultiplexing.
+        For every pair of samples within a lane the combined distance is the
+        sum of the per-index mismatch counts: the I7 (index) distance plus the
+        I5 (index2) distance. Pairs whose combined distance is below
+        ``min_distance`` (default: :data:`MIN_HAMMING_DISTANCE` = 3) are
+        reported as warnings because they risk read bleed-through during
+        demultiplexing.
 
-        For dual-index sheets the combined index (I7+I5 concatenated) is
-        used so that a pair which is close on I7 but well-separated on I5
-        is not incorrectly flagged.
+        The combined distance equals the minimum number of sequencing errors
+        needed to read one sample's barcodes as another's across both index
+        reads, which is the quantity that governs misassignment risk. Summing
+        the per-index distances (rather than concatenating the two indexes into
+        one string) keeps the I7 and I5 positions aligned even when samples use
+        different index lengths.
 
-        Sequences of different lengths are compared up to the length of the
-        shorter sequence — a conservative approach since the instrument reads
-        only as many cycles as configured.
+        Each per-index distance is computed with :func:`index_collision_distance`,
+        so an ``N`` cycle in either index is treated as a wildcard that matches
+        any base. Sequences of different lengths are compared up to the length
+        of the shorter sequence, since the instrument reads only as many cycles
+        as configured.
 
         Parameters
         ----------
@@ -358,12 +406,12 @@ class SampleSheetValidator:
         result:
             :class:`ValidationResult` to append warnings to.
         min_distance:
-            Minimum acceptable Hamming distance. Pairs below this threshold
+            Minimum acceptable combined distance. Pairs below this threshold
             generate a ``INDEX_DISTANCE_TOO_LOW`` warning.
         """
-        # Group by lane; treat None as lane-unaware (compare all samples)
+        # Group by lane; treat None as lane-unaware (compare all samples).
+        # bucket entry: (sample_id, index1, index2)
         lane_buckets: dict[str | None, list[tuple[str, str, str]]] = {}
-        # bucket entry: (sample_id, index1, combined_index)
 
         for sample in samples:
             lane = sample.get("lane")
@@ -374,22 +422,26 @@ class SampleSheetValidator:
             if not idx1:
                 continue  # no index to compare
 
-            combined = idx1 + idx2 if idx2 else idx1
-            lane_buckets.setdefault(lane, []).append((sid, idx1, combined))
+            lane_buckets.setdefault(lane, []).append((sid, idx1, idx2))
 
         for lane, entries in lane_buckets.items():
-            # Compare every pair — O(n²) but n is always small (< 200 samples)
+            # Compare every pair: O(n^2) in the number of samples per lane.
+            # n is small in practice (a few hundred at most), so this is cheap.
             for i in range(len(entries)):
                 for j in range(i + 1, len(entries)):
-                    sid_a, _, combined_a = entries[i]
-                    sid_b, _, combined_b = entries[j]
+                    sid_a, i7_a, i5_a = entries[i]
+                    sid_b, i7_b, i5_b = entries[j]
 
-                    dist = hamming_distance(combined_a, combined_b)
+                    dist = index_collision_distance(i7_a, i7_b) + index_collision_distance(
+                        i5_a, i5_b
+                    )
                     if dist < min_distance:
+                        combined_a = f"{i7_a}+{i5_a}" if i5_a else i7_a
+                        combined_b = f"{i7_b}+{i5_b}" if i5_b else i7_b
                         result.add_warning(
                             "INDEX_DISTANCE_TOO_LOW",
                             f"Indexes for '{sid_a}' and '{sid_b}' in lane "
-                            f"{lane!r} have a Hamming distance of {dist} "
+                            f"{lane!r} have a combined distance of {dist} "
                             f"(minimum recommended: {min_distance}). "
                             f"This may cause demultiplexing bleed-through.",
                             lane=lane,

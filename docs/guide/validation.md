@@ -32,19 +32,23 @@ for w in result.warnings:
 | `NO_ADAPTERS` | warning | No adapter sequences configured |
 | `ADAPTER_MISMATCH` | warning | Adapter is non-standard |
 
-## Hamming distance checking
+## Index distance checking
 
-Indexes that are too similar cause read bleed-through between samples during demultiplexing — a common cause of low-quality runs that is not caught by a simple duplicate check.
+Indexes that are too similar cause read bleed-through between samples during demultiplexing, a common cause of low-quality runs that a simple duplicate check does not catch.
 
-The validator computes the Hamming distance between every pair of indexes within each lane. For dual-index sheets, the I7 and I5 sequences are combined before comparison, so a pair that is close on I7 but well-separated on I5 is not incorrectly flagged.
+For every pair of samples within a lane, the validator computes a combined distance: the I7 (index) mismatch count plus the I5 (index2) mismatch count. This sum equals the minimum number of sequencing errors needed to read one sample's barcodes as another's across both index reads, which is the quantity that governs misassignment risk. Summing the per-index distances (rather than concatenating the two indexes into one string) keeps the I7 and I5 positions aligned even when samples use different index lengths. A pair is flagged when the combined distance is below the threshold.
+
+Each per-index distance treats an `N` cycle as a wildcard that matches any base, matching how demultiplexers handle `N`. Two indexes that differ only where one carries an `N` are therefore reported as colliding. Sequences of different lengths are compared up to the length of the shorter sequence.
 
 ```python
 # Default threshold: 3
 result = SampleSheetValidator().validate(sheet)
 
-# Custom threshold — stricter for longer indexes
+# Custom threshold: stricter for longer indexes
 result = SampleSheetValidator().validate(sheet, min_hamming_distance=4)
 ```
+
+The standalone helpers are also available: `hamming_distance(a, b)` for the literal Hamming distance and `index_collision_distance(a, b)` for the wildcard-aware per-index distance the validator uses.
 
 ## Structured results
 
