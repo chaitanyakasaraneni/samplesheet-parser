@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+## [2.2.0] - 2026-06-10
+
 ### Fixed
 
 - **Index-free libraries are no longer dropped silently by the writer.** When
