@@ -957,7 +957,16 @@ class SampleSheetWriter:
             }
             sid = std.get("Sample_ID", "")
             idx = std.get("index", "")
-            if not sid or not idx:
+            if not sid:
+                continue
+            if not idx:
+                logger.warning(
+                    "Sample %r has no index; the writer requires an index per "
+                    "sample, so this index-free library is dropped from the "
+                    "output. Add an index or write the sheet by another means "
+                    "to preserve it.",
+                    sid,
+                )
                 continue
             self._samples.append(
                 _SampleRecord(
@@ -1005,7 +1014,16 @@ class SampleSheetWriter:
         for record in sheet.records or []:
             sid = record.get("Sample_ID", "")
             idx = record.get("Index", "")
-            if not sid or not idx:
+            if not sid:
+                continue
+            if not idx:
+                logger.warning(
+                    "Sample %r has no index; the writer requires an index per "
+                    "sample, so this index-free library is dropped from the "
+                    "output. Add an index or write the sheet by another means "
+                    "to preserve it.",
+                    sid,
+                )
                 continue
             extra = {k: v for k, v in record.items() if k not in std_cols}
             self._samples.append(

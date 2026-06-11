@@ -874,3 +874,52 @@ Lane,Sample_ID,Index,Index2,Sample_Project
         )
         result = _validate(sheet)
         assert _distance_warnings(result) == []
+
+
+# ---------------------------------------------------------------------------
+# Index-key casing: the distance check accepts V2-style capital-I keys too
+# ---------------------------------------------------------------------------
+
+
+class _StubSheet:
+    """Minimal sheet exposing hand-built sample dicts to the validator.
+
+    The V1/V2 parsers always normalize index keys to lowercase, so
+    capital-I keys only reach the validator through hand-built dicts or the
+    output of ``normalize_index_lengths`` (whose documented examples use
+    ``Index``/``Index2``). This stub lets us exercise that path directly.
+    """
+
+    def __init__(self, samples: list[dict[str, Any]]) -> None:
+        self._samples = samples
+        self.adapters: list[str] = []
+
+    def samples(self) -> list[dict[str, Any]]:
+        return self._samples
+
+
+class TestDistanceAcceptsCapitalIndexKeys:
+    def test_capital_index_keys_are_compared(self):
+        # Two dual-index samples differing by 1 on I7 and 1 on I5 (combined 2,
+        # below the default threshold). Keyed with V2-style Index/Index2, the
+        # distance check must still flag them rather than silently skip.
+        sheet = _StubSheet(
+            [
+                {"sample_id": "S1", "lane": "1", "Index": "ATTACTCG", "Index2": "TATAGCCT"},
+                {"sample_id": "S2", "lane": "1", "Index": "ATTACTCA", "Index2": "TATAGCCA"},
+            ]
+        )
+        result = SampleSheetValidator().validate(sheet)  # type: ignore[arg-type]
+        warnings = _distance_warnings(result)
+        assert len(warnings) == 1
+        assert warnings[0].context["distance"] == 2
+
+    def test_capital_index_keys_well_separated_no_warning(self):
+        sheet = _StubSheet(
+            [
+                {"sample_id": "S1", "lane": "1", "Index": "ATTACTCG"},
+                {"sample_id": "S2", "lane": "1", "Index": "GCTAGCTA"},
+            ]
+        )
+        result = SampleSheetValidator().validate(sheet)  # type: ignore[arg-type]
+        assert _distance_warnings(result) == []

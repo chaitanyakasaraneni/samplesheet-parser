@@ -32,6 +32,9 @@ htmlcov/
 venv/
 env/
 
+# uv (lockfile intentionally not tracked for this library)
+uv.lock
+
 # Editor
 .vscode/
 .idea/

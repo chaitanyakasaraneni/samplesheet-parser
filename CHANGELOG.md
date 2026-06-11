@@ -8,7 +8,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Fixed
+
+- **Index-free libraries are no longer dropped silently by the writer.** When
+  loading a parsed sheet with `SampleSheetWriter.from_sheet()`, a sample with a
+  valid `Sample_ID` but no index was skipped without notice (the writer
+  requires an index per sample). Such samples are still dropped, but now a
+  warning is logged naming the sample, so the loss is visible. This aligns the
+  writer with the validator, which treats index-free libraries as legitimate.
+- **Index-distance check now accepts V2-style index keys.** The combined
+  index-distance check read only the lowercase `index`/`index2` keys, so
+  hand-built sample dicts (or the output of `normalize_index_lengths`) keyed
+  with `Index`/`Index2` were silently skipped. It now accepts both casings,
+  consistent with the duplicate-index and character checks.
 
 ## [2.1.0] - 2026-06-09
 

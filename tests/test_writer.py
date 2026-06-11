@@ -795,7 +795,7 @@ class TestWriterFromV2SheetEdgeCases:
         assert "Custom_Setting,foo" in out.read_text()
 
     def test_incomplete_v2_record_skipped(self, tmp_path):
-        """Line 966: record missing Sample_ID or Index is skipped in from_sheet."""
+        """A record missing Sample_ID or Index is skipped in from_sheet."""
         src = tmp_path / "v2.csv"
         src.write_text(
             "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
@@ -807,6 +807,44 @@ class TestWriterFromV2SheetEdgeCases:
         w = SampleSheetWriter.from_sheet(sheet, version=SampleSheetVersion.V2)
         assert len(w._samples) == 1
         assert w._samples[0].sample_id == "S1"
+
+    def test_index_free_v2_sample_dropped_with_warning(self, tmp_path, caplog):
+        """An index-free V2 sample (valid Sample_ID, empty Index) is dropped
+        from the writer, which requires an index, and a warning is logged so
+        the loss is not silent."""
+        src = tmp_path / "v2_indexfree.csv"
+        src.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\n"
+            "S1,ATTACTCG\n"
+            "WholeLane,\n"  # valid Sample_ID, no index (legitimate library)
+        )
+        sheet = _parse(src)
+        with caplog.at_level("WARNING", logger="samplesheet_parser.writer"):
+            w = SampleSheetWriter.from_sheet(sheet, version=SampleSheetVersion.V2)
+        assert [s.sample_id for s in w._samples] == ["S1"]
+        assert "WholeLane" in caplog.text
+        assert "no index" in caplog.text
+
+
+class TestWriterFromV1IndexFree:
+
+    def test_index_free_v1_sample_dropped_with_warning(self, tmp_path, caplog):
+        """An index-free V1 sample (valid Sample_ID, empty index) is dropped
+        from the writer with a warning rather than silently."""
+        src = tmp_path / "v1_indexfree.csv"
+        src.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,T\n\n"
+            "[Data]\nSample_ID,index\n"
+            "S1,ATTACTCG\n"
+            "WholeLane,\n"  # valid Sample_ID, no index
+        )
+        sheet = _parse(src)
+        with caplog.at_level("WARNING", logger="samplesheet_parser.writer"):
+            w = SampleSheetWriter.from_sheet(sheet, version=SampleSheetVersion.V1)
+        assert [s.sample_id for s in w._samples] == ["S1"]
+        assert "WholeLane" in caplog.text
+        assert "no index" in caplog.text
 
 
 class TestUpdateSampleLaneFilter:

@@ -419,8 +419,12 @@ class SampleSheetValidator:
 
         for sample in samples:
             lane = sample.get("lane")
-            idx1 = (sample.get("index") or "").upper()
-            idx2 = (sample.get("index2") or "").upper()
+            # Accept both V1-style (``index``/``index2``) and V2-style
+            # (``Index``/``Index2``) keys so hand-built dicts and the output of
+            # ``normalize_index_lengths`` are checked the same way the duplicate
+            # and character checks already handle them.
+            idx1 = (sample.get("index") or sample.get("Index") or "").upper()
+            idx2 = (sample.get("index2") or sample.get("Index2") or "").upper()
             sid = sample.get("sample_id", "?")
 
             if not idx1:
