@@ -32,6 +32,12 @@ __author__ = "Chaitanya Kasaraneni"
 __email__ = "kc.kasaraneni@gmail.com"
 __license__ = "Apache 2.0"
 
+from samplesheet_parser.chemistry import (
+    Chemistry,
+    ColorBalanceReport,
+    analyze_color_balance,
+    chemistry_for_instrument,
+)
 from samplesheet_parser.converter import SampleSheetConverter
 from samplesheet_parser.diff import DiffResult, SampleSheetDiff
 from samplesheet_parser.enums import IndexType, InstrumentPlatform, SampleSheetVersion, UMILocation
@@ -39,6 +45,7 @@ from samplesheet_parser.factory import SampleSheetFactory
 from samplesheet_parser.filter import FilterResult, SampleSheetFilter
 from samplesheet_parser.index_utils import normalize_index_lengths
 from samplesheet_parser.merger import MergeResult, SampleSheetMerger
+from samplesheet_parser.parsers.element import ElementRunManifest
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 from samplesheet_parser.protocol import SampleSheetParser
@@ -54,6 +61,7 @@ from samplesheet_parser.writer import SampleSheetWriter
 __all__ = [
     "SampleSheetV1",
     "SampleSheetV2",
+    "ElementRunManifest",
     "SampleSheetFactory",
     "SampleSheetParser",
     "SampleSheetVersion",
@@ -64,6 +72,10 @@ __all__ = [
     "ValidationResult",
     "hamming_distance",
     "index_collision_distance",
+    "Chemistry",
+    "ColorBalanceReport",
+    "analyze_color_balance",
+    "chemistry_for_instrument",
     "SampleSheetConverter",
     "SampleSheetDiff",
     "DiffResult",

@@ -2,7 +2,7 @@
 
 **Format-agnostic parser for Illumina SampleSheet.csv files.**
 
-Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
+Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — plus non-Illumina **Element AVITI** run manifests — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, **per-cycle color-balance validation** against the instrument's optical chemistry, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
 
 [![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -312,6 +312,8 @@ The detector reads only as much of the file as needed — stopping after `[Heade
 | `INDEX_DISTANCE_TOO_LOW` | warning | Two indexes in the same lane have Hamming distance < 3, risking demultiplexing bleed-through |
 | `NO_ADAPTERS` | warning | No adapter sequences configured |
 | `ADAPTER_MISMATCH` | warning | Adapter is non-standard |
+| `COLOR_BALANCE_NO_SIGNAL` | error | An index cycle has no signal in an optical channel (2-/1-channel chemistry) — the index read will fail. *Opt-in.* |
+| `COLOR_BALANCE_LOW` | warning | An index cycle has weak signal in a channel, or no base diversity (4-channel) — degraded base calls. *Opt-in.* |
 
 ### Index distance checking
 
@@ -340,6 +342,95 @@ samples = sheet.samples()
 result = ValidationResult()
 SampleSheetValidator()._check_index_distances(samples, result, min_distance=4)
 ```
+
+### Color-balance checking (opt-in)
+
+On 2-channel instruments (NextSeq, NovaSeq, NovaSeq X) and 1-channel
+instruments (iSeq), bases are called from optical signal: `A` lights
+both channels, `C` only red, `T` only green, and **`G` is a dark base with no
+signal at all**. A cycle where the whole index pool reads `G` produces no
+signal, so the instrument cannot register the tile and the index read fails —
+a real, common cause of wrecked runs that a Hamming-distance check cannot see.
+
+Because the sample sheet already contains every sample's index, this can be
+predicted *before the run starts* with no sequencing data. The validator scores
+the pool cycle-by-cycle: it transposes the indexes into columns and checks that
+each column produces signal in both channels.
+
+```python
+from samplesheet_parser import SampleSheetFactory, SampleSheetValidator
+
+sheet = SampleSheetFactory().create_parser("SampleSheet.csv", parse=True)
+
+# Opt in; the instrument is read from the sheet header (or pass instrument=...)
+result = SampleSheetValidator().validate(sheet, check_color_balance=True)
+
+for err in result.errors:
+    print(err)
+# [ERROR] COLOR_BALANCE_NO_SIGNAL: On 2-channel chemistry (NovaSeqXSeries),
+#   index1 cycle 4 has no red or green signal across the pool: no sample
+#   carries a red or green base (A/C/T) at this cycle ... the index read will fail.
+```
+
+The chemistry is resolved from the instrument name; the check is **off by
+default** (it can legitimately fail a low-plex pool) and is skipped silently
+for unknown instruments. The same analysis is available standalone:
+
+```python
+from samplesheet_parser import analyze_color_balance, chemistry_for_instrument
+
+chem = chemistry_for_instrument("NovaSeqXSeries")   # Chemistry.TWO_CHANNEL
+report = analyze_color_balance(["ATGGCTAC", "CAGGTACG", "TCGGACGT", "GATGGCTA"],
+                               chemistry=chem)
+for cb in report.dark_cycles:
+    print(cb.read, cb.cycle, cb.base_counts)   # index1 4 {'G': 4}
+```
+
+From the CLI:
+
+```bash
+samplesheet validate SampleSheet.csv --color-balance
+samplesheet validate SampleSheet.csv --color-balance --instrument NovaSeqXSeries
+```
+
+| Chemistry | Instruments | What is flagged |
+|---|---|---|
+| 4-channel | MiSeq, HiSeq 2000/2500/3000/4000, Element AVITI | Zero-diversity cycles (warning) |
+| 2-channel | NextSeq, NovaSeq 6000, NovaSeq X, MiniSeq | Dark cycles / weak channels |
+| 1-channel | iSeq 100 | Dark cycles / weak channels |
+
+Element AVITI uses four-channel avidity chemistry (four images per cycle, one
+per avidite dye — [Arslan et al., *Nat. Biotechnol.* 2023](https://www.nature.com/articles/s41587-023-01750-7)),
+so it has no dark base; color-balance checking flags low-diversity index
+cycles rather than dark cycles.
+
+---
+
+## Multi-vendor support
+
+The factory is not limited to Illumina. Any parser that implements the
+`SampleSheetParser` protocol can be auto-detected, and **Element Biosciences
+AVITI `RunManifest.csv`** files are supported out of the box — the same
+`SampleSheetFactory` recognises them and returns a parser with the identical
+interface:
+
+```python
+from samplesheet_parser import SampleSheetFactory
+
+factory = SampleSheetFactory()
+sheet = factory.create_parser("RunManifest.csv", parse=True)
+
+print(factory.version)       # SampleSheetVersion.ELEMENT_AVITI
+print(sheet.index_type())    # "dual"
+for s in sheet.samples():    # same schema as Illumina: sample_id, index, index2, ...
+    print(s["sample_id"], s["index"], s["index2"])
+```
+
+AVITI is a four-channel avidity platform, so color-balance validation applies
+to it too (flagging low-diversity index cycles). Manifest columns
+(`SampleName`, `Index1`, `Index2`, `Lane`, `Project`, `ExternalID`) are mapped
+to the shared sample schema, so the validator, diff, and filter tooling work
+across vendors without special-casing.
 
 ---
 

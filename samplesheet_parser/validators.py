@@ -22,6 +22,12 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
+from samplesheet_parser.chemistry import (
+    DEFAULT_MIN_SIGNAL_FRACTION,
+    Chemistry,
+    analyze_color_balance,
+    chemistry_for_instrument,
+)
 from samplesheet_parser.protocol import SampleSheetParser
 
 logger = logging.getLogger(__name__)
@@ -230,6 +236,15 @@ class SampleSheetValidator:
                                  no adapter sequences (warning only).
     * **ADAPTER_MISMATCH**     - Adapter does not match any known Illumina
                                  adapter (warning only; custom adapters are valid).
+    * **COLOR_BALANCE_NO_SIGNAL** - On 2-/1-channel chemistry, an index cycle
+                                 where the whole pool is dark (all ``G``) in a
+                                 channel, so the instrument gets no signal and
+                                 the index read fails. See
+                                 :meth:`_check_color_balance`.
+    * **COLOR_BALANCE_LOW**    - An index cycle with signal below the threshold
+                                 in one channel (2-/1-channel) or no base
+                                 diversity (4-channel), degrading base-call
+                                 quality (warning only).
 
     Examples
     --------
@@ -243,6 +258,9 @@ class SampleSheetValidator:
         sheet: SampleSheetParser,
         *,
         min_hamming_distance: int = MIN_HAMMING_DISTANCE,
+        check_color_balance: bool = False,
+        instrument: str | None = None,
+        min_signal_fraction: float = DEFAULT_MIN_SIGNAL_FRACTION,
     ) -> ValidationResult:
         """Run all validation checks on a parsed sample sheet.
 
@@ -257,6 +275,21 @@ class SampleSheetValidator:
             ``INDEX_DISTANCE_TOO_LOW`` warning. Defaults to
             :data:`MIN_HAMMING_DISTANCE` (3). Set higher (e.g. ``4``) for
             stricter demultiplexing requirements with longer indexes.
+        check_color_balance:
+            Opt in to per-cycle index colour-balance checking against the
+            instrument's optical chemistry (see :meth:`_check_color_balance`).
+            Off by default because it can turn an otherwise-valid low-plex
+            pool into an error; enable it when the sheet declares (or you pass)
+            a known instrument.
+        instrument:
+            Instrument name used to resolve the optical chemistry for the
+            colour-balance check. Defaults to the instrument declared in the
+            sheet header (``InstrumentPlatform`` / ``Instrument Type``).
+        min_signal_fraction:
+            Minimum fraction of the pool that must light each optical channel
+            at every index cycle before a ``COLOR_BALANCE_LOW`` warning is
+            raised. Defaults to
+            :data:`~samplesheet_parser.chemistry.DEFAULT_MIN_SIGNAL_FRACTION`.
 
         Returns
         -------
@@ -275,6 +308,14 @@ class SampleSheetValidator:
         self._check_index_distances(samples, result, min_distance=min_hamming_distance)
         self._check_duplicate_sample_ids(samples, result)
         self._check_adapters(sheet, result)
+        if check_color_balance:
+            self._check_color_balance(
+                sheet,
+                samples,
+                result,
+                instrument=instrument,
+                min_signal_fraction=min_signal_fraction,
+            )
 
         return result
 
@@ -482,6 +523,127 @@ class SampleSheetValidator:
                 )
             else:
                 bucket.add(sid)
+
+    @staticmethod
+    def _resolve_instrument(sheet: SampleSheetParser) -> str | None:
+        """Best-effort read of the instrument name from a parsed sheet.
+
+        Looks at the parser attributes first (``instrument_platform`` for V2,
+        ``instrument_type`` for V1, ``instrument`` for vendor parsers) and
+        falls back to the equivalent ``[Header]`` keys.
+        """
+        for attr in ("instrument_platform", "instrument_type", "instrument"):
+            value = getattr(sheet, attr, None)
+            if value:
+                return str(value)
+        header = getattr(sheet, "header", None) or {}
+        for key in ("InstrumentPlatform", "Instrument Type", "InstrumentType", "Instrument"):
+            value = header.get(key)
+            if value:
+                return str(value)
+        return None
+
+    def _check_color_balance(
+        self,
+        sheet: SampleSheetParser,
+        samples: list[dict[str, Any]],
+        result: ValidationResult,
+        *,
+        instrument: str | None = None,
+        min_signal_fraction: float = DEFAULT_MIN_SIGNAL_FRACTION,
+    ) -> None:
+        """Flag index cycles that will fail or degrade on the instrument's chemistry.
+
+        Resolves the instrument's optical chemistry (4-/2-/1-channel) and scores
+        the index pool per cycle. On 2-/1-channel chemistry a cycle where the
+        whole pool is dark (all ``G``) in a channel produces no signal and is
+        reported as ``COLOR_BALANCE_NO_SIGNAL`` (error); a cycle with signal
+        below *min_signal_fraction* in some channel is ``COLOR_BALANCE_LOW``
+        (warning). On 4-channel chemistry only single-base (zero-diversity)
+        cycles are flagged as ``COLOR_BALANCE_LOW``.
+
+        The check is skipped (no findings) when the instrument is unknown, since
+        guessing the chemistry could produce misleading errors. Pass *instrument*
+        to force a chemistry when the sheet header omits it.
+
+        Index sequences are read from each sample using the same ``index`` /
+        ``Index`` key fallback as :meth:`_check_index_distances`.
+        """
+        name = instrument or self._resolve_instrument(sheet)
+        chemistry = chemistry_for_instrument(name)
+        if chemistry is None:
+            logger.debug("Skipping colour-balance check: unknown instrument %r.", name)
+            return
+
+        index1 = [(s.get("index") or s.get("Index") or "").upper() for s in samples]
+        index2 = [(s.get("index2") or s.get("Index2") or "").upper() for s in samples]
+        has_index2 = any(index2)
+
+        report = analyze_color_balance(
+            index1,
+            index2 if has_index2 else None,
+            chemistry=chemistry,
+            min_signal_fraction=min_signal_fraction,
+        )
+
+        for cb in report.dark_cycles:
+            no_red = cb.red_fraction == 0.0
+            no_green = cb.green_fraction == 0.0
+            if no_red and no_green:
+                channel = "red or green"
+                signal_bases = "A/C/T"
+            elif no_red:
+                channel = "red"
+                signal_bases = "A or C"
+            else:
+                channel = "green"
+                signal_bases = "A or T"
+            result.add_error(
+                "COLOR_BALANCE_NO_SIGNAL",
+                f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+                f"{cb.cycle} has no {channel} signal across the pool: no sample "
+                f"carries a {channel} base ({signal_bases}) at this cycle "
+                f"(base counts {cb.base_counts}). The instrument cannot register "
+                f"this cycle and the index read will fail.",
+                instrument=name,
+                chemistry=chemistry.value,
+                read=cb.read,
+                cycle=cb.cycle,
+                channel=channel,
+                base_counts=cb.base_counts,
+            )
+
+        for cb in report.weak_cycles:
+            if chemistry is Chemistry.FOUR_CHANNEL:
+                base = next(iter(cb.base_counts))
+                result.add_warning(
+                    "COLOR_BALANCE_LOW",
+                    f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+                    f"{cb.cycle} has no base diversity (every sample reads "
+                    f"'{base}'), which degrades focusing and phasing.",
+                    instrument=name,
+                    chemistry=chemistry.value,
+                    read=cb.read,
+                    cycle=cb.cycle,
+                    base_counts=cb.base_counts,
+                )
+            else:
+                pct = round(min(cb.red_fraction or 0.0, cb.green_fraction or 0.0) * 100, 1)
+                result.add_warning(
+                    "COLOR_BALANCE_LOW",
+                    f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+                    f"{cb.cycle} carries weak signal in one channel "
+                    f"(as low as {pct}% of the pool; recommended "
+                    f"≥ {round(min_signal_fraction * 100)}%), risking poor "
+                    f"base calls for this cycle.",
+                    instrument=name,
+                    chemistry=chemistry.value,
+                    read=cb.read,
+                    cycle=cb.cycle,
+                    red_fraction=cb.red_fraction,
+                    green_fraction=cb.green_fraction,
+                    base_counts=cb.base_counts,
+                )
 
     def _check_adapters(
         self,

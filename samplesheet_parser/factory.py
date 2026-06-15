@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Any
 
 from samplesheet_parser.enums import SampleSheetVersion
+from samplesheet_parser.parsers.element import ElementRunManifest
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 from samplesheet_parser.protocol import SampleSheetParser
@@ -116,7 +117,7 @@ class SampleSheetFactory:
         """
         cls._registry.insert(0, (detector, parser_class, version))
         logger.debug(
-            f"Registered custom parser {parser_class.__name__!r} " f"for version {version.value!r}."
+            f"Registered custom parser {parser_class.__name__!r} for version {version.value!r}."
         )
 
     @classmethod
@@ -189,6 +190,15 @@ class SampleSheetFactory:
                     return parser
             except Exception as exc:
                 logger.debug(f"Custom detector {detector!r} raised {exc!r} for {path} - skipping.")
+
+        # Built-in non-Illumina vendor detection. Run as a first-class step
+        # (not via the clearable registry) so it survives clear_registry().
+        if ElementRunManifest.is_manifest(path):
+            logger.info("Detected Element AVITI RunManifest - using ElementRunManifest")
+            self.version = SampleSheetVersion.ELEMENT_AVITI
+            element_parser: SampleSheetParser = ElementRunManifest(path, **kwargs)
+            self.parser = element_parser
+            return element_parser
 
         # Built-in V1/V2 detection.
         detected = self._detect_version(path)

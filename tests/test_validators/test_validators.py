@@ -4,6 +4,36 @@ from samplesheet_parser import SampleSheetValidator
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 
+_DARK_CYCLE_V2 = """\
+[Header]
+FileFormatVersion,2
+RunName,DarkCycle
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,8
+Index2Cycles,8
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Sample_ID,Index,Index2
+S1,ATGGCTAC,TATAGCCT
+S2,CAGGTACG,ATAGAGGC
+S3,TCGGACGT,CCTATCCT
+S4,GATGGCTA,GGCTCTGA
+"""
+
+
+def _parse_v2(path, content):
+    path.write_text(content)
+    sheet = SampleSheetV2(str(path))
+    sheet.parse()
+    return sheet
+
 
 def _valid_v1(path):
     sheet = SampleSheetV1(path)
@@ -18,7 +48,6 @@ def _valid_v2(path):
 
 
 class TestValidValidation:
-
     def test_valid_v1_passes(self, v1_minimal):
         result = SampleSheetValidator().validate(_valid_v1(v1_minimal))
         assert result.is_valid
@@ -34,12 +63,42 @@ class TestValidValidation:
         assert result.summary().startswith("PASS")
 
 
-class TestEmptySamples:
+class TestColorBalance:
+    def test_off_by_default(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(sheet)
+        assert result.is_valid
+        assert not any(e.code.startswith("COLOR_BALANCE") for e in result.errors)
 
+    def test_dark_cycle_errors_when_enabled(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(sheet, check_color_balance=True)
+        assert not result.is_valid
+        codes = [e.code for e in result.errors]
+        assert "COLOR_BALANCE_NO_SIGNAL" in codes
+
+    def test_unknown_instrument_skips_silently(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(
+            sheet, check_color_balance=True, instrument="MysterySeq 9000"
+        )
+        assert not any(e.code.startswith("COLOR_BALANCE") for e in result.errors)
+
+    def test_instrument_override_forces_chemistry(self, tmp_path):
+        # Force 4-channel: the all-G index cycles become low-diversity
+        # warnings rather than dark-cycle errors.
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(
+            sheet, check_color_balance=True, instrument="MiSeq"
+        )
+        assert not any(e.code == "COLOR_BALANCE_NO_SIGNAL" for e in result.errors)
+
+
+class TestEmptySamples:
     def test_empty_data_section(self, tmp_path):
         p = tmp_path / "empty.csv"
         p.write_text(
-            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n" "[Data]\nLane,Sample_ID,index\n"
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n[Data]\nLane,Sample_ID,index\n"
         )
         sheet = SampleSheetV1(str(p))
         sheet.parse()
@@ -49,7 +108,6 @@ class TestEmptySamples:
 
 
 class TestIndexValidation:
-
     def test_invalid_chars_in_index(self, tmp_path):
         p = tmp_path / "bad_index.csv"
         p.write_text(
@@ -86,7 +144,6 @@ class TestIndexValidation:
 
 
 class TestDuplicateIndex:
-
     def test_duplicate_index_same_lane(self, tmp_path):
         p = tmp_path / "dup_idx.csv"
         p.write_text(
@@ -155,7 +212,6 @@ class TestDuplicateIndex:
 
 
 class TestDuplicateSampleId:
-
     def test_duplicate_sample_id_error(self, tmp_path):
         p = tmp_path / "dup_sid.csv"
         p.write_text(
@@ -190,7 +246,6 @@ class TestDuplicateSampleId:
 
 
 class TestAdapterValidation:
-
     def test_no_adapters_warning(self, tmp_path):
         p = tmp_path / "no_adapter.csv"
         p.write_text(
@@ -278,7 +333,6 @@ class TestMinHammingDistance:
 
 
 class TestValidationResult:
-
     def test_to_dict(self, v1_minimal):
         result = SampleSheetValidator().validate(_valid_v1(v1_minimal))
         d = result.to_dict()
@@ -308,7 +362,6 @@ class TestValidationResult:
 
 
 class TestHammingSkipsNoIndex:
-
     def test_sample_without_index_skipped_in_hamming_check(self, tmp_path):
         """Line 360: sample with no index is skipped without error during distance check."""
         p = tmp_path / "no_idx.csv"
