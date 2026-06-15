@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+## [2.3.0] - 2026-06-15
+
 ### Added
 
 - **Per-cycle color-balance validation (`samplesheet_parser.chemistry`).** Models
