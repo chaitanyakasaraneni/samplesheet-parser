@@ -10,6 +10,34 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _No unreleased changes._
 
+## [2.3.0] - 2026-06-15
+
+### Added
+
+- **Per-cycle color-balance validation (`samplesheet_parser.chemistry`).** Models
+  the optical detection chemistry of each instrument (4-channel, 2-channel,
+  1-channel) and scores an index pool cycle-by-cycle for signal balance. On
+  2-/1-channel chemistry (NextSeq, NovaSeq, NovaSeq X, iSeq), a cycle where the
+  whole pool reads the dark base `G` produces no optical signal and fails to
+  register; the validator now reports this as a `COLOR_BALANCE_NO_SIGNAL` error.
+  Four-channel instruments (MiSeq/HiSeq and Element AVITI, which images four
+  avidite dyes per cycle) have no dark base, so zero-diversity index cycles are
+  reported as `COLOR_BALANCE_LOW` warnings instead. The check is **opt-in** via
+  `SampleSheetValidator.validate(..., check_color_balance=True)` and the
+  `samplesheet validate --color-balance` CLI flag, and is skipped silently for
+  unknown instruments. New public API: `Chemistry`, `chemistry_for_instrument`,
+  `analyze_color_balance`, `ColorBalanceReport`.
+- **Multi-vendor support: Element Biosciences AVITI.** `SampleSheetFactory` now
+  auto-detects Element AVITI `RunManifest.csv` files and parses them through a
+  new `ElementRunManifest` parser that satisfies the existing
+  `SampleSheetParser` protocol, mapping manifest columns to the shared sample
+  schema. The validator (including color balance, with AVITI modelled as a
+  four-channel platform), diff, and filter tooling work across vendors without
+  special-casing. New format enum value: `SampleSheetVersion.ELEMENT_AVITI`.
+- New examples: `examples/demo_color_balance.py`,
+  `examples/demo_element_aviti.py`, and
+  `examples/sample_sheets/element_aviti_RunManifest.csv`.
+
 ## [2.2.0] - 2026-06-10
 
 ### Fixed

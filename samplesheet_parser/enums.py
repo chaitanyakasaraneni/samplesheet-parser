@@ -20,6 +20,13 @@ class SampleSheetVersion(str, Enum):
 
     V1 = "V1"
     V2 = "V2"
+    ELEMENT_AVITI = "ElementAVITI"
+    """Element Biosciences AVITI ``RunManifest.csv`` (non-Illumina vendor).
+
+    Detected by the presence of a ``[SAMPLES]`` section together with a
+    ``[RUNVALUES]`` section or a ``SampleName``/``Index1`` column layout.
+    Parsed by :class:`~samplesheet_parser.parsers.element.ElementRunManifest`.
+    """
 
 
 class IndexType(str, Enum):

@@ -263,6 +263,28 @@ if _TYPER_AVAILABLE:
                 metavar="N",
             ),
         ] = _MIN_HAMMING_DEFAULT,
+        color_balance: Annotated[
+            bool,
+            typer.Option(
+                "--color-balance/--no-color-balance",
+                help=(
+                    "Also check per-cycle index colour balance against the "
+                    "instrument's optical chemistry (flags dark/no-signal "
+                    "cycles on 2-/1-channel instruments). Off by default."
+                ),
+            ),
+        ] = False,
+        instrument: Annotated[
+            str | None,
+            typer.Option(
+                "--instrument",
+                help=(
+                    "Instrument name for the colour-balance check, overriding "
+                    "the sheet header (e.g. 'NovaSeqXSeries', 'MiSeq')."
+                ),
+                metavar="NAME",
+            ),
+        ] = None,
     ) -> None:
         """Validate a sample sheet for index, adapter, and structural issues.
 
@@ -292,7 +314,12 @@ if _TYPER_AVAILABLE:
             raise RuntimeError("SampleSheetFactory.version must be set after create_parser")
         version = factory.version
 
-        result = SampleSheetValidator().validate(sheet, min_hamming_distance=min_hamming)
+        result = SampleSheetValidator().validate(
+            sheet,
+            min_hamming_distance=min_hamming,
+            check_color_balance=color_balance,
+            instrument=instrument,
+        )
 
         if fmt == "json":
             _print_json(
@@ -301,6 +328,7 @@ if _TYPER_AVAILABLE:
                     "version": version.value,
                     "is_valid": result.is_valid,
                     "min_hamming_distance": min_hamming,
+                    "color_balance_checked": color_balance,
                     "errors": [
                         {"code": e.code, "message": e.message, "context": e.context}
                         for e in result.errors
@@ -408,8 +436,7 @@ if _TYPER_AVAILABLE:
             )
         else:
             typer.echo(
-                f"Converted {path.name} ({converter.source_version.value})"
-                f" → {out} ({target.value})"
+                f"Converted {path.name} ({converter.source_version.value}) → {out} ({target.value})"
             )
 
     # ---------------------------------------------------------------------------
