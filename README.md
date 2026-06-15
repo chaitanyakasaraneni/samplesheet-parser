@@ -18,15 +18,15 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 ![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_v03.png)
 
-*`SampleSheetFactory` auto-detects the format and routes to the correct parser. Both formats share a common interface — `SampleSheetConverter` handles bidirectional conversion, `SampleSheetValidator` catches index and adapter issues, `SampleSheetDiff` compares two sheets across any combination of V1/V2 formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
+*`SampleSheetFactory` auto-detects the format — Illumina V1/V2 or an Element AVITI run manifest — and routes to the correct parser. All formats share a common interface — `SampleSheetConverter` handles bidirectional conversion between the Illumina formats, `SampleSheetValidator` catches index, adapter, and color-balance issues, `SampleSheetDiff` compares two sheets across any combination of formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
 
 ---
 
 ## The problem this solves
 
-Labs running mixed instrument fleets — older NovaSeq 6000 alongside newer NovaSeq X series — produce two incompatible SampleSheet formats. BCLConvert V2 sheets use `[BCLConvert_Settings]` / `[BCLConvert_Data]` sections, `OverrideCycles` for UMI encoding, and `FileFormatVersion` in the header. IEM V1 sheets use `IEMFileVersion` and a flat `[Data]` section.
+Labs running mixed instrument fleets — older NovaSeq 6000 alongside newer NovaSeq X series, and increasingly non-Illumina platforms like the Element AVITI — produce several incompatible sample-sheet formats. BCLConvert V2 sheets use `[BCLConvert_Settings]` / `[BCLConvert_Data]` sections, `OverrideCycles` for UMI encoding, and `FileFormatVersion` in the header. IEM V1 sheets use `IEMFileVersion` and a flat `[Data]` section. Element AVITI ships a `RunManifest.csv` with an entirely different layout.
 
-Existing tools either hard-code one format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format, exposes a consistent interface for both, converts between formats, validates index integrity (including Hamming distance), diffs sheets to catch accidental changes before a run starts, and writes new sheets programmatically — so you never have to hand-edit a CSV again.
+Existing tools either hard-code one vendor's format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format across vendors, exposes a consistent interface for all of them, converts between the Illumina formats, validates index integrity (including Hamming distance and per-cycle color balance against each instrument's optical chemistry), diffs sheets to catch accidental changes before a run starts, and writes new sheets programmatically — so you never have to hand-edit a CSV again.
 
 ---
 
@@ -54,7 +54,7 @@ from samplesheet_parser import SampleSheetFactory
 factory = SampleSheetFactory()
 sheet = factory.create_parser("SampleSheet.csv", parse=True)
 
-print(factory.version)      # SampleSheetVersion.V1 or .V2
+print(factory.version)      # SampleSheetVersion.V1, .V2, or .ELEMENT_AVITI
 print(sheet.index_type())   # "dual", "single", or "none"
 
 for sample in sheet.samples():

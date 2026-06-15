@@ -2,7 +2,7 @@
 
 ## Auto-detect format (recommended)
 
-The simplest entry point. `SampleSheetFactory` detects V1 vs V2 automatically using a three-step strategy and returns the correct parser.
+The simplest entry point. `SampleSheetFactory` detects the format automatically — Illumina V1, V2, or an Element AVITI run manifest — and returns the correct parser.
 
 ```python
 from samplesheet_parser import SampleSheetFactory
@@ -10,7 +10,7 @@ from samplesheet_parser import SampleSheetFactory
 factory = SampleSheetFactory()
 sheet = factory.create_parser("SampleSheet.csv", parse=True)
 
-print(factory.version)      # SampleSheetVersion.V1 or .V2
+print(factory.version)      # SampleSheetVersion.V1, .V2, or .ELEMENT_AVITI
 print(sheet.index_type())   # "dual", "single", or "none"
 
 for sample in sheet.samples():

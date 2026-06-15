@@ -31,6 +31,10 @@ for w in result.warnings:
 | `INDEX_DISTANCE_TOO_LOW` | warning | Hamming distance between two indexes < threshold |
 | `NO_ADAPTERS` | warning | No adapter sequences configured |
 | `ADAPTER_MISMATCH` | warning | Adapter is non-standard |
+| `COLOR_BALANCE_NO_SIGNAL` | error | A 2-/1-channel index cycle produces no optical signal (opt-in) |
+| `COLOR_BALANCE_LOW` | warning | An index cycle has weak channel signal or zero diversity (opt-in) |
+
+The last two checks are **opt-in** — see [Color-balance checking](#color-balance-checking) below.
 
 ## Index distance checking
 
@@ -49,6 +53,32 @@ result = SampleSheetValidator().validate(sheet, min_hamming_distance=4)
 ```
 
 The standalone helpers are also available: `hamming_distance(a, b)` for the literal Hamming distance and `index_collision_distance(a, b)` for the wildcard-aware per-index distance the validator uses.
+
+## Color-balance checking
+
+Optical sequencers read each index base by its fluorescent signal, and the number of channels differs by instrument: four-channel (MiSeq, HiSeq, Element AVITI), two-channel (NextSeq, NovaSeq 6000, NovaSeq X), and one-channel (iSeq). On two-channel chemistry the base `G` is "dark" — no dye — so an index cycle where the **entire pool** reads `G` emits no signal and the cycle fails to register, miscalling every barcode at that position. A Hamming-distance check cannot catch this because the indexes may still be perfectly distinct.
+
+`samplesheet-parser` models each instrument's chemistry and scores the pool cycle-by-cycle. The check is **opt-in** because it can turn a passing sheet into a failing one, and it needs to know the instrument:
+
+```python
+result = SampleSheetValidator().validate(
+    sheet,
+    check_color_balance=True,
+    instrument="NovaSeq X",   # optional; inferred from the sheet header when present
+)
+```
+
+- On **two-/one-channel** instruments, an all-`G` (no-signal) cycle is a `COLOR_BALANCE_NO_SIGNAL` error and a channel below `min_signal_fraction` (default 0.10) is a `COLOR_BALANCE_LOW` warning.
+- On **four-channel** instruments (including Element AVITI, an avidity platform with no dark base), there is no no-signal failure mode; a zero-diversity cycle — where the whole pool reads one base — is reported as a `COLOR_BALANCE_LOW` warning instead.
+- If the instrument is unknown, the check is skipped silently.
+
+The CLI exposes the same check:
+
+```bash
+samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
+```
+
+The underlying API — `Chemistry`, `chemistry_for_instrument()`, and `analyze_color_balance()` returning a `ColorBalanceReport` — is public and usable on its own.
 
 ## Structured results
 

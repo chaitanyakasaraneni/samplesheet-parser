@@ -21,7 +21,7 @@ from samplesheet_parser import SampleSheetFactory
 factory = SampleSheetFactory()
 sheet = factory.create_parser("SampleSheet.csv", parse=True)
 
-print(factory.version)       # SampleSheetVersion.V1 or .V2
+print(factory.version)       # SampleSheetVersion.V1, .V2, or .ELEMENT_AVITI
 print(sheet.index_type())    # "dual", "single", or "none"
 print(sheet.experiment_name)
 
@@ -50,6 +50,34 @@ for err in result.errors:
 
 # Custom Hamming distance threshold
 result = SampleSheetValidator().validate(sheet, min_hamming_distance=4)
+```
+
+See `examples/demo_color_balance.py` for the opt-in per-cycle color-balance
+check (`validate(..., check_color_balance=True)`).
+
+---
+
+## Multi-vendor (Element AVITI)
+
+The same factory that detects Illumina V1/V2 sheets also auto-detects a
+non-Illumina Element AVITI `RunManifest.csv` and returns a parser with the
+identical interface. Demo: `examples/demo_element_aviti.py`.
+
+```python
+from samplesheet_parser import SampleSheetFactory, SampleSheetValidator
+
+sheet = SampleSheetFactory().create_parser(
+    "examples/sample_sheets/element_aviti_RunManifest.csv", parse=True
+)
+
+print(sheet.index_type())   # "dual"
+for s in sheet.samples():
+    print(s["sample_id"], s["index"], s["index2"])
+
+# Color balance works here too — AVITI resolves to four-channel chemistry,
+# so zero-diversity cycles surface as COLOR_BALANCE_LOW warnings.
+result = SampleSheetValidator().validate(sheet, check_color_balance=True)
+print(result.summary())
 ```
 
 ---

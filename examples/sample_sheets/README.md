@@ -1,13 +1,15 @@
 # Example Sample Sheets
 
-Reference sample sheets covering the full range of supported formats.
-Each file is a valid, runnable example that can be parsed by `samplesheet-parser`.
+Reference sample sheets covering the full range of supported formats — the two
+Illumina formats (IEM V1, BCLConvert V2) plus the non-Illumina Element AVITI run
+manifest. Each file is a valid, runnable example that can be parsed by
+`samplesheet-parser`, and all are auto-detected by `SampleSheetFactory`.
 
 ---
 
 ## V1 — IEM / bcl2fastq format
 
-Used with: NovaSeq 6000, HiSeq, NextSeq 500/550, MiSeq  
+Used with: NovaSeq 6000, HiSeq, NextSeq 500/550, MiSeq
 Identified by: `IEMFileVersion` in `[Header]`
 
 | File | Instrument | Indexes | Key feature |
@@ -36,7 +38,7 @@ AdapterRead2,AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT   ← Read 2
 
 ## V2 — BCLConvert format
 
-Used with: NovaSeq X, NovaSeq X Plus, NextSeq 1000/2000  
+Used with: NovaSeq X, NovaSeq X Plus, NextSeq 1000/2000
 Identified by: `FileFormatVersion` in `[Header]`, or `[BCLConvert_Settings]` / `[BCLConvert_Data]` section names
 
 | File | Instrument | Indexes | UMI | Key feature |
@@ -58,6 +60,35 @@ Y151;I8;Y151              — single index, no Index2 cycle
 ```
 
 Segment order: Read1 ; Index1 ; Index2 ; Read2
+
+---
+
+## Element AVITI — RunManifest (non-Illumina)
+
+Used with: Element Biosciences AVITI / AVITI24
+Identified by: a `[SAMPLES]` section (Illumina sheets use `[Data]` / `[BCLConvert_Data]`) plus a `[RUNVALUES]` section or a `SampleName` column
+
+| File | Instrument | Indexes | Key feature |
+|---|---|---|---|
+| `element_aviti_RunManifest.csv` | AVITI | Dual (10+10 bp) | `[RUNVALUES]` / `[SETTINGS]` / `[SAMPLES]` layout; four-channel avidity chemistry |
+
+AVITI is a four-channel platform (four avidite dyes imaged per cycle, no dark
+base), so the color-balance validator treats it like MiSeq/HiSeq — flagging
+zero-diversity index cycles as warnings rather than dark-cycle errors. The
+parser maps manifest columns onto the same sample schema as the Illumina
+parsers (`SampleName` → `sample_id`, `Index1` → `index`, `Index2` → `index2`,
+`Project` → `sample_project`, `Lane` → `lane`), so `samples()`, `index_type()`,
+validation, diff, and filtering all work unchanged.
+
+```python
+from samplesheet_parser import SampleSheetFactory, SampleSheetValidator
+
+sheet = SampleSheetFactory().create_parser(
+    "examples/sample_sheets/element_aviti_RunManifest.csv", parse=True
+)
+result = SampleSheetValidator().validate(sheet, check_color_balance=True)
+print(result.summary())
+```
 
 ---
 

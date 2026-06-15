@@ -2,13 +2,14 @@
 
 ## Format auto-detection
 
-`SampleSheetFactory` uses a three-step detection strategy — no format hints required from the caller:
+`SampleSheetFactory` detects the format across vendors — no format hints required from the caller:
 
-1. **Header discriminator** — scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
-2. **Section name scan** — if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
-3. **Default** — fall back to V1 (broadest compatibility with legacy files)
+1. **Vendor manifest check** — recognize a non-Illumina Element AVITI `RunManifest.csv` by its `[SAMPLES]` section combined with a `[RUNVALUES]` section or a `SampleName` column (→ `ELEMENT_AVITI`)
+2. **Header discriminator** — scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
+3. **Section name scan** — if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
+4. **Default** — fall back to V1 (broadest compatibility with legacy files)
 
-The detector reads only as much of the file as needed — stopping after `[Header]` in the common case.
+The detector reads only as much of the file as needed — stopping after `[Header]` in the common case for Illumina sheets.
 
 ```python
 from samplesheet_parser import SampleSheetFactory
@@ -16,7 +17,7 @@ from samplesheet_parser import SampleSheetFactory
 factory = SampleSheetFactory()
 sheet = factory.create_parser("SampleSheet.csv", parse=True)
 
-print(factory.version)   # SampleSheetVersion.V1 or .V2
+print(factory.version)   # SampleSheetVersion.V1, .V2, or .ELEMENT_AVITI
 ```
 
 ## V1 parser

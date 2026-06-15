@@ -5,13 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "samplesheet-parser"
 version = "2.3.0"
-description = "Format-agnostic parser for Illumina SampleSheet.csv files — supports IEM V1 and BCLConvert V2"
+description = "Multi-vendor, format-agnostic parser for sequencing sample sheets — Illumina IEM V1 & BCLConvert V2 plus Element AVITI run manifests, with index validation and color-balance checking"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Chaitanya Kasaraneni", email = "kc.kasaraneni@gmail.com" }]
 keywords = [
     "illumina", "samplesheet", "bclconvert", "bcl2fastq", "ngs",
     "genomics", "bioinformatics", "demultiplexing", "sequencing",
+    "element", "aviti", "multi-vendor", "color-balance", "run-manifest",
 ]
 classifiers = [
     "Development Status :: 5 - Production/Stable",

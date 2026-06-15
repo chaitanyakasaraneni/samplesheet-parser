@@ -2,11 +2,12 @@
 samplesheet-parser
 ====================
 
-Format-agnostic parser for Illumina SampleSheet.csv files.
+Multi-vendor, format-agnostic parser for sequencing sample sheets.
 
 Supports:
   - Illumina Experiment Manager (IEM) V1 format  - bcl2fastq era
   - BCLConvert V2 format                          - NovaSeq X / modern era
+  - Element Biosciences AVITI RunManifest.csv     - non-Illumina, avidity chemistry
 
 Quickstart
 ----------
