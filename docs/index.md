@@ -11,7 +11,7 @@ Supports the classic Illumina IEM V1 format (bcl2fastq era), the modern BCLConve
 [![codecov](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser/branch/main/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18989694.svg)](https://doi.org/10.5281/zenodo.18989694)
 
-![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_v03.png)
+![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_v2.3.png)
 
 ---
 
