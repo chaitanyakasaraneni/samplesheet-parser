@@ -8,7 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Documentation
+
+- Refreshed stale docs after the multi-vendor / color-balance release: updated
+  the README tagline, format-detection steps (now vendor-aware), and citation
+  block (v2.3.0 + DOI); documented the `chemistry` module, `ElementRunManifest`,
+  the `SampleSheetVersion.ELEMENT_AVITI` enum, the `validate(...)`
+  color-balance parameters, and the `--color-balance` / `--instrument` CLI flags
+  in the API and CLI references.
 
 ## [2.3.0] - 2026-06-15
 

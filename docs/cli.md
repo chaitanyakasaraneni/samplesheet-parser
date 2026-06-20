@@ -79,6 +79,8 @@ Validate a sheet for index, adapter, and structural issues.
 samplesheet validate SampleSheet.csv
 samplesheet validate SampleSheet.csv --format json
 samplesheet validate SampleSheet.csv --min-hamming 4
+samplesheet validate SampleSheet.csv --color-balance
+samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
 ```
 
 **Options:**
@@ -87,6 +89,8 @@ samplesheet validate SampleSheet.csv --min-hamming 4
 |---|---|---|
 | `--format` / `-f` | `text` | Output format: `text` or `json` |
 | `--min-hamming` | `3` | Minimum Hamming distance between indexes |
+| `--color-balance` / `--no-color-balance` | off | Also run per-cycle color-balance checking against the instrument's optical chemistry (opt-in; skipped silently for unknown instruments) |
+| `--instrument` | from header | Instrument name used to resolve chemistry for the color-balance check |
 
 **Exit codes:** `0` = valid, `1` = errors found, `2` = parse/usage error.
 

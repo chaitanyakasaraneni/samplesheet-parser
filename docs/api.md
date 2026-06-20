@@ -15,6 +15,11 @@ from samplesheet_parser import (
     SampleSheetMerger,
     SampleSheetSplitter,
     SampleSheetFilter,
+    ElementRunManifest,
+    Chemistry,
+    chemistry_for_instrument,
+    analyze_color_balance,
+    ColorBalanceReport,
     normalize_index_lengths,
     hamming_distance,
 )
@@ -36,12 +41,12 @@ from samplesheet_parser import (
 
 ## SampleSheetParser Protocol
 
-`SampleSheetParser` is a `runtime_checkable` structural protocol satisfied by both `SampleSheetV1` and `SampleSheetV2`. Use it as a type hint wherever either parser is accepted, or implement it in a third-party parser and register it with the factory.
+`SampleSheetParser` is a `runtime_checkable` structural protocol satisfied by `SampleSheetV1`, `SampleSheetV2`, and the non-Illumina `ElementRunManifest`. Use it as a type hint wherever any parser is accepted, or implement it in a third-party parser and register it with the factory.
 
 ```python
 from samplesheet_parser import SampleSheetParser
 
-isinstance(sheet, SampleSheetParser)   # True for V1 and V2 instances
+isinstance(sheet, SampleSheetParser)   # True for V1, V2, and AVITI instances
 ```
 
 ---
@@ -121,7 +126,13 @@ from samplesheet_parser.instruments import (
 
 | Method | Returns | Description |
 |---|---|---|
-| `validate(sheet, *, min_hamming_distance=3)` | `ValidationResult` | Run all checks; returns structured result |
+| `validate(sheet, *, min_hamming_distance=3, check_color_balance=False, instrument=None, min_signal_fraction=0.1)` | `ValidationResult` | Run all checks; returns structured result |
+
+Color-balance checking is **opt-in** via `check_color_balance=True`. The
+instrument is read from the sheet header when present, or supplied with
+`instrument=`; the check is skipped silently for unknown instruments. It emits
+`COLOR_BALANCE_NO_SIGNAL` (error) and `COLOR_BALANCE_LOW` (warning) issues — see
+[Validation → Color-balance checking](guide/validation.md#color-balance-checking).
 
 ### ValidationResult
 
@@ -248,6 +259,75 @@ from samplesheet_parser.instruments import (
 
 ---
 
+## ElementRunManifest
+
+Non-Illumina parser for Element Biosciences AVITI `RunManifest.csv` files. It
+satisfies the `SampleSheetParser` protocol, so it works with the validator,
+diff, splitter, and filter just like the Illumina parsers. The factory
+auto-detects manifests, so you rarely instantiate this directly.
+
+```python
+from samplesheet_parser import ElementRunManifest
+
+sheet = ElementRunManifest("RunManifest.csv")
+sheet.parse()
+```
+
+| Method / attribute | Returns | Description |
+|---|---|---|
+| `parse(do_clean=True)` | `None` | Parse `[RUNVALUES]` / `[SETTINGS]` / `[SAMPLES]` sections |
+| `samples()` | `list[dict]` | Manifest rows mapped to the shared schema (`sample_id`, `index`, `index2`, `lane`, `sample_project`) |
+| `index_type()` | `str` | `"dual"`, `"single"`, or `"none"` |
+| `parse_custom_section(name, *, required=False)` | `dict[str, str]` | Parse any manifest section as key/value pairs |
+| `.adapters` | `list[str]` | Adapter sequences from `[SETTINGS]` |
+| `is_manifest(path)` | `bool` | Static detector used by the factory (`[SAMPLES]` + `[RUNVALUES]`/`SampleName`) |
+
+Manifest columns map as `SampleName → sample_id`, `Index1 → index`,
+`Index2 → index2`, `Lane → lane`, `Project → sample_project`; other columns
+(e.g. `ExternalID`) are preserved as passthrough fields.
+
+---
+
+## samplesheet_parser.chemistry
+
+Per-cycle color-balance analysis against an instrument's optical detection
+chemistry.
+
+```python
+from samplesheet_parser import (
+    Chemistry,
+    chemistry_for_instrument,
+    analyze_color_balance,
+    ColorBalanceReport,
+)
+```
+
+| Name | Kind | Description |
+|---|---|---|
+| `Chemistry` | `str, Enum` | `ONE_CHANNEL` / `TWO_CHANNEL` / `FOUR_CHANNEL` |
+| `chemistry_for_instrument(name)` | `Chemistry \| None` | Resolve an instrument name to its chemistry; `None` if unknown |
+| `analyze_color_balance(index1, index2=None, *, chemistry, min_signal_fraction=0.1)` | `ColorBalanceReport` | Score index pools cycle-by-cycle |
+
+### ColorBalanceReport
+
+| Attribute / method | Type | Description |
+|---|---|---|
+| `chemistry` | `Chemistry` | Chemistry the pool was scored against |
+| `pool_size` | `int` | Number of indexes analysed |
+| `cycles` | `list[CycleBalance]` | Per-cycle signal breakdown |
+| `dark_cycles` | `list[CycleBalance]` | Cycles producing no optical signal (2-/1-channel) |
+| `weak_cycles` | `list[CycleBalance]` | Below-threshold or zero-diversity cycles |
+| `is_balanced` | `bool` | `True` when there are no dark or weak cycles |
+
+```python
+chem = chemistry_for_instrument("NovaSeq X")          # Chemistry.TWO_CHANNEL
+report = analyze_color_balance(["ATGC", "CAGT", "TCGA", "GATG"], chemistry=chem)
+for cb in report.dark_cycles:
+    print(cb.read, cb.cycle, cb.base_counts)
+```
+
+---
+
 ## normalize_index_lengths
 
 ```python
@@ -286,6 +366,7 @@ Used internally by `SampleSheetValidator` when checking index collision threshol
 ```python
 from samplesheet_parser.enums import SampleSheetVersion, InstrumentPlatform, UMILocation
 
-SampleSheetVersion.V1   # IEM / bcl2fastq
-SampleSheetVersion.V2   # BCLConvert
+SampleSheetVersion.V1              # IEM / bcl2fastq
+SampleSheetVersion.V2              # BCLConvert
+SampleSheetVersion.ELEMENT_AVITI   # Element AVITI RunManifest (non-Illumina)
 ```

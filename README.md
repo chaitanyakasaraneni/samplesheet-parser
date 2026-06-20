@@ -1,6 +1,6 @@
 # samplesheet-parser
 
-**Format-agnostic parser for Illumina SampleSheet.csv files.**
+**Multi-vendor, format-agnostic parser for sequencing sample sheets.**
 
 Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — plus non-Illumina **Element AVITI** run manifests — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, **per-cycle color-balance validation** against the instrument's optical chemistry, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
 
@@ -289,13 +289,14 @@ samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv --format json
 
 ## Format detection logic
 
-The factory uses a three-step detection strategy — no format hints required from the caller:
+The factory detects the format across vendors — no format hints required from the caller:
 
-1. **Header discriminator** — scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
-2. **Section name scan** — if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
-3. **Default** — fall back to V1 (broadest compatibility with legacy files)
+1. **Vendor manifest check** — recognise a non-Illumina Element AVITI `RunManifest.csv` by its `[SAMPLES]` section combined with a `[RUNVALUES]` section or a `SampleName` column (→ `ELEMENT_AVITI`)
+2. **Header discriminator** — scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
+3. **Section name scan** — if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
+4. **Default** — fall back to V1 (broadest compatibility with legacy files)
 
-The detector reads only as much of the file as needed — stopping after `[Header]` in the common case.
+For Illumina sheets the detector reads only as much of the file as needed — stopping after `[Header]` in the common case.
 
 ---
 
@@ -729,13 +730,16 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR c
 
 ```bibtex
 @software{kasaraneni2026samplesheetparser,
-  author  = {Kasaraneni, Chaitanya},
-  title   = {samplesheet-parser: Format-agnostic parser for Illumina SampleSheet.csv},
+  author  = {Kasaraneni, Chaitanya Krishna},
+  title   = {samplesheet-parser: A multi-vendor parser, validator, and converter for sequencing sample sheets},
   year    = {2026},
   url     = {https://github.com/chaitanyakasaraneni/samplesheet-parser},
-  version = {1.1.0}
+  doi     = {10.5281/zenodo.18989694},
+  version = {2.3.0}
 }
 ```
+
+See [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
 
 ---
 
