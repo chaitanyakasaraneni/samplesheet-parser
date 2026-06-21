@@ -11,10 +11,10 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 [![Tests](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions/workflows/ci.yml/badge.svg)](https://github.com/chaitanyakasaraneni/samplesheet-parser/actions)
 [![codecov](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser/branch/main/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/chaitanyakasaraneni/samplesheet-parser)
-[![Docs](https://readthedocs.org/projects/illumina-samplesheet/badge/)](https://illumina-samplesheet.readthedocs.io)
+[![Docs](https://readthedocs.org/projects/samplesheet-parser/badge/)](https://samplesheet-parser.readthedocs.io)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18989694.svg)](https://doi.org/10.5281/zenodo.18989694)
 
-**Docs:** https://illumina-samplesheet.readthedocs.io/ | **PyPI:** https://pypi.org/project/samplesheet-parser/
+**Docs:** https://samplesheet-parser.readthedocs.io/ | **PyPI:** https://pypi.org/project/samplesheet-parser/
 
 ![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_v2.3.png)
 
@@ -355,8 +355,8 @@ a real, common cause of wrecked runs that a Hamming-distance check cannot see.
 
 Because the sample sheet already contains every sample's index, this can be
 predicted *before the run starts* with no sequencing data. The validator scores
-the pool cycle-by-cycle: it transposes the indexes into columns and checks that
-each column produces signal in both channels.
+the pool cycle-by-cycle against the instrument's chemistry, with the exact rule
+depending on the chemistry and the selected mode (see below).
 
 ```python
 from samplesheet_parser import SampleSheetFactory, SampleSheetValidator
@@ -394,16 +394,32 @@ samplesheet validate SampleSheet.csv --color-balance
 samplesheet validate SampleSheet.csv --color-balance --instrument NovaSeqXSeries
 ```
 
-| Chemistry | Instruments | What is flagged |
-|---|---|---|
-| 4-channel | MiSeq, HiSeq 2000/2500/3000/4000, Element AVITI | Zero-diversity cycles (warning) |
-| 2-channel | NextSeq, NovaSeq 6000, NovaSeq X, MiniSeq | Dark cycles / weak channels |
-| 1-channel | iSeq 100 | Dark cycles / weak channels |
+#### Modes: `vendor_faithful` (default) and `conservative`
 
-Element AVITI uses four-channel avidity chemistry (four images per cycle, one
-per avidite dye — [Arslan et al., *Nat. Biotechnol.* 2023](https://www.nature.com/articles/s41587-023-01750-7)),
-so it has no dark base; color-balance checking flags low-diversity index
-cycles rather than dark cycles.
+Color balance has two modes, selectable via
+`validate(..., color_balance_mode=...)` or `analyze_color_balance(..., mode=...)`:
+
+- **`vendor_faithful`** (default) encodes each platform's *published* rule
+  exactly — Illumina's "signal in at least one channel" minimum for 2-channel,
+  the both-lasers rule for 4-channel, and Element's permissive low-diversity
+  stance for AVITI.
+- **`conservative`** is stricter than the published minimum: it also fails
+  single-channel 2-channel cycles and AVITI low-diversity cycles. (This was the
+  behavior before modes existed — pass `color_balance_mode="conservative"` to
+  keep it.)
+
+| Chemistry | Instruments | Failure rule (both modes) | Stricter in `conservative` |
+|---|---|---|---|
+| 4-channel | MiSeq, HiSeq 2000/2500/3000/4000 | a green `{G,T}` or red `{A,C}` laser is entirely absent | — |
+| 2-channel | NextSeq, NovaSeq 6000, NovaSeq X, MiniSeq | all-`G` cycle (no signal either channel) | single-channel cycle also fails |
+| 1-channel | iSeq 100 | all-`G` cycle | single-channel cycle also fails |
+| avidity | Element AVITI | (no dark/laser failure) | low-diversity cycle fails |
+
+Element AVITI uses avidity chemistry — each base has its own avidite dye
+([Arslan et al., *Nat. Biotechnol.* 2023](https://www.nature.com/articles/s41587-023-01750-7))
+— so it has no dark base and no laser-pair constraint. In `vendor_faithful`
+mode, AVITI low diversity in the first cycles is an advisory
+(`COLOR_BALANCE_ADVISORY`), never a failure.
 
 ---
 
@@ -735,7 +751,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR c
   year    = {2026},
   url     = {https://github.com/chaitanyakasaraneni/samplesheet-parser},
   doi     = {10.5281/zenodo.18989694},
-  version = {2.3.0}
+  version = {2.4.0}
 }
 ```
 

@@ -160,7 +160,6 @@ def v2_with_cloud_data(tmp_path: Path) -> str:
 
 
 class TestConverterInit:
-
     def test_detects_v1(self, v1_sheet: str) -> None:
         from samplesheet_parser.enums import SampleSheetVersion
 
@@ -190,7 +189,6 @@ class TestConverterInit:
 
 
 class TestV1ToV2:
-
     def test_output_file_created(self, v1_sheet: str, tmp_path: Path) -> None:
         out = tmp_path / "output_v2.csv"
         result = SampleSheetConverter(v1_sheet).to_v2(out)
@@ -290,7 +288,6 @@ class TestV1ToV2:
 
 
 class TestV2ToV1:
-
     def test_output_file_created(self, v2_sheet: str, tmp_path: Path) -> None:
         out = tmp_path / "output_v1.csv"
         result = SampleSheetConverter(v2_sheet).to_v1(out)
@@ -393,7 +390,6 @@ class TestV2ToV1:
 
 
 class TestRoundTrip:
-
     def test_v1_to_v2_to_v1_sample_ids(self, v1_sheet: str, tmp_path: Path) -> None:
         """Sample IDs should survive a full V1 → V2 → V1 round trip."""
         v2_out = tmp_path / "round_v2.csv"
@@ -512,7 +508,6 @@ class TestRoundTrip:
 
 
 class TestConverterEdgeCases:
-
     def test_to_v2_raises_type_error_for_wrong_sheet_type(self, tmp_path: Path) -> None:
         """Line 135: TypeError when internal _sheet is not SampleSheetV1."""
         p = tmp_path / "v1.csv"

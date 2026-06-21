@@ -35,6 +35,7 @@ __license__ = "Apache 2.0"
 
 from samplesheet_parser.chemistry import (
     Chemistry,
+    ColorBalanceMode,
     ColorBalanceReport,
     analyze_color_balance,
     chemistry_for_instrument,
@@ -74,6 +75,7 @@ __all__ = [
     "hamming_distance",
     "index_collision_distance",
     "Chemistry",
+    "ColorBalanceMode",
     "ColorBalanceReport",
     "analyze_color_balance",
     "chemistry_for_instrument",

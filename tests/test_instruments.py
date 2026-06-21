@@ -22,7 +22,6 @@ from samplesheet_parser.instruments import (
 
 
 class TestReverseComplement:
-
     @pytest.mark.parametrize(
         "seq, expected",
         [
@@ -45,7 +44,6 @@ class TestReverseComplement:
 
 
 class TestDetectWorkflow:
-
     @pytest.mark.parametrize("name", ["MiSeq", "miseq", "MISEQ", "HiSeq 2500", "HiSeq2000"])
     def test_workflow_a_instruments(self, name: str) -> None:
         assert detect_workflow(name) == Workflow.A
@@ -96,7 +94,6 @@ class TestDetectWorkflow:
 
 
 class TestParseWorkflow:
-
     @pytest.mark.parametrize(
         "value, expected",
         [

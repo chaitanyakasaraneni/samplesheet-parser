@@ -6,7 +6,6 @@ from samplesheet_parser.parsers.v2 import ReadStructure, SampleSheetV2
 
 
 class TestSampleSheetV2Parsing:
-
     def test_parse_header(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
         sheet.parse()
@@ -65,7 +64,7 @@ class TestSampleSheetV2Parsing:
     def test_parse_data_missing_required_columns(self, tmp_path):
         p = tmp_path / "missing_index.csv"
         p.write_text(
-            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n" "[BCLConvert_Data]\nSample_ID\nS1\n"
+            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n[BCLConvert_Data]\nSample_ID\nS1\n"
         )
         sheet = SampleSheetV2(str(p))
         with pytest.raises(ValueError, match="Missing required .*columns"):
@@ -97,7 +96,6 @@ class TestSampleSheetV2Parsing:
 
 
 class TestSampleSheetV2Samples:
-
     def test_samples_count(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
         sheet.parse()
@@ -137,7 +135,6 @@ class TestSampleSheetV2Samples:
 
 
 class TestSampleSheetV2IndexType:
-
     def test_dual_index(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
         sheet.parse()
@@ -155,7 +152,6 @@ class TestSampleSheetV2IndexType:
 
 
 class TestOverrideCyclesDecoding:
-
     def test_no_umi(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
         sheet.parse()
@@ -249,7 +245,6 @@ class TestOverrideCyclesDecoding:
 
 
 class TestSampleSheetV2BCLConvertSectionsOnly:
-
     def test_no_header_falls_back(self, v2_bclconvert_sections_only):
         """Sheet with no [Header] at all should raise because FileFormatVersion is missing."""
         sheet = SampleSheetV2(v2_bclconvert_sections_only)
@@ -258,7 +253,6 @@ class TestSampleSheetV2BCLConvertSectionsOnly:
 
 
 class TestSampleSheetV2CloudData:
-
     def test_parse_cloud_data_skips_malformed(self, tmp_path):
         p = tmp_path / "cloud.csv"
         p.write_text(
@@ -275,7 +269,6 @@ class TestSampleSheetV2CloudData:
 
 
 class TestSampleSheetV2Equality:
-
     def test_equal_sheets(self, v2_minimal, tmp_path):
         import shutil
 
@@ -305,7 +298,6 @@ class TestSampleSheetV2Equality:
 
 
 class TestSampleSheetV2EdgeCases:
-
     def test_index_type_returns_none_when_no_index_column(self, tmp_path):
         """Line 339: index_type() returns 'none' when columns has no Index."""
         p = tmp_path / "v2.csv"
@@ -381,7 +373,7 @@ class TestSampleSheetV2EdgeCases:
     def test_empty_bclconvert_data_raises(self, tmp_path):
         """Line 535: parse() raises when [BCLConvert_Data] section is completely empty."""
         p = tmp_path / "v2.csv"
-        p.write_text("[Header]\nFileFormatVersion,2\nRunName,T\n\n" "[BCLConvert_Data]\n")
+        p.write_text("[Header]\nFileFormatVersion,2\nRunName,T\n\n[BCLConvert_Data]\n")
         sheet = SampleSheetV2(str(p))
         with pytest.raises(ValueError, match=r"BCLConvert_Data"):
             sheet.parse()

@@ -191,7 +191,6 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 
 
 class TestMergerHappyPath:
-
     def test_two_clean_v1_sheets_no_conflicts(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
@@ -264,7 +263,6 @@ class TestMergerHappyPath:
 
 
 class TestMergerMixedFormat:
-
     def test_mixed_input_produces_mixed_format_warning(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         c = _write(tmp_path, "c.csv", _V2_C)
@@ -315,7 +313,6 @@ class TestMergerMixedFormat:
 
 
 class TestMergerIndexCollision:
-
     def test_collision_sets_has_conflicts(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B_COLLISION)
@@ -387,7 +384,6 @@ class TestMergerIndexCollision:
 
 
 class TestMergerReadLengthConflict:
-
     def test_different_read_lengths_is_conflict(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)  # 151/151
         b = _write(tmp_path, "b.csv", _V1_B_DIFF_READ)  # 76/76
@@ -412,7 +408,6 @@ class TestMergerReadLengthConflict:
 
 
 class TestMergerAdapterConflict:
-
     def test_different_adapters_produces_warning(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B_DIFF_ADAPTER)
@@ -444,7 +439,6 @@ class TestMergerAdapterConflict:
 
 
 class TestMergerUsageErrors:
-
     def test_no_paths_raises_value_error(self, tmp_path: Path) -> None:
         with pytest.raises(ValueError, match="No input sheets registered"):
             SampleSheetMerger().merge(tmp_path / "out.csv")
@@ -470,7 +464,6 @@ class TestMergerUsageErrors:
 
 
 class TestMergerIndexDistance:
-
     def test_close_indexes_across_sheets_produce_distance_warning(self, tmp_path: Path) -> None:
         """Indexes within Hamming distance < 3 across sheets → warning."""
         a = _write(tmp_path, "a.csv", _V1_A)
@@ -516,7 +509,6 @@ class TestMergerIndexDistance:
 
 
 class TestMergerReadOnlyParsing:
-
     def test_source_files_are_not_modified(self, tmp_path: Path) -> None:
         """Merger must not mutate source sheet files (clean=False)."""
         a = _write(tmp_path, "a.csv", _V1_A)
@@ -569,7 +561,6 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 
 
 class TestMergerIncompleteRecord:
-
     def test_missing_index_produces_structured_warning(self, tmp_path: Path) -> None:
         """A sample row with no Index should produce INCOMPLETE_SAMPLE_RECORD warning."""
         a = _write(tmp_path, "a.csv", _V1_A)
@@ -630,7 +621,6 @@ class TestMergerIncompleteRecord:
 
 
 class TestMergerAdapterConflictMessage:
-
     def test_adapter_conflict_warning_names_primary_sheet(self, tmp_path: Path) -> None:
         """Warning message must reference parsed[0] (the sheet whose adapters are used)."""
         a = _write(tmp_path, "a.csv", _V1_A)  # primary - adapters kept
@@ -706,7 +696,6 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 
 
 class TestMergerMultiLaneRecords:
-
     def test_collision_detected_in_non_primary_lane(self, tmp_path: Path) -> None:
         """INDEX_COLLISION must fire for lane 2 even when Sample_ID is the
         same across lanes (which sheet.samples() would de-duplicate)."""
@@ -773,7 +762,6 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 
 
 class TestMergerPrimaryPreScan:
-
     def test_incomplete_record_in_primary_sheet_emits_warning(self, tmp_path: Path) -> None:
         """A row in parsed[0] that is missing Index must produce
         INCOMPLETE_SAMPLE_RECORD, not be silently dropped."""
@@ -846,7 +834,6 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 
 
 class TestMergerSecondaryMultiLane:
-
     def test_both_lane_rows_appear_in_merged_output(self, tmp_path: Path) -> None:
         """Secondary sheet with SampleC in lanes 1 and 2 - both rows must be
         written.  If _build_writer uses sheet.samples() the second lane entry
@@ -881,7 +868,6 @@ class TestMergerSecondaryMultiLane:
 
 
 class TestMergerValidateMergedExceptionHandling:
-
     def test_validate_merged_exception_produces_conflict_not_raise(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -932,7 +918,6 @@ class TestMergerValidateMergedExceptionHandling:
 
 
 class TestMergerReadLengthKeyOrder:
-
     def test_no_false_conflict_when_key_order_differs(self, tmp_path: Path) -> None:
         """Two sheets with identical read lengths (151/151) must not trigger
         READ_LENGTH_CONFLICT even if one parser returned Read2Cycles before
@@ -1049,7 +1034,6 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 
 
 class TestMergerAdapterBothGuard:
-
     def test_no_conflict_when_primary_has_no_adapters(self, tmp_path: Path) -> None:
         """Primary sheet has no adapters; secondary has adapters.
         Should NOT produce ADAPTER_CONFLICT - nothing to conflict against."""
@@ -1091,7 +1075,6 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,I5_Index_ID,index2,Sample_Project
 
 
 class TestMergerReadLengthSentinel:
-
     def test_missing_reads_vs_present_reads_is_conflict(self, tmp_path: Path) -> None:
         """One sheet has [Reads] (151/151), other has none → READ_LENGTH_CONFLICT."""
         a = _write(tmp_path, "a.csv", _V1_A)  # has [Reads] 151/151
@@ -1270,7 +1253,6 @@ Lane,Sample_ID,Sample_Name,I7_Index_ID,index,Sample_Project
 
 
 class TestMergerIncompleteRecords:
-
     def test_incomplete_record_in_primary_emits_warning(self, tmp_path: Path) -> None:
         """Lines 541-542: primary sheet record missing Sample_ID/Index gets a warning."""
         a = _write(tmp_path, "a.csv", _V1_WITH_INCOMPLETE_RECORD)

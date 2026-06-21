@@ -1,6 +1,6 @@
 site_name: samplesheet-parser
 site_description: Format-agnostic parser for Illumina SampleSheet.csv files — supports IEM V1 and BCLConvert V2
-site_url: https://illumina-samplesheet.readthedocs.io
+site_url: https://samplesheet-parser.readthedocs.io
 repo_url: https://github.com/chaitanyakasaraneni/samplesheet-parser
 repo_name: chaitanyakasaraneni/samplesheet-parser
 edit_uri: edit/main/docs/

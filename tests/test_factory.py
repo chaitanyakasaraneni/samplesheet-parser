@@ -8,7 +8,6 @@ from samplesheet_parser.parsers.v2 import SampleSheetV2
 
 
 class TestFormatDetection:
-
     def test_detects_v1_by_iem_version(self, v1_minimal):
         factory = SampleSheetFactory()
         sheet = factory.create_parser(v1_minimal)
@@ -30,7 +29,7 @@ class TestFormatDetection:
     def test_defaults_to_v1_when_no_indicators(self, tmp_path):
         """Sheet with no version markers → defaults to V1."""
         p = tmp_path / "ambiguous.csv"
-        p.write_text("[Header]\nExperiment Name,Test\n\n" "[Data]\nSample_ID,index\nS1,ATCACG\n")
+        p.write_text("[Header]\nExperiment Name,Test\n\n[Data]\nSample_ID,index\nS1,ATCACG\n")
         factory = SampleSheetFactory()
         factory.create_parser(str(p))
         assert factory.version == SampleSheetVersion.V1
@@ -75,7 +74,6 @@ class TestFormatDetection:
 
 
 class TestFactoryParseDelegate:
-
     def test_parse_true_parses_immediately(self, v1_minimal):
         sheet = SampleSheetFactory().create_parser(v1_minimal, parse=True)
         # If parse ran, records should be populated
@@ -95,7 +93,6 @@ class TestFactoryParseDelegate:
 
 
 class TestFactoryGetUmiLength:
-
     def test_umi_length_v2(self, v2_with_umi):
         factory = SampleSheetFactory()
         factory.create_parser(v2_with_umi, parse=True)
@@ -133,7 +130,6 @@ class TestFactoryGetUmiLength:
 
 
 class TestFactoryRepr:
-
     def test_repr_before_use(self):
         r = repr(SampleSheetFactory())
         assert "version=None" in r

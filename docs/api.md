@@ -17,6 +17,7 @@ from samplesheet_parser import (
     SampleSheetFilter,
     ElementRunManifest,
     Chemistry,
+    ColorBalanceMode,
     chemistry_for_instrument,
     analyze_color_balance,
     ColorBalanceReport,
@@ -126,12 +127,15 @@ from samplesheet_parser.instruments import (
 
 | Method | Returns | Description |
 |---|---|---|
-| `validate(sheet, *, min_hamming_distance=3, check_color_balance=False, instrument=None, min_signal_fraction=0.1)` | `ValidationResult` | Run all checks; returns structured result |
+| `validate(sheet, *, min_hamming_distance=3, check_color_balance=False, instrument=None, color_balance_mode="vendor_faithful", min_signal_fraction=0.1)` | `ValidationResult` | Run all checks; returns structured result |
 
 Color-balance checking is **opt-in** via `check_color_balance=True`. The
 instrument is read from the sheet header when present, or supplied with
-`instrument=`; the check is skipped silently for unknown instruments. It emits
-`COLOR_BALANCE_NO_SIGNAL` (error) and `COLOR_BALANCE_LOW` (warning) issues — see
+`instrument=`; the check is skipped silently for unknown instruments.
+`color_balance_mode` is `"vendor_faithful"` (default) or `"conservative"` (see
+[`ColorBalanceMode`](#samplesheet_parserchemistry)). It emits
+`COLOR_BALANCE_NO_SIGNAL` (error), `COLOR_BALANCE_LOW` (warning), and
+`COLOR_BALANCE_ADVISORY` (warning, AVITI) issues — see
 [Validation → Color-balance checking](guide/validation.md#color-balance-checking).
 
 ### ValidationResult
@@ -296,6 +300,7 @@ chemistry.
 ```python
 from samplesheet_parser import (
     Chemistry,
+    ColorBalanceMode,
     chemistry_for_instrument,
     analyze_color_balance,
     ColorBalanceReport,
@@ -304,20 +309,29 @@ from samplesheet_parser import (
 
 | Name | Kind | Description |
 |---|---|---|
-| `Chemistry` | `str, Enum` | `ONE_CHANNEL` / `TWO_CHANNEL` / `FOUR_CHANNEL` |
-| `chemistry_for_instrument(name)` | `Chemistry \| None` | Resolve an instrument name to its chemistry; `None` if unknown |
-| `analyze_color_balance(index1, index2=None, *, chemistry, min_signal_fraction=0.1)` | `ColorBalanceReport` | Score index pools cycle-by-cycle |
+| `Chemistry` | `str, Enum` | `ONE_CHANNEL` / `TWO_CHANNEL` / `FOUR_CHANNEL` (Illumina two-laser) / `AVIDITY` (Element AVITI) |
+| `ColorBalanceMode` | `str, Enum` | `VENDOR_FAITHFUL` (default, published rule) / `CONSERVATIVE` (stricter) |
+| `chemistry_for_instrument(name)` | `Chemistry \| None` | Resolve an instrument name to its chemistry; `None` if unknown. `"AVITI"` → `AVIDITY` |
+| `analyze_color_balance(index1, index2=None, *, chemistry, mode="vendor_faithful", min_signal_fraction=0.1)` | `ColorBalanceReport` | Score index pools cycle-by-cycle |
+
+Rules by chemistry: **2-/1-channel** — all-`G` cycle fails (both modes); a
+single-channel cycle fails only in `conservative` (Illumina's minimum is "at
+least one channel"). **4-channel** — a cycle missing the green `{G,T}` or red
+`{A,C}` laser fails (both modes). **avidity** — low diversity is an advisory in
+`vendor_faithful`, a failure in `conservative`.
 
 ### ColorBalanceReport
 
 | Attribute / method | Type | Description |
 |---|---|---|
 | `chemistry` | `Chemistry` | Chemistry the pool was scored against |
+| `mode` | `ColorBalanceMode` | Mode the pool was scored under |
 | `pool_size` | `int` | Number of indexes analysed |
 | `cycles` | `list[CycleBalance]` | Per-cycle signal breakdown |
-| `dark_cycles` | `list[CycleBalance]` | Cycles producing no optical signal (2-/1-channel) |
-| `weak_cycles` | `list[CycleBalance]` | Below-threshold or zero-diversity cycles |
-| `is_balanced` | `bool` | `True` when there are no dark or weak cycles |
+| `dark_cycles` | `list[CycleBalance]` | Failing cycles (no signal / laser absent / conservative escalations) |
+| `weak_cycles` | `list[CycleBalance]` | Non-failing warnings (single-channel or below-threshold) |
+| `advisory_cycles` | `list[CycleBalance]` | AVITI low-diversity advisories (vendor_faithful) |
+| `is_balanced` | `bool` | `True` when there are no **dark** (failing) cycles |
 
 ```python
 chem = chemistry_for_instrument("NovaSeq X")          # Chemistry.TWO_CHANNEL

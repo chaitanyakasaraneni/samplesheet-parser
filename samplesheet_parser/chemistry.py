@@ -6,14 +6,17 @@ signal in one, two, or four optical channels per cycle. The number of
 channels determines how a base is encoded as *signal*, and that in turn
 determines what makes a pool of indexes safe to sequence together:
 
-* **4-channel** (MiSeq, HiSeq 2000/2500/3000/4000, and Element AVITI) -
-  each base has its own dye, so any base produces signal. Illumina images
-  four colours per cycle; Element's avidity chemistry likewise captures
-  four images per cycle, one per avidite dye (Arslan et al., *Nat.
-  Biotechnol.* 2023), so the AVITI is a four-channel platform with no dark
-  base. The only real risk is *low diversity*: if every sample reads the
-  same base at a cycle, the instrument struggles to focus and phase,
-  degrading base-call quality.
+* **4-channel** (Illumina MiSeq, HiSeq 2000/2500/3000/4000) - four colours
+  imaged with two lasers: a green laser reads ``{G,T}`` and a red laser
+  reads ``{A,C}``. Every base produces signal, but each cycle still needs at
+  least one base from *each* laser group across the pool, or one laser is
+  dark and clusters cannot be registered.
+
+* **avidity** (Element AVITI) - each base is labelled with its own avidite
+  dye (four images per cycle, no dark base; Arslan et al., *Nat. Biotechnol.*
+  2023). Unlike Illumina's two-laser SBS there is no laser-pair constraint,
+  so the platform tolerates low-diversity pools; low diversity is at most an
+  advisory, never a failure.
 
 * **2-channel SBS** (NextSeq, NovaSeq 6000, NovaSeq X, MiniSeq) - two
   images (nominally "red" and "green") are captured and the base is
@@ -52,17 +55,49 @@ from samplesheet_parser.instruments import _normalize
 # Default minimum fraction of the pool that must produce signal in each
 # optical channel at every index cycle. Below this (but above zero) the
 # cycle is flagged as weak; exactly zero is flagged as a dark/no-signal
-# cycle. 0.10 mirrors Illumina low-plex pooling guidance (each channel
-# should carry meaningful signal, not a single stray sample).
+# cycle. 0.10 is a heuristic (not a published vendor number); Illumina's
+# stated rule is qualitative.
 DEFAULT_MIN_SIGNAL_FRACTION = 0.10
+
+# AVITI (avidity) advisory window: Element's metrics flag low base diversity in
+# the first few cycles of an index/read for attention, but never as a failure.
+# Ref: Element "ElemBio Cloud / AVITI OS - Metrics and Charts"; Element "AVITI
+# System: The Ideal Platform for Low-Diversity Sequencing."
+AVIDITY_ADVISORY_FIRST_CYCLES = 5
 
 
 class Chemistry(str, Enum):
-    """Optical detection chemistry of a sequencing instrument."""
+    """Optical detection chemistry of a sequencing instrument.
+
+    ``FOUR_CHANNEL`` and ``AVIDITY`` are both "four-colour" in that every base
+    produces signal (no single dark base), but they differ in registration
+    structure and therefore in color-balance rules:
+
+    * ``FOUR_CHANNEL`` (Illumina MiSeq/HiSeq) images two lasers - a green laser
+      reads ``{G,T}`` and a red laser reads ``{A,C}`` - so each cycle needs at
+      least one base from *each* laser group across the pool.
+    * ``AVIDITY`` (Element AVITI) labels each base with its own avidite dye, so
+      there is no laser-pair constraint and the platform tolerates low-diversity
+      pools (Arslan et al., Nat. Biotechnol. 2023).
+    """
 
     ONE_CHANNEL = "1-channel"
     TWO_CHANNEL = "2-channel"
     FOUR_CHANNEL = "4-channel"
+    AVIDITY = "avidity"
+
+
+class ColorBalanceMode(str, Enum):
+    """How strictly to score color balance.
+
+    ``VENDOR_FAITHFUL`` (default) encodes each platform's *published* rule
+    exactly. ``CONSERVATIVE`` is stricter than the published hard minimum,
+    flagging risks the vendor's minimum permits (e.g. single-channel 2-channel
+    cycles, or AVITI low diversity).
+    """
+
+    VENDOR_FAITHFUL = "vendor_faithful"
+    CONSERVATIVE = "conservative"
 
 
 # ---------------------------------------------------------------------------
@@ -99,11 +134,13 @@ _INSTRUMENT_CHEMISTRY: dict[str, Chemistry] = {
     "hiseq2500": Chemistry.FOUR_CHANNEL,
     "hiseq3000": Chemistry.FOUR_CHANNEL,
     "hiseq4000": Chemistry.FOUR_CHANNEL,
-    # Element Biosciences AVITI - avidity chemistry captures four images per
-    # cycle (one per avidite dye), so it is a four-channel platform with no
-    # dark base. Ref: Arslan et al., Nat. Biotechnol. 2023.
-    "aviti": Chemistry.FOUR_CHANNEL,
-    "elementaviti": Chemistry.FOUR_CHANNEL,
+    # Element Biosciences AVITI - avidity chemistry labels each base with its
+    # own avidite dye (four images per cycle, no dark base) and, unlike
+    # Illumina's two-laser four-colour SBS, has no laser-pair constraint, so it
+    # tolerates low-diversity pools. Modelled as its own chemistry.
+    # Ref: Arslan et al., Nat. Biotechnol. 2023.
+    "aviti": Chemistry.AVIDITY,
+    "elementaviti": Chemistry.AVIDITY,
     # 2-channel
     "nextseq500": Chemistry.TWO_CHANNEL,
     "nextseq550": Chemistry.TWO_CHANNEL,
@@ -218,14 +255,21 @@ class ColorBalanceReport:
 
     chemistry: Chemistry
     pool_size: int
+    mode: ColorBalanceMode = ColorBalanceMode.VENDOR_FAITHFUL
     cycles: list[CycleBalance] = field(default_factory=list)
     dark_cycles: list[CycleBalance] = field(default_factory=list)
     weak_cycles: list[CycleBalance] = field(default_factory=list)
+    advisory_cycles: list[CycleBalance] = field(default_factory=list)
 
     @property
     def is_balanced(self) -> bool:
-        """True if no dark or weak cycles were found."""
-        return not self.dark_cycles and not self.weak_cycles
+        """True if no *failing* (dark) cycles were found.
+
+        Weak cycles (single-channel-but-present, or below the soft signal
+        threshold) and advisory cycles (AVITI low diversity) are quality flags
+        that do not fail the pool.
+        """
+        return not self.dark_cycles
 
 
 def _column_bases(indexes: list[str], cycle: int) -> dict[str, int]:
@@ -243,35 +287,52 @@ def analyze_color_balance(
     index2: list[str] | None = None,
     *,
     chemistry: Chemistry,
+    mode: ColorBalanceMode | str = ColorBalanceMode.VENDOR_FAITHFUL,
     min_signal_fraction: float = DEFAULT_MIN_SIGNAL_FRACTION,
 ) -> ColorBalanceReport:
-    """Score an index pool for colour balance against a chemistry.
+    """Score an index pool for colour balance against a chemistry and mode.
 
-    The pool is analysed cycle-by-cycle. For 2-channel and 1-channel
-    chemistries each cycle is checked for red and green signal: a channel
-    with no contributing sample is a *dark cycle* (the run will fail to
-    register), and a channel below *min_signal_fraction* is a *weak cycle*.
-    For 4-channel chemistry, a cycle where the whole pool reads a single
-    base is flagged as weak (low diversity degrades focusing and phasing).
+    Rules per chemistry (sources cited inline below):
+
+    * **2-/1-channel** (NextSeq/MiniSeq/NovaSeq, iSeq). ``G`` is the dark base.
+      An all-``G`` cycle (no signal in either channel) is a *dark* failure in
+      both modes. A single-channel cycle (one channel present, the other dark)
+      is a *failure* in ``CONSERVATIVE`` mode but only a *weak* warning in
+      ``VENDOR_FAITHFUL`` mode, matching Illumina's hard minimum of "signal in
+      at least one channel" (Index Adapters Pooling Guide #1000000041074).
+    * **4-channel** (Illumina MiSeq/HiSeq). A green laser reads ``{G,T}`` and a
+      red laser reads ``{A,C}``; each cycle must include at least one base from
+      each laser group across the pool, else a laser is dark. A cycle missing
+      either laser is a *dark* failure in **both** modes (correctness, not a
+      strictness choice).
+    * **avidity** (Element AVITI). No dark base and no laser-pair constraint, so
+      low diversity never fails. In ``VENDOR_FAITHFUL`` mode low diversity in
+      the first :data:`AVIDITY_ADVISORY_FIRST_CYCLES` cycles is an *advisory*
+      (never a failure); in ``CONSERVATIVE`` mode any low-diversity cycle is
+      escalated to a *dark* failure.
 
     Parameters
     ----------
-    index1:
-        I7 index sequences, one per sample (empty strings are ignored).
-    index2:
-        Optional I5 index sequences, one per sample.
+    index1, index2:
+        I7 (and optional I5) index sequences; empty strings are ignored.
     chemistry:
         Chemistry to score against - see :func:`chemistry_for_instrument`.
+    mode:
+        :class:`ColorBalanceMode` (or its string value). Defaults to
+        ``VENDOR_FAITHFUL``.
     min_signal_fraction:
-        Minimum fraction of the pool that must light each channel at every
-        cycle before the cycle is flagged weak. Defaults to
-        :data:`DEFAULT_MIN_SIGNAL_FRACTION`.
+        Soft threshold below which an otherwise-present channel is flagged weak
+        (heuristic; not a published vendor number).
 
     Returns
     -------
     ColorBalanceReport
-        Per-cycle diagnostics plus collected dark and weak cycles.
+        Per-cycle diagnostics with dark (failing), weak (warning), and advisory
+        cycles collected separately.
     """
+    mode = ColorBalanceMode(mode)
+    conservative = mode is ColorBalanceMode.CONSERVATIVE
+
     reads: list[tuple[str, list[str]]] = [("index1", [s for s in index1 if s])]
     if index2 is not None:
         reads.append(("index2", [s for s in index2 if s]))
@@ -279,6 +340,7 @@ def analyze_color_balance(
     report = ColorBalanceReport(
         chemistry=chemistry,
         pool_size=len([s for s in index1 if s]),
+        mode=mode,
     )
 
     for read_name, seqs in reads:
@@ -299,37 +361,107 @@ def analyze_color_balance(
                 distinct_bases=len([b for b in counts if b != "N"]),
             )
 
+            # A single sample lights whatever its own bases dictate; not
+            # assessable as a pool. Record but never flag.
+            if pool < 2:
+                report.cycles.append(cb)
+                continue
+
             if chemistry is Chemistry.FOUR_CHANNEL:
-                # Any base produces signal; only flag total lack of diversity.
-                if cb.distinct_bases <= 1 and pool >= 2:
-                    report.weak_cycles.append(cb)
-            else:
-                red = green = 0
-                for base, n in counts.items():
-                    sig = _TWO_CHANNEL_SIGNAL.get(base)
-                    if sig is None:
-                        continue  # N or unexpected char: no guaranteed signal
-                    if sig[0]:
-                        red += n
-                    if sig[1]:
-                        green += n
-                cb.red_fraction = red / pool
-                cb.green_fraction = green / pool
-
-                # Pool size 1 cannot be "balanced" - a single sample lights
-                # whatever channels its own bases dictate. Skip it rather than
-                # flag every cycle of a single-sample sheet.
-                if pool < 2:
-                    report.cycles.append(cb)
-                    continue
-
-                if cb.is_dark:
-                    report.dark_cycles.append(cb)
-                elif (
-                    cb.red_fraction < min_signal_fraction or cb.green_fraction < min_signal_fraction
-                ):
-                    report.weak_cycles.append(cb)
+                _score_four_channel(cb, counts, pool, report)
+            elif chemistry is Chemistry.AVIDITY:
+                _score_avidity(cb, report, conservative=conservative)
+            else:  # TWO_CHANNEL / ONE_CHANNEL
+                _score_two_channel(
+                    cb,
+                    counts,
+                    pool,
+                    report,
+                    conservative=conservative,
+                    min_signal_fraction=min_signal_fraction,
+                )
 
             report.cycles.append(cb)
 
     return report
+
+
+def _score_two_channel(
+    cb: CycleBalance,
+    counts: dict[str, int],
+    pool: int,
+    report: ColorBalanceReport,
+    *,
+    conservative: bool,
+    min_signal_fraction: float,
+) -> None:
+    """2-/1-channel rule. Red = {A,C}, green = {A,T}; G is dark.
+
+    Illumina hard minimum: signal in at least one channel (Index Adapters
+    Pooling Guide #1000000041074; NextSeq/MiniSeq and NovaSeq 6000
+    color-balancing knowledge articles).
+    """
+    red = green = 0
+    for base, n in counts.items():
+        sig = _TWO_CHANNEL_SIGNAL.get(base)
+        if sig is None:
+            continue  # N or unexpected char: no guaranteed signal
+        if sig[0]:
+            red += n
+        if sig[1]:
+            green += n
+    cb.red_fraction = red / pool
+    cb.green_fraction = green / pool
+
+    red_present = red > 0
+    green_present = green > 0
+    if not red_present and not green_present:
+        report.dark_cycles.append(cb)  # all-G: no signal either channel (both modes)
+    elif not red_present or not green_present:
+        # Single channel: vendor minimum met (>=1 channel), but imbalanced.
+        if conservative:
+            report.dark_cycles.append(cb)
+        else:
+            report.weak_cycles.append(cb)
+    elif cb.red_fraction < min_signal_fraction or cb.green_fraction < min_signal_fraction:
+        report.weak_cycles.append(cb)  # both present but one is faint (both modes)
+
+
+def _score_four_channel(
+    cb: CycleBalance,
+    counts: dict[str, int],
+    pool: int,
+    report: ColorBalanceReport,
+) -> None:
+    """Illumina 4-colour rule (both modes). Green laser = {G,T}, red laser = {A,C}.
+
+    Each cycle must include at least one base from each laser group across the
+    pool, or a laser is dark and clusters cannot be registered. Ref: Index
+    Adapters Pooling Guide #1000000041074, four-channel section.
+    """
+    red_laser = counts.get("A", 0) + counts.get("C", 0)  # {A,C}
+    green_laser = counts.get("G", 0) + counts.get("T", 0)  # {G,T}
+    cb.red_fraction = red_laser / pool
+    cb.green_fraction = green_laser / pool
+    if red_laser == 0 or green_laser == 0:
+        report.dark_cycles.append(cb)
+
+
+def _score_avidity(
+    cb: CycleBalance,
+    report: ColorBalanceReport,
+    *,
+    conservative: bool,
+) -> None:
+    """Element AVITI (avidity) rule. No dark base; low diversity is tolerated.
+
+    Ref: Element "ElemBio Cloud / AVITI OS - Metrics and Charts"; Element
+    "AVITI System: The Ideal Platform for Low-Diversity Sequencing."
+    """
+    low_diversity = cb.distinct_bases <= 1
+    if not low_diversity:
+        return
+    if conservative:
+        report.dark_cycles.append(cb)  # escalate low diversity to a failure
+    elif cb.cycle <= AVIDITY_ADVISORY_FIRST_CYCLES:
+        report.advisory_cycles.append(cb)  # first-cycles low diversity: advisory only

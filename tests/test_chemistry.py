@@ -6,9 +6,13 @@ import pytest
 
 from samplesheet_parser.chemistry import (
     Chemistry,
+    ColorBalanceMode,
     analyze_color_balance,
     chemistry_for_instrument,
 )
+
+CONSERVATIVE = ColorBalanceMode.CONSERVATIVE
+VENDOR_FAITHFUL = ColorBalanceMode.VENDOR_FAITHFUL
 
 
 class TestChemistryForInstrument:
@@ -23,7 +27,8 @@ class TestChemistryForInstrument:
             ("NovaSeqXSeries", Chemistry.TWO_CHANNEL),
             ("NovaSeq6000", Chemistry.TWO_CHANNEL),
             ("iSeq 100", Chemistry.ONE_CHANNEL),
-            ("AVITI", Chemistry.FOUR_CHANNEL),
+            ("AVITI", Chemistry.AVIDITY),
+            ("Element AVITI", Chemistry.AVIDITY),
         ],
     )
     def test_known_instruments(self, name: str, expected: Chemistry) -> None:
@@ -48,16 +53,27 @@ class TestTwoChannelColorBalance:
         dark = [c for c in report.dark_cycles if c.cycle == 1]
         assert dark and dark[0].red_fraction == 0.0 and dark[0].green_fraction == 0.0
 
-    def test_no_red_signal_is_dark(self) -> None:
-        # Cycle 1 is all G/T -> green present, red absent.
+    def test_single_channel_cycle_is_weak_in_vendor_faithful(self) -> None:
+        # Cycle 1 is all G/T -> green present, red absent. Illumina's hard
+        # minimum is "at least one channel", so vendor_faithful treats this as
+        # a weak warning (pass), not a failure.
         report = analyze_color_balance(
             ["GAAA", "TCCC", "GTTT", "TACG"],
             chemistry=Chemistry.TWO_CHANNEL,
         )
+        assert report.is_balanced  # no dark/failing cycle
+        weak = [c for c in report.weak_cycles if c.cycle == 1]
+        assert weak and weak[0].red_fraction == 0.0 and weak[0].green_fraction > 0.0
+
+    def test_single_channel_cycle_is_dark_in_conservative(self) -> None:
+        report = analyze_color_balance(
+            ["GAAA", "TCCC", "GTTT", "TACG"],
+            chemistry=Chemistry.TWO_CHANNEL,
+            mode=CONSERVATIVE,
+        )
+        assert not report.is_balanced
         dark = [c for c in report.dark_cycles if c.cycle == 1]
-        assert dark
-        assert dark[0].red_fraction == 0.0
-        assert dark[0].green_fraction > 0.0
+        assert dark and dark[0].red_fraction == 0.0
 
     def test_balanced_pool_has_no_findings(self) -> None:
         report = analyze_color_balance(
@@ -90,16 +106,29 @@ class TestTwoChannelColorBalance:
 
 
 class TestFourChannelColorBalance:
-    def test_no_dark_cycles_on_four_channel(self) -> None:
-        # All-G cycle is fine on 4-channel (G has its own dye), but it is
-        # zero-diversity so it should be a weak cycle, never a dark error.
+    # Illumina 4-channel: green laser {G,T}, red laser {A,C}; each cycle needs
+    # both. Both modes (this is a correctness rule, not a strictness choice).
+
+    def test_all_g_cycle_fails_red_laser_absent(self) -> None:
+        # All-G cycle: green laser present (G), red laser {A,C} absent -> fail.
+        for mode in (VENDOR_FAITHFUL, CONSERVATIVE):
+            report = analyze_color_balance(
+                ["GAAA", "GCCC", "GTTT"],
+                chemistry=Chemistry.FOUR_CHANNEL,
+                mode=mode,
+            )
+            dark = [c for c in report.dark_cycles if c.cycle == 1]
+            assert dark, mode
+            assert dark[0].red_fraction == 0.0
+
+    def test_gt_only_cycle_fails_red_laser_absent(self) -> None:
+        # Diverse ({G,T}) but the red {A,C} laser is dark -> fail (the bug fix).
         report = analyze_color_balance(
-            ["GAAA", "GCCC", "GTTT"],
+            ["GACT", "TCAG", "GATC", "TCGA"],
             chemistry=Chemistry.FOUR_CHANNEL,
         )
-        assert report.dark_cycles == []
-        weak = [c for c in report.weak_cycles if c.cycle == 1]
-        assert weak and weak[0].distinct_bases == 1
+        dark = [c for c in report.dark_cycles if c.cycle == 1]
+        assert dark and dark[0].red_fraction == 0.0
 
     def test_diverse_pool_passes(self) -> None:
         report = analyze_color_balance(
@@ -107,3 +136,36 @@ class TestFourChannelColorBalance:
             chemistry=Chemistry.FOUR_CHANNEL,
         )
         assert report.is_balanced
+
+
+class TestAvidityColorBalance:
+    # Element AVITI: no dark base, low diversity tolerated.
+
+    def test_low_diversity_is_advisory_in_vendor_faithful(self) -> None:
+        # All-G cycle 1: an advisory only (never a failure) on AVITI.
+        report = analyze_color_balance(
+            ["GAAA", "GCCC", "GTTT"],
+            chemistry=Chemistry.AVIDITY,
+        )
+        assert report.is_balanced  # not a failure
+        assert report.dark_cycles == []
+        assert [c.cycle for c in report.advisory_cycles] == [1]
+
+    def test_low_diversity_fails_in_conservative(self) -> None:
+        report = analyze_color_balance(
+            ["GAAA", "GCCC", "GTTT"],
+            chemistry=Chemistry.AVIDITY,
+            mode=CONSERVATIVE,
+        )
+        assert not report.is_balanced
+        assert [c.cycle for c in report.dark_cycles] == [1]
+
+    def test_gt_only_cycle_passes_on_avidity(self) -> None:
+        # A {G,T}-only cycle fails Illumina 4-channel (red laser) but is fine on
+        # avidity (each base has its own dye; diversity is present).
+        report = analyze_color_balance(
+            ["GACT", "TCAG", "GATC", "TCGA"],
+            chemistry=Chemistry.AVIDITY,
+        )
+        assert report.is_balanced
+        assert report.advisory_cycles == []

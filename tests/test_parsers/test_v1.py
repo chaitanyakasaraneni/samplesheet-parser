@@ -6,7 +6,6 @@ from samplesheet_parser.parsers.v1 import SampleSheetV1
 
 
 class TestSampleSheetV1Parsing:
-
     def test_parse_header(self, v1_minimal):
         sheet = SampleSheetV1(v1_minimal)
         sheet.parse()
@@ -201,7 +200,6 @@ class TestSampleSheetV1Parsing:
 
 
 class TestSampleSheetV1Samples:
-
     def test_samples_count(self, v1_minimal):
         sheet = SampleSheetV1(v1_minimal)
         sheet.parse()
@@ -262,7 +260,6 @@ class TestSampleSheetV1Samples:
 
 
 class TestSampleSheetV1IndexType:
-
     def test_dual_index(self, v1_minimal):
         sheet = SampleSheetV1(v1_minimal)
         sheet.parse()
@@ -280,7 +277,6 @@ class TestSampleSheetV1IndexType:
 
 
 class TestSampleSheetV1Equality:
-
     def test_equal_sheets(self, v1_minimal, tmp_path):
         import shutil
 
@@ -312,11 +308,10 @@ class TestSampleSheetV1Equality:
 
 
 class TestSampleSheetV1EdgeCases:
-
     def test_required_section_error_raises_value_error(self, tmp_path):
         """Lines 249-250, 603: completely empty [Data] section triggers required-section error."""
         p = tmp_path / "empty_data.csv"
-        p.write_text("[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n" "[Data]\n")
+        p.write_text("[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n[Data]\n")
         sheet = SampleSheetV1(str(p))
         with pytest.raises(ValueError, match=r"\[Data\]"):
             sheet.parse(do_clean=False)
@@ -359,9 +354,7 @@ class TestSampleSheetV1EdgeCases:
     def test_experiment_id_overrides_experiment_name(self, tmp_path):
         """Line 548: experiment_id replaces experiment_name when they differ."""
         p = tmp_path / "exp_id.csv"
-        p.write_text(
-            "[Header]\nIEMFileVersion,5\n\n" "[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n"
-        )
+        p.write_text("[Header]\nIEMFileVersion,5\n\n[Data]\nLane,Sample_ID,index\n1,S1,ATTACTCG\n")
         sheet = SampleSheetV1(str(p), experiment_id="OverrideName")
         sheet.parse()
         assert sheet.experiment_name == "OverrideName"

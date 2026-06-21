@@ -8,11 +8,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed (behavioral)
+
+- **Color-balance checking now has two modes: `vendor_faithful` (new default)
+  and `conservative`.** `vendor_faithful` encodes each platform's published
+  rule exactly; `conservative` is the previous, stricter behavior (single-channel
+  2-channel cycles and AVITI low-diversity treated as failures). Selectable via
+  `analyze_color_balance(..., mode=...)` and `SampleSheetValidator.validate(...,
+  color_balance_mode=...)`. **Callers relying on the old stricter results should
+  pass `color_balance_mode="conservative"`.**
+- **Fixed a 4-channel color-balance bug (both modes):** Illumina four-channel
+  cycles are now failed when either laser group is absent (green `{G,T}` / red
+  `{A,C}`), e.g. an all-`G` or `G/T`-only cycle (red laser dark). Previously only
+  zero-diversity cycles were flagged.
+- **Element AVITI is now modelled as its own `Chemistry.AVIDITY`** (per-base dye,
+  no laser-pair constraint), distinct from Illumina `FOUR_CHANNEL`;
+  `chemistry_for_instrument("AVITI")` now returns `Chemistry.AVIDITY`. AVITI low
+  diversity is an advisory (`COLOR_BALANCE_ADVISORY`), never a failure, in
+  `vendor_faithful` mode.
+
 ### Documentation
 
 - Refreshed stale docs after the multi-vendor / color-balance release: updated
   the README tagline, format-detection steps (now vendor-aware), and citation
-  block (v2.3.0 + DOI); documented the `chemistry` module, `ElementRunManifest`,
+  block (DOI); documented the `chemistry` module, `ElementRunManifest`,
   the `SampleSheetVersion.ELEMENT_AVITI` enum, the `validate(...)`
   color-balance parameters, and the `--color-balance` / `--instrument` CLI flags
   in the API and CLI references.

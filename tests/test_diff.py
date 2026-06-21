@@ -719,7 +719,6 @@ Lane,Sample_ID,Index,Index2,Sample_Project
 
 
 class TestDiffResultStr:
-
     def test_str_includes_header_changes_section(self):
         """Lines 207-208: __str__ renders header changes block."""
         result = DiffResult(

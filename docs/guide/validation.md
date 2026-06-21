@@ -31,8 +31,9 @@ for w in result.warnings:
 | `INDEX_DISTANCE_TOO_LOW` | warning | Hamming distance between two indexes < threshold |
 | `NO_ADAPTERS` | warning | No adapter sequences configured |
 | `ADAPTER_MISMATCH` | warning | Adapter is non-standard |
-| `COLOR_BALANCE_NO_SIGNAL` | error | A 2-/1-channel index cycle produces no optical signal (opt-in) |
-| `COLOR_BALANCE_LOW` | warning | An index cycle has weak channel signal or zero diversity (opt-in) |
+| `COLOR_BALANCE_NO_SIGNAL` | error | An index cycle has no optical signal (2-/1-channel dark, or a 4-channel laser absent), or a conservative-mode escalation (opt-in) |
+| `COLOR_BALANCE_LOW` | warning | An index cycle has weak or single-channel signal (opt-in) |
+| `COLOR_BALANCE_ADVISORY` | warning | AVITI low-diversity advisory in `vendor_faithful` mode (opt-in) |
 
 The last two checks are **opt-in** — see [Color-balance checking](#color-balance-checking) below.
 
@@ -56,7 +57,7 @@ The standalone helpers are also available: `hamming_distance(a, b)` for the lite
 
 ## Color-balance checking
 
-Optical sequencers read each index base by its fluorescent signal, and the number of channels differs by instrument: four-channel (MiSeq, HiSeq, Element AVITI), two-channel (NextSeq, NovaSeq 6000, NovaSeq X), and one-channel (iSeq). On two-channel chemistry the base `G` is "dark" — no dye — so an index cycle where the **entire pool** reads `G` emits no signal and the cycle fails to register, miscalling every barcode at that position. A Hamming-distance check cannot catch this because the indexes may still be perfectly distinct.
+Optical sequencers read each index base by its fluorescent signal, and the detection differs by instrument: Illumina four-channel/two-laser (MiSeq, HiSeq), two-channel (NextSeq, NovaSeq 6000, NovaSeq X), one-channel (iSeq), and Element AVITI avidity (per-base dye). On two-channel chemistry the base `G` is "dark" — no dye — so an index cycle where the **entire pool** reads `G` emits no signal and the cycle fails to register, miscalling every barcode at that position. A Hamming-distance check cannot catch this because the indexes may still be perfectly distinct.
 
 `samplesheet-parser` models each instrument's chemistry and scores the pool cycle-by-cycle. The check is **opt-in** because it can turn a passing sheet into a failing one, and it needs to know the instrument:
 
@@ -65,11 +66,20 @@ result = SampleSheetValidator().validate(
     sheet,
     check_color_balance=True,
     instrument="NovaSeq X",   # optional; inferred from the sheet header when present
+    color_balance_mode="vendor_faithful",   # or "conservative"
 )
 ```
 
-- On **two-/one-channel** instruments, an all-`G` (no-signal) cycle is a `COLOR_BALANCE_NO_SIGNAL` error and a channel below `min_signal_fraction` (default 0.10) is a `COLOR_BALANCE_LOW` warning.
-- On **four-channel** instruments (including Element AVITI, an avidity platform with no dark base), there is no no-signal failure mode; a zero-diversity cycle — where the whole pool reads one base — is reported as a `COLOR_BALANCE_LOW` warning instead.
+### Modes
+
+- **`vendor_faithful`** (default) encodes each platform's published rule exactly.
+- **`conservative`** is stricter than the published minimum (the behavior before modes existed — pass `color_balance_mode="conservative"` to keep it).
+
+### Rules by chemistry
+
+- **Two-/one-channel**: an all-`G` (no-signal) cycle is a `COLOR_BALANCE_NO_SIGNAL` error in both modes. A single-channel cycle (one channel present, the other dark) meets Illumina's "at least one channel" minimum, so it is a `COLOR_BALANCE_LOW` warning in `vendor_faithful` but an error in `conservative`. A both-present-but-faint channel (below `min_signal_fraction`, default 0.10) is a `COLOR_BALANCE_LOW` warning.
+- **Four-channel** (Illumina MiSeq/HiSeq): the green laser reads `{G,T}` and the red laser reads `{A,C}`; a cycle missing either laser group (e.g. all-`G`, or `G/T`-only) is a `COLOR_BALANCE_NO_SIGNAL` error in **both** modes.
+- **Avidity** (Element AVITI): each base has its own dye and there is no laser-pair constraint, so low diversity never fails. In `vendor_faithful` it is a `COLOR_BALANCE_ADVISORY` warning (first cycles only); in `conservative` it is escalated to an error.
 - If the instrument is unknown, the check is skipped silently.
 
 The CLI exposes the same check:
@@ -78,7 +88,7 @@ The CLI exposes the same check:
 samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
 ```
 
-The underlying API — `Chemistry`, `chemistry_for_instrument()`, and `analyze_color_balance()` returning a `ColorBalanceReport` — is public and usable on its own.
+The underlying API — `Chemistry`, `ColorBalanceMode`, `chemistry_for_instrument()`, and `analyze_color_balance(..., mode=...)` returning a `ColorBalanceReport` — is public and usable on its own.
 
 ## Structured results
 

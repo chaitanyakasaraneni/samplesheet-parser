@@ -1,8 +1,33 @@
 """Tests for SampleSheetValidator."""
 
 from samplesheet_parser import SampleSheetValidator
+from samplesheet_parser.chemistry import ColorBalanceMode
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
+
+# index1 cycle 1 is all G/T across the pool (green present, red {A,C} absent):
+# a single-channel cycle on 2-channel chemistry. No all-G cycle anywhere.
+_SINGLE_CHANNEL_V2 = """\
+[Header]
+FileFormatVersion,2
+RunName,SingleChannel
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,8
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Sample_ID,Index
+S1,GACATACG
+S2,TAACGTAC
+S3,GAGTACGA
+S4,TATGCGTT
+"""
 
 _DARK_CYCLE_V2 = """\
 [Header]
@@ -84,14 +109,38 @@ class TestColorBalance:
         )
         assert not any(e.code.startswith("COLOR_BALANCE") for e in result.errors)
 
-    def test_instrument_override_forces_chemistry(self, tmp_path):
-        # Force 4-channel: the all-G index cycles become low-diversity
-        # warnings rather than dark-cycle errors.
+    def test_avidity_override_makes_all_g_advisory_not_error(self, tmp_path):
+        # Force AVITI (avidity): all-G index cycles are advisory, never errors.
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(
+            sheet, check_color_balance=True, instrument="AVITI"
+        )
+        assert result.is_valid
+        assert not any(e.code == "COLOR_BALANCE_NO_SIGNAL" for e in result.errors)
+
+    def test_four_channel_all_g_fails_on_red_laser(self, tmp_path):
+        # On MiSeq (4-channel) an all-G cycle fails: the red {A,C} laser is dark.
         sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
         result = SampleSheetValidator().validate(
             sheet, check_color_balance=True, instrument="MiSeq"
         )
-        assert not any(e.code == "COLOR_BALANCE_NO_SIGNAL" for e in result.errors)
+        assert not result.is_valid
+        assert any(e.code == "COLOR_BALANCE_NO_SIGNAL" for e in result.errors)
+
+    def test_single_channel_passes_vendor_faithful_fails_conservative(self, tmp_path):
+        # A single-channel 2-channel cycle: vendor_faithful (default) treats it
+        # as a weak warning (pass); conservative escalates it to an error.
+        sheet = _parse_v2(tmp_path / "s.csv", _SINGLE_CHANNEL_V2)
+
+        vf = SampleSheetValidator().validate(sheet, check_color_balance=True)
+        assert vf.is_valid
+        assert any(w.code == "COLOR_BALANCE_LOW" for w in vf.warnings)
+
+        cons = SampleSheetValidator().validate(
+            sheet, check_color_balance=True, color_balance_mode=ColorBalanceMode.CONSERVATIVE
+        )
+        assert not cons.is_valid
+        assert any(e.code == "COLOR_BALANCE_NO_SIGNAL" for e in cons.errors)
 
 
 class TestEmptySamples:

@@ -23,8 +23,10 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from samplesheet_parser.chemistry import (
+    AVIDITY_ADVISORY_FIRST_CYCLES,
     DEFAULT_MIN_SIGNAL_FRACTION,
     Chemistry,
+    ColorBalanceMode,
     analyze_color_balance,
     chemistry_for_instrument,
 )
@@ -260,6 +262,7 @@ class SampleSheetValidator:
         min_hamming_distance: int = MIN_HAMMING_DISTANCE,
         check_color_balance: bool = False,
         instrument: str | None = None,
+        color_balance_mode: ColorBalanceMode | str = ColorBalanceMode.VENDOR_FAITHFUL,
         min_signal_fraction: float = DEFAULT_MIN_SIGNAL_FRACTION,
     ) -> ValidationResult:
         """Run all validation checks on a parsed sample sheet.
@@ -314,6 +317,7 @@ class SampleSheetValidator:
                 samples,
                 result,
                 instrument=instrument,
+                mode=color_balance_mode,
                 min_signal_fraction=min_signal_fraction,
             )
 
@@ -550,17 +554,16 @@ class SampleSheetValidator:
         result: ValidationResult,
         *,
         instrument: str | None = None,
+        mode: ColorBalanceMode | str = ColorBalanceMode.VENDOR_FAITHFUL,
         min_signal_fraction: float = DEFAULT_MIN_SIGNAL_FRACTION,
     ) -> None:
         """Flag index cycles that will fail or degrade on the instrument's chemistry.
 
-        Resolves the instrument's optical chemistry (4-/2-/1-channel) and scores
-        the index pool per cycle. On 2-/1-channel chemistry a cycle where the
-        whole pool is dark (all ``G``) in a channel produces no signal and is
-        reported as ``COLOR_BALANCE_NO_SIGNAL`` (error); a cycle with signal
-        below *min_signal_fraction* in some channel is ``COLOR_BALANCE_LOW``
-        (warning). On 4-channel chemistry only single-base (zero-diversity)
-        cycles are flagged as ``COLOR_BALANCE_LOW``.
+        Resolves the instrument's optical chemistry and scores the index pool
+        per cycle under *mode* (see :class:`ColorBalanceMode`). Failing cycles
+        are reported as ``COLOR_BALANCE_NO_SIGNAL`` (error), risky-but-permitted
+        cycles as ``COLOR_BALANCE_LOW`` (warning), and AVITI low-diversity in
+        ``vendor_faithful`` mode as ``COLOR_BALANCE_ADVISORY`` (warning).
 
         The check is skipped (no findings) when the instrument is unknown, since
         guessing the chemistry could produce misleading errors. Pass *instrument*
@@ -583,67 +586,116 @@ class SampleSheetValidator:
             index1,
             index2 if has_index2 else None,
             chemistry=chemistry,
+            mode=mode,
             min_signal_fraction=min_signal_fraction,
         )
 
         for cb in report.dark_cycles:
-            no_red = cb.red_fraction == 0.0
-            no_green = cb.green_fraction == 0.0
-            if no_red and no_green:
-                channel = "red or green"
-                signal_bases = "A/C/T"
-            elif no_red:
-                channel = "red"
-                signal_bases = "A or C"
-            else:
-                channel = "green"
-                signal_bases = "A or T"
             result.add_error(
                 "COLOR_BALANCE_NO_SIGNAL",
-                f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
-                f"{cb.cycle} has no {channel} signal across the pool: no sample "
-                f"carries a {channel} base ({signal_bases}) at this cycle "
-                f"(base counts {cb.base_counts}). The instrument cannot register "
-                f"this cycle and the index read will fail.",
+                self._dark_message(chemistry, name, cb, report.mode),
                 instrument=name,
                 chemistry=chemistry.value,
+                mode=report.mode.value,
                 read=cb.read,
                 cycle=cb.cycle,
-                channel=channel,
                 base_counts=cb.base_counts,
             )
 
         for cb in report.weak_cycles:
-            if chemistry is Chemistry.FOUR_CHANNEL:
-                base = next(iter(cb.base_counts))
-                result.add_warning(
-                    "COLOR_BALANCE_LOW",
-                    f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
-                    f"{cb.cycle} has no base diversity (every sample reads "
-                    f"'{base}'), which degrades focusing and phasing.",
-                    instrument=name,
-                    chemistry=chemistry.value,
-                    read=cb.read,
-                    cycle=cb.cycle,
-                    base_counts=cb.base_counts,
-                )
-            else:
-                pct = round(min(cb.red_fraction or 0.0, cb.green_fraction or 0.0) * 100, 1)
-                result.add_warning(
-                    "COLOR_BALANCE_LOW",
-                    f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
-                    f"{cb.cycle} carries weak signal in one channel "
-                    f"(as low as {pct}% of the pool; recommended "
-                    f"≥ {round(min_signal_fraction * 100)}%), risking poor "
-                    f"base calls for this cycle.",
-                    instrument=name,
-                    chemistry=chemistry.value,
-                    read=cb.read,
-                    cycle=cb.cycle,
-                    red_fraction=cb.red_fraction,
-                    green_fraction=cb.green_fraction,
-                    base_counts=cb.base_counts,
-                )
+            result.add_warning(
+                "COLOR_BALANCE_LOW",
+                self._weak_message(chemistry, name, cb, min_signal_fraction),
+                instrument=name,
+                chemistry=chemistry.value,
+                read=cb.read,
+                cycle=cb.cycle,
+                red_fraction=cb.red_fraction,
+                green_fraction=cb.green_fraction,
+                base_counts=cb.base_counts,
+            )
+
+        for cb in report.advisory_cycles:
+            base = next(iter(cb.base_counts))
+            result.add_warning(
+                "COLOR_BALANCE_ADVISORY",
+                f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+                f"{cb.cycle} has low base diversity (every sample reads '{base}') "
+                f"within the first {AVIDITY_ADVISORY_FIRST_CYCLES} cycles. AVITI "
+                f"tolerates low-diversity sequencing, so this is an advisory only, "
+                f"not a failure.",
+                instrument=name,
+                chemistry=chemistry.value,
+                read=cb.read,
+                cycle=cb.cycle,
+                base_counts=cb.base_counts,
+            )
+
+    @staticmethod
+    def _dark_message(
+        chemistry: Chemistry,
+        name: str | None,
+        cb: Any,
+        mode: ColorBalanceMode,
+    ) -> str:
+        """Human-readable message for a failing (dark) cycle, by chemistry."""
+        if chemistry is Chemistry.FOUR_CHANNEL:
+            missing = "red ({A,C})" if (cb.red_fraction or 0.0) == 0.0 else "green ({G,T})"
+            return (
+                f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+                f"{cb.cycle}: the {missing} laser is unrepresented across the pool "
+                f"(base counts {cb.base_counts}); both lasers are required for "
+                f"cluster registration, so the index read will fail."
+            )
+        if chemistry is Chemistry.AVIDITY:
+            base = next(iter(cb.base_counts))
+            return (
+                f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+                f"{cb.cycle} has low base diversity (every sample reads '{base}'); "
+                f"flagged as a failure in conservative mode."
+            )
+        no_red = (cb.red_fraction or 0.0) == 0.0
+        no_green = (cb.green_fraction or 0.0) == 0.0
+        if no_red and no_green:
+            channel, signal_bases = "red or green", "A/C/T"
+        elif no_red:
+            channel, signal_bases = "red", "A or C"
+        else:
+            channel, signal_bases = "green", "A or T"
+        return (
+            f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+            f"{cb.cycle} has no {channel} signal across the pool: no sample "
+            f"carries a {channel} base ({signal_bases}) at this cycle "
+            f"(base counts {cb.base_counts}). The instrument cannot register "
+            f"this cycle and the index read will fail."
+        )
+
+    @staticmethod
+    def _weak_message(
+        chemistry: Chemistry,
+        name: str | None,
+        cb: Any,
+        min_signal_fraction: float,
+    ) -> str:
+        """Human-readable message for a weak (warning) cycle on 2-/1-channel."""
+        no_red = (cb.red_fraction or 0.0) == 0.0
+        no_green = (cb.green_fraction or 0.0) == 0.0
+        if no_red or no_green:
+            present = "green" if no_red else "red"
+            return (
+                f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+                f"{cb.cycle} carries signal in only the {present} channel "
+                f"(base counts {cb.base_counts}). This meets Illumina's "
+                f"'at least one channel' minimum but is colour-imbalanced; "
+                f"enable conservative mode to treat it as a failure."
+            )
+        pct = round(min(cb.red_fraction or 0.0, cb.green_fraction or 0.0) * 100, 1)
+        return (
+            f"On {chemistry.value} chemistry ({name}), {cb.read} cycle "
+            f"{cb.cycle} carries weak signal in one channel (as low as {pct}% "
+            f"of the pool; recommended >= {round(min_signal_fraction * 100)}%), "
+            f"risking poor base calls for this cycle."
+        )
 
     def _check_adapters(
         self,

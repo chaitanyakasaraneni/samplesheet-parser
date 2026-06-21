@@ -49,7 +49,7 @@ samplesheet = "samplesheet_parser.cli:main"
 
 [project.urls]
 Homepage      = "https://github.com/chaitanyakasaraneni/samplesheet-parser"
-Documentation = "https://illumina-samplesheet.readthedocs.io"
+Documentation = "https://samplesheet-parser.readthedocs.io"
 Repository    = "https://github.com/chaitanyakasaraneni/samplesheet-parser"
 Issues        = "https://github.com/chaitanyakasaraneni/samplesheet-parser/issues"
 

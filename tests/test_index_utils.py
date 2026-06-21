@@ -12,7 +12,7 @@ from samplesheet_parser.index_utils import normalize_index_lengths
 def _make_samples(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
     """Build minimal V1-style sample dicts from (index, index2) pairs."""
     return [
-        {"sample_id": f"S{i+1}", "index": idx1, "index2": idx2}
+        {"sample_id": f"S{i + 1}", "index": idx1, "index2": idx2}
         for i, (idx1, idx2) in enumerate(pairs)
     ]
 
@@ -20,7 +20,7 @@ def _make_samples(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
 def _make_v2_samples(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
     """Build minimal V2-style sample dicts from (Index, Index2) pairs."""
     return [
-        {"sample_id": f"S{i+1}", "Index": idx1, "Index2": idx2}
+        {"sample_id": f"S{i + 1}", "Index": idx1, "Index2": idx2}
         for i, (idx1, idx2) in enumerate(pairs)
     ]
 
@@ -31,13 +31,11 @@ def _make_v2_samples(pairs: list[tuple[str, str]]) -> list[dict[str, str]]:
 
 
 class TestNormalizeEmpty:
-
     def test_empty_input_returns_empty(self) -> None:
         assert normalize_index_lengths([]) == []
 
 
 class TestNormalizeTrim:
-
     def test_trim_i7_to_shortest(self) -> None:
         samples = _make_samples([("ATTACTCG", "TATAGCCT"), ("TCCGGAGAGG", "ATAGAGGC")])
         result = normalize_index_lengths(samples, strategy="trim")
@@ -66,7 +64,6 @@ class TestNormalizeTrim:
 
 
 class TestNormalizePad:
-
     def test_pad_i7_to_longest(self) -> None:
         samples = _make_samples([("ATTACTCG", "TATAGCCT"), ("TCCGGAGAGG", "ATAGAGGCTA")])
         result = normalize_index_lengths(samples, strategy="pad")
@@ -91,7 +88,6 @@ class TestNormalizePad:
 
 
 class TestKeyDetection:
-
     def test_detects_v2_keys_automatically(self) -> None:
         samples = _make_v2_samples([("ATTACTCG", "TATAGCCT"), ("TCCGGAGAGG", "ATAGAGGCTA")])
         result = normalize_index_lengths(samples, strategy="trim")
@@ -115,7 +111,6 @@ class TestKeyDetection:
 
 
 class TestEdgeCases:
-
     def test_invalid_strategy_raises(self) -> None:
         samples = _make_samples([("ATTACTCG", "TATAGCCT")])
         with pytest.raises(ValueError, match="strategy"):

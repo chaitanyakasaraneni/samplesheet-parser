@@ -718,7 +718,6 @@ class TestCrossFormatWrite:
 
 
 class TestWriterV2OptionalHeaderFields:
-
     def test_run_description_appears_in_output(self, tmp_path):
         """Line 688: RunDescription written when set."""
         w = SampleSheetWriter(version=SampleSheetVersion.V2)
@@ -748,7 +747,6 @@ class TestWriterV2OptionalHeaderFields:
 
 
 class TestWriterV1ExtraFields:
-
     def test_extra_header_fields_appear_in_v1_output(self, tmp_path):
         """Line 769: extra **kwargs in set_header written to V1 output."""
         w = SampleSheetWriter(version=SampleSheetVersion.V1)
@@ -779,7 +777,6 @@ class TestWriterV1ExtraFields:
 
 
 class TestWriterFromV2SheetEdgeCases:
-
     def test_extra_settings_loaded_from_v2_sheet(self, tmp_path):
         """Line 959: non-standard V2 settings end up in _extra_settings."""
         src = tmp_path / "v2.csv"
@@ -828,7 +825,6 @@ class TestWriterFromV2SheetEdgeCases:
 
 
 class TestWriterFromV1IndexFree:
-
     def test_index_free_v1_sample_dropped_with_warning(self, tmp_path, caplog):
         """An index-free V1 sample (valid Sample_ID, empty index) is dropped
         from the writer with a warning rather than silently."""
@@ -848,7 +844,6 @@ class TestWriterFromV1IndexFree:
 
 
 class TestUpdateSampleLaneFilter:
-
     def test_update_sample_skips_non_matching_lane(self, tmp_path):
         """Line 582: update_sample with lane= skips samples in other lanes."""
         w = SampleSheetWriter(version=SampleSheetVersion.V1)

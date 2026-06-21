@@ -231,7 +231,6 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 
 
 class TestCLIVersion:
-
     def test_version_exits_0(self) -> None:
         result = runner.invoke(app, ["--version"])
         assert result.exit_code == 0
@@ -271,7 +270,6 @@ class TestCLIVersion:
 
 
 class TestCLIInfo:
-
     def test_info_v1_exits_0(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V1_A)
         result = runner.invoke(app, ["info", str(p)])
@@ -375,7 +373,6 @@ class TestCLIInfo:
 
 
 class TestCLIValidate:
-
     def test_valid_sheet_exits_0(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V1_A)
         result = runner.invoke(app, ["validate", str(p)])
@@ -505,7 +502,6 @@ class TestCLIValidate:
 
 
 class TestCLIConvert:
-
     def test_v1_to_v2_exits_0(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "in.csv", _V1_A)
         out = tmp_path / "out.csv"
@@ -599,7 +595,6 @@ class TestCLIConvert:
 
 
 class TestCLIDiff:
-
     def test_identical_sheets_exit_0(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_A)
@@ -723,7 +718,6 @@ class TestCLIDiff:
 
 
 class TestCLIMerge:
-
     def test_clean_merge_exits_0(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)
         b = _write(tmp_path, "b.csv", _V1_B)
@@ -895,7 +889,6 @@ class TestCLIMerge:
 
 
 class TestCLIUnknownFormat:
-
     def test_validate_unknown_format_exits_2(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V1_A)
         result = runner.invoke(app, ["validate", str(p), "--format", "xml"])
@@ -977,7 +970,6 @@ Lane,Sample_ID,Index
 
 
 class TestCLISplit:
-
     def test_split_by_project_exits_0_no_warnings(self, tmp_path: Path) -> None:
         src = _write(tmp_path, "combined.csv", _V2_COMBINED)
         out_dir = tmp_path / "split"
@@ -1078,7 +1070,6 @@ class TestCLISplit:
 
 
 class TestCLIFilter:
-
     def test_filter_by_project_exits_0(self, tmp_path: Path) -> None:
         src = _write(tmp_path, "combined.csv", _V2_COMBINED)
         out = tmp_path / "filtered.csv"
