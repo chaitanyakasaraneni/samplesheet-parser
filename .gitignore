@@ -4,7 +4,7 @@ tests/fixtures/outputs/
 demo_output.txt
 **/CSBJ Submission/
 **/.claude/
-eval/**
+eval/results/
 corpus/**
 paper.md
 paper.bib
