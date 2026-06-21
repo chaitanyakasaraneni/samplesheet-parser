@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "samplesheet-parser"
-version = "2.3.0"
+version = "2.4.0"
 description = "Multi-vendor, format-agnostic parser for sequencing sample sheets — Illumina IEM V1 & BCLConvert V2 plus Element AVITI run manifests, with index validation and color-balance checking"
 readme = "README.md"
 license = { file = "LICENSE" }
