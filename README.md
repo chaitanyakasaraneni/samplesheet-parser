@@ -374,8 +374,9 @@ for err in result.errors:
 ```
 
 The chemistry is resolved from the instrument name; the check is **off by
-default** (it can legitimately fail a low-plex pool) and is skipped silently
-for unknown instruments. The same analysis is available standalone:
+default** (it can legitimately fail a low-plex pool) and, for an unknown
+instrument, is not run but reported as a `COLOR_BALANCE_SKIPPED` note rather than
+passing silently. The same analysis is available standalone:
 
 ```python
 from samplesheet_parser import analyze_color_balance, chemistry_for_instrument
@@ -392,12 +393,20 @@ From the CLI:
 ```bash
 samplesheet validate SampleSheet.csv --color-balance
 samplesheet validate SampleSheet.csv --color-balance --instrument NovaSeqXSeries
+samplesheet validate SampleSheet.csv --color-balance --color-balance-mode conservative
 ```
+
+When `--color-balance` is requested but the instrument cannot be resolved, the
+check is not run (guessing the chemistry would be misleading). This is surfaced
+as a `COLOR_BALANCE_SKIPPED` note (in text and JSON output) rather than a silent
+pass, so a clean result is never mistaken for a passed color-balance check. Pass
+`--instrument` to enable the check.
 
 #### Modes: `vendor_faithful` (default) and `conservative`
 
-Color balance has two modes, selectable via
-`validate(..., color_balance_mode=...)` or `analyze_color_balance(..., mode=...)`:
+Color balance has two modes, selectable on the CLI via
+`--color-balance-mode {vendor_faithful,conservative}` or in the library via
+`validate(..., color_balance_mode=...)` / `analyze_color_balance(..., mode=...)`:
 
 - **`vendor_faithful`** (default) encodes each platform's *published* rule
   exactly — Illumina's "signal in at least one channel" minimum for 2-channel,
@@ -762,6 +771,15 @@ See [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE).
+
+---
+
+## AI-assisted development
+
+Parts of this project's code, tests, and documentation were developed with the
+assistance of generative AI tools (including GitHub Copilot). All AI-generated
+output was reviewed, edited, and verified by the author, who is responsible for
+the correctness of the final software.
 
 ---
 

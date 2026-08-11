@@ -131,11 +131,13 @@ from samplesheet_parser.instruments import (
 
 Color-balance checking is **opt-in** via `check_color_balance=True`. The
 instrument is read from the sheet header when present, or supplied with
-`instrument=`; the check is skipped silently for unknown instruments.
+`instrument=`; for an unknown instrument the check is not run and a
+`COLOR_BALANCE_SKIPPED` note is added (rather than passing silently).
 `color_balance_mode` is `"vendor_faithful"` (default) or `"conservative"` (see
 [`ColorBalanceMode`](#samplesheet_parserchemistry)). It emits
-`COLOR_BALANCE_NO_SIGNAL` (error), `COLOR_BALANCE_LOW` (warning), and
-`COLOR_BALANCE_ADVISORY` (warning, AVITI) issues — see
+`COLOR_BALANCE_NO_SIGNAL` (error), `COLOR_BALANCE_LOW` (warning),
+`COLOR_BALANCE_ADVISORY` (warning, AVITI), and `COLOR_BALANCE_SKIPPED` (note)
+issues — see
 [Validation → Color-balance checking](guide/validation.md#color-balance-checking).
 
 ### ValidationResult
@@ -145,6 +147,8 @@ instrument is read from the sheet header when present, or supplied with
 | `is_valid` | `bool` | `False` if any errors present |
 | `errors` | `list[ValidationIssue]` | Structured error records |
 | `warnings` | `list[ValidationIssue]` | Structured warning records |
+| `notes` | `list[ValidationIssue]` | Informational records (e.g. a skipped check); do not affect `is_valid` |
+| `to_dict()` | `dict` | Serializable `is_valid` / `errors` / `warnings` / `notes` |
 | `summary()` | `str` | One-line human-readable summary |
 
 ### ValidationIssue

@@ -102,12 +102,38 @@ class TestColorBalance:
         codes = [e.code for e in result.errors]
         assert "COLOR_BALANCE_NO_SIGNAL" in codes
 
-    def test_unknown_instrument_skips_silently(self, tmp_path):
+    def test_unknown_instrument_skips_without_error(self, tmp_path):
         sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
         result = SampleSheetValidator().validate(
             sheet, check_color_balance=True, instrument="MysterySeq 9000"
         )
+        # Unknown chemistry: no colour-balance error is raised (would be guessing)...
         assert not any(e.code.startswith("COLOR_BALANCE") for e in result.errors)
+        assert result.is_valid
+
+    def test_unknown_instrument_surfaces_skip_note(self, tmp_path):
+        # ...but the skip is surfaced as a note so a clean result is not mistaken
+        # for a passed colour-balance check.
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(
+            sheet, check_color_balance=True, instrument="MysterySeq 9000"
+        )
+        assert any(n.code == "COLOR_BALANCE_SKIPPED" for n in result.notes)
+        note = next(n for n in result.notes if n.code == "COLOR_BALANCE_SKIPPED")
+        assert note.context.get("instrument") == "MysterySeq 9000"
+        assert "COLOR_BALANCE_SKIPPED" in [n["code"] for n in result.to_dict()["notes"]]
+
+    def test_no_skip_note_when_color_balance_not_requested(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(sheet, instrument="MysterySeq 9000")
+        assert result.notes == []
+
+    def test_known_instrument_produces_no_skip_note(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _DARK_CYCLE_V2)
+        result = SampleSheetValidator().validate(
+            sheet, check_color_balance=True, instrument="NovaSeqXSeries"
+        )
+        assert not any(n.code == "COLOR_BALANCE_SKIPPED" for n in result.notes)
 
     def test_avidity_override_makes_all_g_advisory_not_error(self, tmp_path):
         # Force AVITI (avidity): all-G index cycles are advisory, never errors.

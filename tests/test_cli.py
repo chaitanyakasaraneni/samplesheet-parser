@@ -149,6 +149,32 @@ Lane,Sample_ID,Index,Index2,Sample_Project
 1,SampleC2,TAAGTTGGGT,TGGAACGCTA,ProjectC
 """
 
+# V2 sheet whose index1 cycle 1 is all G/T across the pool (green present, red
+# {A,C} absent): a single-channel 2-channel cycle. On NovaSeqXSeries this is a
+# COLOR_BALANCE_LOW warning under vendor_faithful (exit 0) but a
+# COLOR_BALANCE_NO_SIGNAL error under conservative (exit 1).
+_V2_SINGLE_CHANNEL = """\
+[Header]
+FileFormatVersion,2
+RunName,SingleChannel
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,8
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Sample_ID,Index
+S1,GACATACG
+S2,TAACGTAC
+S3,GAGTACGA
+S4,TATGCGTT
+"""
+
 # V1 sheet with same samples as _V1_A but SampleA1 has a different index -
 # used to trigger sample_changes in diff text output (lines 301-305)
 _V1_A_FIELD_CHANGED = """\
@@ -494,6 +520,85 @@ class TestCLIValidate:
         p = _write(tmp_path, "sheet.csv", _V1_A)
         result = runner.invoke(app, ["validate", str(p), "--min-hamming", "-1"])
         assert result.exit_code == 2
+
+    def test_color_balance_vendor_faithful_single_channel_passes(self, tmp_path: Path) -> None:
+        """A single-channel cycle is a warning (exit 0) in default vendor_faithful mode."""
+        p = _write(tmp_path, "sheet.csv", _V2_SINGLE_CHANNEL)
+        result = runner.invoke(app, ["validate", str(p), "--color-balance"])
+        assert result.exit_code == 0
+        assert "COLOR_BALANCE_LOW" in result.output
+
+    def test_color_balance_conservative_single_channel_fails(self, tmp_path: Path) -> None:
+        """--color-balance-mode conservative escalates the single-channel cycle to an error."""
+        p = _write(tmp_path, "sheet.csv", _V2_SINGLE_CHANNEL)
+        result = runner.invoke(
+            app,
+            ["validate", str(p), "--color-balance", "--color-balance-mode", "conservative"],
+        )
+        assert result.exit_code == 1
+        assert "COLOR_BALANCE_NO_SIGNAL" in result.output
+
+    def test_color_balance_mode_in_json(self, tmp_path: Path) -> None:
+        """JSON output records the mode used when color balance is checked."""
+        p = _write(tmp_path, "sheet.csv", _V2_SINGLE_CHANNEL)
+        result = runner.invoke(
+            app,
+            [
+                "validate",
+                str(p),
+                "--format",
+                "json",
+                "--color-balance",
+                "--color-balance-mode",
+                "conservative",
+            ],
+        )
+        data = json.loads(result.output)
+        assert data["color_balance_mode"] == "conservative"
+
+    def test_color_balance_mode_null_in_json_when_not_checked(self, tmp_path: Path) -> None:
+        """Mode is null in JSON when color balance was not requested."""
+        p = _write(tmp_path, "sheet.csv", _V2_SINGLE_CHANNEL)
+        result = runner.invoke(app, ["validate", str(p), "--format", "json"])
+        data = json.loads(result.output)
+        assert data["color_balance_mode"] is None
+
+    def test_color_balance_invalid_mode_exits_2(self, tmp_path: Path) -> None:
+        """An unrecognized mode value is rejected by typer with exit 2."""
+        p = _write(tmp_path, "sheet.csv", _V2_SINGLE_CHANNEL)
+        result = runner.invoke(
+            app, ["validate", str(p), "--color-balance", "--color-balance-mode", "nonsense"]
+        )
+        assert result.exit_code == 2
+
+    def test_color_balance_unknown_instrument_surfaces_skip_note(self, tmp_path: Path) -> None:
+        """An unknown instrument surfaces a visible COLOR_BALANCE_SKIPPED note,
+        not a silent pass."""
+        p = _write(tmp_path, "sheet.csv", _V2_SINGLE_CHANNEL)
+        result = runner.invoke(
+            app,
+            ["validate", str(p), "--color-balance", "--instrument", "MysterySeq 9000"],
+        )
+        assert result.exit_code == 0
+        assert "COLOR_BALANCE_SKIPPED" in result.output
+
+    def test_color_balance_skip_note_in_json(self, tmp_path: Path) -> None:
+        """The skip note appears in the JSON notes list."""
+        p = _write(tmp_path, "sheet.csv", _V2_SINGLE_CHANNEL)
+        result = runner.invoke(
+            app,
+            [
+                "validate",
+                str(p),
+                "--format",
+                "json",
+                "--color-balance",
+                "--instrument",
+                "MysterySeq 9000",
+            ],
+        )
+        data = json.loads(result.output)
+        assert any(n["code"] == "COLOR_BALANCE_SKIPPED" for n in data["notes"])
 
 
 # ---------------------------------------------------------------------------

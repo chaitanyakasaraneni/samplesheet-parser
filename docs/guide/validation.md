@@ -34,8 +34,9 @@ for w in result.warnings:
 | `COLOR_BALANCE_NO_SIGNAL` | error | An index cycle has no optical signal (2-/1-channel dark, or a 4-channel laser absent), or a conservative-mode escalation (opt-in) |
 | `COLOR_BALANCE_LOW` | warning | An index cycle has weak or single-channel signal (opt-in) |
 | `COLOR_BALANCE_ADVISORY` | warning | AVITI low-diversity advisory in `vendor_faithful` mode (opt-in) |
+| `COLOR_BALANCE_SKIPPED` | note | Color balance was requested but the instrument chemistry could not be resolved, so the check was not run (opt-in) |
 
-The last two checks are **opt-in** — see [Color-balance checking](#color-balance-checking) below.
+The color-balance checks are **opt-in** — see [Color-balance checking](#color-balance-checking) below. Notes are informational and do not affect `is_valid`; they appear in a `notes` list on the result (and in JSON output).
 
 ## Index distance checking
 
@@ -80,12 +81,13 @@ result = SampleSheetValidator().validate(
 - **Two-/one-channel**: an all-`G` (no-signal) cycle is a `COLOR_BALANCE_NO_SIGNAL` error in both modes. A single-channel cycle (one channel present, the other dark) meets Illumina's "at least one channel" minimum, so it is a `COLOR_BALANCE_LOW` warning in `vendor_faithful` but an error in `conservative`. A both-present-but-faint channel (below `min_signal_fraction`, default 0.10) is a `COLOR_BALANCE_LOW` warning.
 - **Four-channel** (Illumina MiSeq/HiSeq): the green laser reads `{G,T}` and the red laser reads `{A,C}`; a cycle missing either laser group (e.g. all-`G`, or `G/T`-only) is a `COLOR_BALANCE_NO_SIGNAL` error in **both** modes.
 - **Avidity** (Element AVITI): each base has its own dye and there is no laser-pair constraint, so low diversity never fails. In `vendor_faithful` it is a `COLOR_BALANCE_ADVISORY` warning (first cycles only); in `conservative` it is escalated to an error.
-- If the instrument is unknown, the check is skipped silently.
+- If the instrument is unknown, the check is not run (guessing the chemistry would be misleading), and a `COLOR_BALANCE_SKIPPED` note is added so a clean result is not mistaken for a passed check.
 
-The CLI exposes the same check:
+The CLI exposes the same check, including the mode:
 
 ```bash
 samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
+samplesheet validate SampleSheet.csv --color-balance --color-balance-mode conservative
 ```
 
 The underlying API — `Chemistry`, `ColorBalanceMode`, `chemistry_for_instrument()`, and `analyze_color_balance(..., mode=...)` returning a `ColorBalanceReport` — is public and usable on its own.
