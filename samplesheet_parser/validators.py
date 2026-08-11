@@ -79,7 +79,7 @@ class ValidationIssue:
     Attributes
     ----------
     level:
-        ``"error"`` or ``"warning"``.
+        ``"error"``, ``"warning"``, or ``"note"``.
     code:
         Short machine-readable code (e.g. ``"DUPLICATE_INDEX"``).
     message:
@@ -105,17 +105,23 @@ class ValidationResult:
     Attributes
     ----------
     is_valid:
-        ``True`` if no *errors* were raised (warnings do not affect
+        ``True`` if no *errors* were raised (warnings and notes do not affect
         this flag).
     errors:
         List of error-level :class:`ValidationIssue` objects.
     warnings:
         List of warning-level :class:`ValidationIssue` objects.
+    notes:
+        List of informational :class:`ValidationIssue` objects. Notes record
+        checks that were requested but not performed (e.g. a colour-balance
+        check skipped because the instrument was unknown), so a clean result
+        is not mistaken for a check that silently did nothing.
     """
 
     is_valid: bool = True
     errors: list[ValidationIssue] = field(default_factory=list)
     warnings: list[ValidationIssue] = field(default_factory=list)
+    notes: list[ValidationIssue] = field(default_factory=list)
 
     def add_error(self, code: str, message: str, **context: Any) -> None:
         self.is_valid = False
@@ -126,6 +132,11 @@ class ValidationResult:
         self.warnings.append(ValidationIssue("warning", code, message, dict(context)))
         logger.warning(f"{code}: {message}")
 
+    def add_note(self, code: str, message: str, **context: Any) -> None:
+        """Record an informational note (does not affect ``is_valid``)."""
+        self.notes.append(ValidationIssue("note", code, message, dict(context)))
+        logger.info(f"{code}: {message}")
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "is_valid": self.is_valid,
@@ -134,6 +145,9 @@ class ValidationResult:
             ],
             "warnings": [
                 {"code": w.code, "message": w.message, "context": w.context} for w in self.warnings
+            ],
+            "notes": [
+                {"code": n.code, "message": n.message, "context": n.context} for n in self.notes
             ],
         }
 
@@ -247,6 +261,10 @@ class SampleSheetValidator:
                                  in one channel (2-/1-channel) or no base
                                  diversity (4-channel), degrading base-call
                                  quality (warning only).
+    * **COLOR_BALANCE_SKIPPED** - Colour balance was requested but the
+                                 instrument chemistry could not be resolved, so
+                                 the check was not run (note only, so a clean
+                                 result is not mistaken for a passed check).
 
     Examples
     --------
@@ -575,7 +593,19 @@ class SampleSheetValidator:
         name = instrument or self._resolve_instrument(sheet)
         chemistry = chemistry_for_instrument(name)
         if chemistry is None:
-            logger.debug("Skipping colour-balance check: unknown instrument %r.", name)
+            detail = (
+                f"instrument {name!r} is not recognised"
+                if name
+                else "no instrument is declared in the sheet or passed via --instrument"
+            )
+            result.add_note(
+                "COLOR_BALANCE_SKIPPED",
+                f"Colour balance was requested but not evaluated: {detail}, so the "
+                f"optical chemistry is unknown. A clean result here does not mean the "
+                f"index pool is colour balanced. Pass a known instrument to enable the "
+                f"check.",
+                instrument=name,
+            )
             return
 
         index1 = [(s.get("index") or s.get("Index") or "").upper() for s in samples]

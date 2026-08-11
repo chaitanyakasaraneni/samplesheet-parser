@@ -29,6 +29,7 @@ Usage
     samplesheet validate SampleSheet.csv
     samplesheet validate SampleSheet.csv --format json
     samplesheet validate SampleSheet.csv --min-hamming 4
+    samplesheet validate SampleSheet.csv --color-balance --color-balance-mode conservative
 
     samplesheet convert SampleSheet_v1.csv --to v2 --output SampleSheet_v2.csv
     samplesheet convert SampleSheet_v2.csv --to v1 --output SampleSheet_v1.csv
@@ -66,6 +67,7 @@ try:
 except ImportError:  # pragma: no cover
     _TYPER_AVAILABLE = False
 
+from samplesheet_parser.chemistry import ColorBalanceMode
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.validators import MIN_HAMMING_DISTANCE as _MIN_HAMMING_DEFAULT
 
@@ -274,6 +276,18 @@ if _TYPER_AVAILABLE:
                 ),
             ),
         ] = False,
+        color_balance_mode: Annotated[
+            ColorBalanceMode,
+            typer.Option(
+                "--color-balance-mode",
+                help=(
+                    "Strictness of the colour-balance check (only with "
+                    "--color-balance). 'vendor_faithful' encodes each platform's "
+                    "published rule; 'conservative' also fails single-channel and "
+                    "low-diversity cycles the vendor minimum permits."
+                ),
+            ),
+        ] = ColorBalanceMode.VENDOR_FAITHFUL,
         instrument: Annotated[
             str | None,
             typer.Option(
@@ -318,6 +332,7 @@ if _TYPER_AVAILABLE:
             sheet,
             min_hamming_distance=min_hamming,
             check_color_balance=color_balance,
+            color_balance_mode=color_balance_mode,
             instrument=instrument,
         )
 
@@ -329,6 +344,7 @@ if _TYPER_AVAILABLE:
                     "is_valid": result.is_valid,
                     "min_hamming_distance": min_hamming,
                     "color_balance_checked": color_balance,
+                    "color_balance_mode": color_balance_mode.value if color_balance else None,
                     "errors": [
                         {"code": e.code, "message": e.message, "context": e.context}
                         for e in result.errors
@@ -337,6 +353,10 @@ if _TYPER_AVAILABLE:
                         {"code": w.code, "message": w.message, "context": w.context}
                         for w in result.warnings
                     ],
+                    "notes": [
+                        {"code": n.code, "message": n.message, "context": n.context}
+                        for n in result.notes
+                    ],
                     "summary": result.summary(),
                 }
             )
@@ -344,6 +364,11 @@ if _TYPER_AVAILABLE:
             typer.echo(f"File:    {path}")
             typer.echo(f"Format:  {version.value}")
             typer.echo(f"Result:  {result.summary()}")
+
+            if result.notes:
+                typer.echo("\nNotes:")
+                for n in result.notes:
+                    typer.echo(f"  {n}")
 
             if result.warnings:
                 typer.echo("\nWarnings:")
