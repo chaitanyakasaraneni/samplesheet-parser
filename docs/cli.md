@@ -81,6 +81,7 @@ samplesheet validate SampleSheet.csv --format json
 samplesheet validate SampleSheet.csv --min-hamming 4
 samplesheet validate SampleSheet.csv --color-balance
 samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
+samplesheet validate SampleSheet.csv --color-balance --color-balance-mode conservative
 ```
 
 **Options:**
@@ -89,8 +90,14 @@ samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
 |---|---|---|
 | `--format` / `-f` | `text` | Output format: `text` or `json` |
 | `--min-hamming` | `3` | Minimum Hamming distance between indexes |
-| `--color-balance` / `--no-color-balance` | off | Also run per-cycle color-balance checking against the instrument's optical chemistry (opt-in; skipped silently for unknown instruments) |
+| `--color-balance` / `--no-color-balance` | off | Also run per-cycle color-balance checking against the instrument's optical chemistry (opt-in) |
+| `--color-balance-mode` | `vendor_faithful` | Strictness of the color-balance check: `vendor_faithful` (each platform's published rule) or `conservative` (also fails single-channel and low-diversity cycles the vendor minimum permits) |
 | `--instrument` | from header | Instrument name used to resolve chemistry for the color-balance check |
+
+When `--color-balance` is requested but the instrument cannot be resolved, the
+check is not run and a `COLOR_BALANCE_SKIPPED` note is emitted (in both text and
+JSON output) rather than passing silently, so a clean result is not mistaken for
+a passed color-balance check. Pass `--instrument` to enable the check.
 
 **Exit codes:** `0` = valid, `1` = errors found, `2` = parse/usage error.
 

@@ -8,7 +8,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Added
+
+- **CLI `--color-balance-mode` option** on `samplesheet validate`
+  (`vendor_faithful` default, or `conservative`), exposing the color-balance
+  strictness that was previously reachable only through the library. JSON output
+  now reports `color_balance_mode` when color balance is checked.
+- **`ValidationResult.notes`** informational channel (with `add_note()`, included
+  in `to_dict()` and CLI text/JSON output). Notes do not affect `is_valid`.
+
+### Changed (behavioral)
+
+- **Color balance no longer skips silently on an unknown instrument.** When
+  `--color-balance` (or `check_color_balance=True`) is requested but the
+  instrument chemistry cannot be resolved, the validator now emits a
+  `COLOR_BALANCE_SKIPPED` note instead of only a debug log, so a clean result is
+  not mistaken for a passed color-balance check.
+
+### CI
+
+- **CI now tests the full supported Python range (3.10-3.13)** via a matrix,
+  matching the `pyproject.toml` classifiers (previously only 3.12 ran).
 
 ## [2.4.0] - 2026-06-21
 
