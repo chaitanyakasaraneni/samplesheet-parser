@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+## [2.5.0] - 2026-08-10
+
 ### Added
 
 - **CLI `--color-balance-mode` option** on `samplesheet validate`
