@@ -6,8 +6,6 @@ demo_output.txt
 **/.claude/
 eval/results/
 corpus/**
-paper.md
-paper.bib
 images/gen_arch_excalidraw.py
 images/samplesheet_parser_arch_v2.3.excalidraw
 
