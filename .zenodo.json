@@ -1,13 +1,14 @@
 {
-  "title": "samplesheet-parser: A Python library for parsing, validating, converting, and merging Illumina SampleSheet V1 and V2 files",
-  "description": "Open-source Python library providing format auto-detection, bidirectional V1/V2 conversion, structural and index validation, sheet diffing, and cross-project merging for Illumina SampleSheet files.",
+  "title": "samplesheet-parser: A multi-vendor parser, validator, and converter for sequencing sample sheets",
+  "description": "Dependency-free Python library and CLI for parsing, validating, converting, diffing, and merging sequencing sample sheets across vendors — Illumina IEM V1 (bcl2fastq), Illumina BCLConvert V2, and Element AVITI run manifests. Provides format auto-detection behind a shared interface, bidirectional V1/V2 conversion, structural and index-integrity validation, and instrument-aware optical color-balance checking.",
   "upload_type": "software",
   "access_right": "open",
   "license": "Apache-2.0",
   "version": "2.5.0",
   "keywords": [
-    "bioinformatics", "Illumina", "SampleSheet", "BCLConvert",
-    "demultiplexing", "genomics", "sequencing", "Python"
+    "bioinformatics", "Illumina", "Element AVITI", "avidity", "SampleSheet",
+    "BCLConvert", "color balance", "multi-vendor", "demultiplexing",
+    "genomics", "sequencing", "Python"
   ],
   "creators": [
     {

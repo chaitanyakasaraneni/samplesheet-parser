@@ -4,6 +4,23 @@ Thanks for contributing! This guide explains how to set up a local development e
 
 ---
 
+## Reporting issues and getting support
+
+- **Found a bug or have a feature request?** Open an issue on the
+  [GitHub issue tracker](https://github.com/chaitanyakasaraneni/samplesheet-parser/issues).
+  For bugs, please include the `samplesheet-parser` version, your Python
+  version, a minimal sample sheet that reproduces the problem (with any
+  sensitive sample IDs redacted), and the full command or code plus the
+  output you got versus what you expected.
+- **Have a usage question or want to discuss an idea?** Open an issue on the
+  [tracker](https://github.com/chaitanyakasaraneni/samplesheet-parser/issues)
+  and label it as a question — the maintainer monitors issues and is happy to
+  help.
+- **Security-sensitive reports** should not be filed as public issues. Please
+  email the maintainer directly at kc.kasaraneni@gmail.com instead.
+
+---
+
 ## Table of contents
 
 - [Contributing to samplesheet-parser](#contributing-to-samplesheet-parser)
@@ -28,7 +45,7 @@ Thanks for contributing! This guide explains how to set up a local development e
 git clone https://github.com/chaitanyakasaraneni/samplesheet-parser.git
 cd samplesheet-parser
 
-# 2. Create a virtual environment (Python 3.12+)
+# 2. Create a virtual environment (Python 3.10+)
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
