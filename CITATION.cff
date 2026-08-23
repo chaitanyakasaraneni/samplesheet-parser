@@ -11,8 +11,8 @@ abstract: >
   (including wildcard-aware Hamming-distance collision detection), and
   instrument-aware optical color-balance checking for four-, two-, and
   one-channel Illumina chemistries and Element AVITI avidity chemistry.
-version: 2.5.0
-date-released: 2026-08-10
+version: 2.5.1
+date-released: 2026-08-23
 license: Apache-2.0
 url: "https://github.com/chaitanyakasaraneni/samplesheet-parser"
 repository-code: "https://github.com/chaitanyakasaraneni/samplesheet-parser"

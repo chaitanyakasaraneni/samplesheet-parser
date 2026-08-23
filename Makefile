@@ -1,5 +1,5 @@
 # Makefile for samplesheet-parser
-# Keeps the version in sync across pyproject.toml, CITATION.cff, and .zenodo.json.
+# Keeps the version in sync across pyproject.toml, CITATION.cff, .zenodo.json, and uv.lock.
 # Portable to GNU Make 3.81 (macOS default) — recipes are single POSIX-sh lines.
 
 PKG       := samplesheet_parser
@@ -11,12 +11,12 @@ CHANGELOG := CHANGELOG.md
 CURRENT_VERSION := $(shell sed -n -E 's/^version = "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/p' $(PYPROJECT) | head -1)
 
 .DEFAULT_GOAL := help
-.PHONY: help version major minor patch tag test lint build clean
+.PHONY: help version major minor patch tag lock test lint build clean
 
 help:
 	@echo "samplesheet-parser — current version: $(CURRENT_VERSION)"
 	@echo ""
-	@echo "Version bumping (syncs $(PYPROJECT), $(CITATION), $(ZENODO); rolls $(CHANGELOG)):"
+	@echo "Version bumping (syncs $(PYPROJECT), $(CITATION), $(ZENODO), uv.lock; rolls $(CHANGELOG)):"
 	@echo "  make patch    patch bump (x.y.Z)"
 	@echo "  make minor    minor bump (x.Y.0)"
 	@echo "  make major    major bump (X.0.0)"
@@ -24,6 +24,7 @@ help:
 	@echo "Other targets:"
 	@echo "  make version  print the current version"
 	@echo "  make tag      create git tag v$(CURRENT_VERSION)"
+	@echo "  make lock     refresh uv.lock (uv lock)"
 	@echo "  make test     run pytest"
 	@echo "  make lint     run ruff"
 	@echo "  make build    build sdist + wheel"
@@ -50,6 +51,9 @@ _bump:
 	sed -E 's/^version = "[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$$new"'"/' $(PYPROJECT) > $(PYPROJECT).tmp && mv $(PYPROJECT).tmp $(PYPROJECT); \
 	sed -E -e 's/^version: .*/version: '"$$new"'/' -e 's/^date-released: .*/date-released: '"$$today"'/' $(CITATION) > $(CITATION).tmp && mv $(CITATION).tmp $(CITATION); \
 	sed -E 's/("version": )"[0-9]+\.[0-9]+\.[0-9]+"/\1"'"$$new"'"/' $(ZENODO) > $(ZENODO).tmp && mv $(ZENODO).tmp $(ZENODO); \
+	if command -v uv >/dev/null 2>&1; then \
+	  if uv lock >/dev/null 2>&1; then lock_note=", uv.lock"; else lock_note=" (warning: uv lock failed)"; fi; \
+	else lock_note=" (uv not found — uv.lock not refreshed)"; fi; \
 	cl_note=""; \
 	if [ -f $(CHANGELOG) ] && grep -q '^## \[Unreleased\]' $(CHANGELOG); then \
 	  awk -v v="$$new" -v d="$$today" '!done && /^## \[Unreleased\]/ {print "## [Unreleased]"; print ""; print "_No unreleased changes._"; print ""; print "## [" v "] - " d; done=1; next} {print}' $(CHANGELOG) > $(CHANGELOG).tmp && mv $(CHANGELOG).tmp $(CHANGELOG); \
@@ -58,7 +62,7 @@ _bump:
 	  cl_note=" (warning: no [Unreleased] section in $(CHANGELOG) — not rolled)"; \
 	fi; \
 	echo "Bumped $$cur -> $$new  (date-released: $$today)"; \
-	echo "  updated: $(PYPROJECT), $(CITATION), $(ZENODO)$$cl_note"; \
+	echo "  updated: $(PYPROJECT), $(CITATION), $(ZENODO)$$lock_note$$cl_note"; \
 	echo "Next: review $(CHANGELOG), then: git commit -am \"release v$$new\" && make tag && git push --follow-tags"
 
 tag:
@@ -66,6 +70,10 @@ tag:
 	if git rev-parse "v$$v" >/dev/null 2>&1; then echo "tag v$$v already exists"; exit 1; fi; \
 	git tag -a "v$$v" -m "Release v$$v"; \
 	echo "created annotated tag v$$v  (push with: git push --follow-tags)"
+
+lock:
+	@command -v uv >/dev/null 2>&1 || { echo "error: uv not found (https://docs.astral.sh/uv/)"; exit 1; }; \
+	uv lock && echo "uv.lock refreshed to $(CURRENT_VERSION)"
 
 test:
 	@pytest
