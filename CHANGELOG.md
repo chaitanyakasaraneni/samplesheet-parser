@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+## [2.5.1] - 2026-08-23
+
 ### Fixed
 
 - **JSON output now emits basenames instead of absolute paths** for written
