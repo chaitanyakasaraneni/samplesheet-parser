@@ -715,7 +715,7 @@ if _TYPER_AVAILABLE:
                     "by": by,
                     "output_dir": str(output_dir),
                     "summary": result.summary(),
-                    "files": {k: Path(v).name for k, v in result.output_files.items()},
+                    "files": {k: v.name for k, v in result.output_files.items()},
                     "sample_counts": result.sample_counts,
                     "warnings": result.warnings,
                 }

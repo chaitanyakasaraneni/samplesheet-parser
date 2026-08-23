@@ -1120,7 +1120,7 @@ class TestCLISplit:
         assert data["by"] == "project"
         # File paths in JSON are basenames, not absolute paths, so the report
         # is reproducible regardless of the output directory (e.g. for
-        # snapshot-based pipeline tests). See fix/json-relative-output-paths.
+        # snapshot-based pipeline tests such as nf-core nf-test).
         for name in data["files"].values():
             assert os.sep not in name
             assert name == os.path.basename(name)
