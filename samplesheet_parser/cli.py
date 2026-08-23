@@ -612,7 +612,7 @@ if _TYPER_AVAILABLE:
                 {
                     "has_conflicts": result.has_conflicts,
                     "sample_count": result.sample_count,
-                    "output_path": str(result.output_path) if result.output_path else None,
+                    "output_path": result.output_path.name if result.output_path else None,
                     "source_versions": result.source_versions,
                     "summary": result.summary(),
                     "conflicts": [
@@ -715,7 +715,7 @@ if _TYPER_AVAILABLE:
                     "by": by,
                     "output_dir": str(output_dir),
                     "summary": result.summary(),
-                    "files": {k: str(v) for k, v in result.output_files.items()},
+                    "files": {k: Path(v).name for k, v in result.output_files.items()},
                     "sample_counts": result.sample_counts,
                     "warnings": result.warnings,
                 }
@@ -814,7 +814,7 @@ if _TYPER_AVAILABLE:
                     "source_version": result.source_version,
                     "matched_count": result.matched_count,
                     "total_count": result.total_count,
-                    "output_path": str(result.output_path) if result.output_path else None,
+                    "output_path": result.output_path.name if result.output_path else None,
                     "summary": result.summary(),
                     "criteria": {
                         "project": project or None,

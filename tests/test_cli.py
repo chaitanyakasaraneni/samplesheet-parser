@@ -25,6 +25,7 @@ Covers:
 from __future__ import annotations
 
 import json
+import os
 import textwrap
 from pathlib import Path
 
@@ -933,6 +934,10 @@ class TestCLIMerge:
             "warnings",
         ):
             assert key in data
+        # output_path in JSON is a basename, not an absolute path, so the
+        # report is reproducible regardless of where the file is written.
+        if data["output_path"] is not None:
+            assert data["output_path"] == os.path.basename(data["output_path"])
 
     def test_json_sample_count_is_correct(self, tmp_path: Path) -> None:
         a = _write(tmp_path, "a.csv", _V1_A)  # 2 samples
@@ -1113,6 +1118,12 @@ class TestCLISplit:
         assert "files" in data
         assert "sample_counts" in data
         assert data["by"] == "project"
+        # File paths in JSON are basenames, not absolute paths, so the report
+        # is reproducible regardless of the output directory (e.g. for
+        # snapshot-based pipeline tests). See fix/json-relative-output-paths.
+        for name in data["files"].values():
+            assert os.sep not in name
+            assert name == os.path.basename(name)
 
     def test_split_missing_file_exits_2(self, tmp_path: Path) -> None:
         result = runner.invoke(
@@ -1256,6 +1267,8 @@ class TestCLIFilter:
         assert data["matched_count"] == 2
         assert data["total_count"] == 4
         assert data["criteria"]["project"] == "ProjectA"
+        # output_path in JSON is a basename, not an absolute path.
+        assert data["output_path"] == "filtered.csv"
 
     def test_filter_text_output_shows_summary(self, tmp_path: Path) -> None:
         src = _write(tmp_path, "combined.csv", _V2_COMBINED)

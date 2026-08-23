@@ -8,7 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Fixed
+
+- **JSON output now emits basenames instead of absolute paths** for written
+  files: `output_path` in `merge` and `filter`, and the `files` values in
+  `split`. The absolute paths made the machine-readable reports depend on the
+  working directory, which broke reproducible/snapshot-based pipeline tests
+  (e.g. nf-core nf-test). The `MergeResult`/`FilterResult.output_path`
+  attributes are unchanged and still hold the full `Path`.
 
 ## [2.5.0] - 2026-08-10
 
