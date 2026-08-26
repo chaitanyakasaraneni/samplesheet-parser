@@ -10,6 +10,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _No unreleased changes._
 
+## [2.5.2] - 2026-08-26
+
+### Changed (behavioral)
+
+- **`merge` and `split` no longer exit non-zero on warnings.** Warnings are
+  advisory, so `merge` now exits 0 on a successful merge (1 only when genuine
+  conflicts are present) and `split` exits 0 on success regardless of warnings.
+  Previously a warning-only run exited 1, which caused workflow engines (e.g.
+  Nextflow) to kill the task even though valid output was written. Hard errors
+  still exit 2.
+
 ## [2.5.1] - 2026-08-23
 
 ### Fixed
