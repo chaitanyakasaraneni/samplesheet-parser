@@ -211,7 +211,7 @@ samplesheet split combined.csv --output-dir ./out/ --prefix Run001_ --format jso
 |---|---|---|
 | `--by` | `project` | Grouping strategy: `project` or `lane` |
 | `--output-dir` / `-d` | `./split/` | Directory in which to write output files |
-| `--to` | (same as input) | Target format: `v1` or `v2` |
+| `--to` | `v2` | Target format: `v1` or `v2` |
 | `--format` / `-f` | `text` | Output format: `text` or `json` |
 | `--prefix` | `""` | String prepended to each output filename |
 
@@ -253,7 +253,7 @@ samplesheet filter combined.csv --project ProjectA --output out.csv --format jso
 | `--lane` / `-l` | — | Keep only samples from this lane |
 | `--sample-id` / `-s` | — | Keep only samples matching this ID or glob pattern |
 | `--output` / `-o` | `SampleSheet_filtered.csv` | Output file path |
-| `--to` | (same as input) | Target format: `v1` or `v2` |
+| `--to` | `v2` | Target format: `v1` or `v2` |
 | `--format` / `-f` | `text` | Output format: `text` or `json` |
 
 At least one of `--project`, `--lane`, or `--sample-id` is required.  Multiple criteria are ANDed.
