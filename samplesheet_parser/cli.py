@@ -576,8 +576,8 @@ if _TYPER_AVAILABLE:
         mismatches across sheets. Mixed V1/V2 inputs are auto-converted to the
         target format.
 
-        Exits 0 on clean merge.
-        Exits 1 if conflicts or warnings were found.
+        Exits 0 on a successful merge (warnings are allowed).
+        Exits 1 if conflicts were found.
         Exits 2 on bad arguments or unreadable files.
         """
         from samplesheet_parser.merger import SampleSheetMerger
@@ -641,8 +641,9 @@ if _TYPER_AVAILABLE:
             if result.output_path:
                 typer.echo(f"\nOutput: {result.output_path}")
 
-        has_issues = result.has_conflicts or bool(result.warnings)
-        raise typer.Exit(code=1 if has_issues else 0)
+        # Warnings are advisory and do not fail the command; only genuine
+        # conflicts (which prevent a valid merged sheet) exit non-zero.
+        raise typer.Exit(code=1 if result.has_conflicts else 0)
 
     # ---------------------------------------------------------------------------
     # split
@@ -685,8 +686,7 @@ if _TYPER_AVAILABLE:
         the sample rows are divided.  Output filenames are
         ``{prefix}{group}_SampleSheet.csv``.
 
-        Exits 0 on success.
-        Exits 1 if warnings were produced (e.g. samples with no project).
+        Exits 0 on success (warnings are allowed).
         Exits 2 on bad arguments or unreadable files.
         """
         from samplesheet_parser.splitter import SampleSheetSplitter
@@ -732,7 +732,9 @@ if _TYPER_AVAILABLE:
                 for w in result.warnings:
                     typer.echo(f"  {w}")
 
-        raise typer.Exit(code=1 if result.warnings else 0)
+        # Warnings are advisory and do not fail the command; a successful split
+        # exits 0 regardless of warnings.
+        raise typer.Exit(code=0)
 
     # ---------------------------------------------------------------------------
     # filter

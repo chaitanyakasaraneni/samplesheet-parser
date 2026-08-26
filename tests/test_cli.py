@@ -964,8 +964,9 @@ class TestCLIMerge:
         c = _write(tmp_path, "c.csv", _V2_C)
         out = tmp_path / "combined.csv"
         result = runner.invoke(app, ["merge", str(a), str(b), str(c), "--output", str(out)])
-        # Mixed format warning → exit 1 (has_issues=True), but file still written
-        assert result.exit_code == 1
+        # Mixed-format warning is advisory: the merge succeeds (exit 0) and the
+        # file is written. Only conflicts exit non-zero.
+        assert result.exit_code == 0
         assert out.exists()
 
     def test_merge_exception_exits_2(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1101,11 +1102,13 @@ class TestCLISplit:
         )
         assert result.exit_code == 0
 
-    def test_split_with_warnings_exits_1(self, tmp_path: Path) -> None:
+    def test_split_with_warnings_exits_0(self, tmp_path: Path) -> None:
+        # Warnings (e.g. samples with no project) are advisory: split still
+        # succeeds and exits 0.
         src = _write(tmp_path, "combined.csv", _V2_NO_PROJECT)
         out_dir = tmp_path / "split"
         result = runner.invoke(app, ["split", str(src), "--output-dir", str(out_dir)])
-        assert result.exit_code == 1
+        assert result.exit_code == 0
 
     def test_split_json_output(self, tmp_path: Path) -> None:
         src = _write(tmp_path, "combined.csv", _V2_COMBINED)
