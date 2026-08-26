@@ -190,7 +190,7 @@ samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv --format json
 | `--format` / `-f` | `text` | Output format: `text` or `json` |
 | `--force` | `False` | Write output even if conflicts are found |
 
-**Exit codes:** `0` = clean merge, `1` = conflicts or warnings, `2` = bad arguments or unreadable files.
+**Exit codes:** `0` = successful merge (warnings are advisory), `1` = conflicts, `2` = bad arguments or unreadable files.
 
 ---
 
@@ -217,7 +217,7 @@ samplesheet split combined.csv --output-dir ./out/ --prefix Run001_ --format jso
 
 Output filenames follow the pattern `{prefix}{group}_SampleSheet.csv`.
 
-**Exit codes:** `0` = success, `1` = warnings produced (e.g. unassigned samples), `2` = bad arguments or unreadable files.
+**Exit codes:** `0` = success (warnings are advisory), `2` = bad arguments or unreadable files.
 
 **JSON output:**
 ```json
