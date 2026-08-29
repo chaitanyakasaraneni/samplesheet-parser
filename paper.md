@@ -15,7 +15,7 @@ authors:
 affiliations:
   - name: Independent Researcher
     index: 1
-date: 23 August 2026
+date: 28 August 2026
 bibliography: paper.bib
 ---
 
@@ -28,10 +28,7 @@ run, the sample sheet has no single standard. Illumina alone ships two mutually
 incompatible layouts, the legacy IEM V1 format consumed by `bcl2fastq`
 [@bcl2fastq] and the modern BCLConvert V2 format [@bclconvert_guide], and
 non-Illumina platforms such as the Element AVITI [@arslan2023avidity] introduce
-their own run-manifest dialect. A single error in any of these files, whether a
-duplicated index, a barcode collision, or an index design that produces no
-optical signal, can invalidate an entire flow cell after the reagents and machine
-time have already been spent.
+their own run-manifest dialect.
 
 `samplesheet-parser` is a dependency-free Python library and command-line tool
 that parses, validates, converts, diffs, merges, splits, filters, and
@@ -42,9 +39,7 @@ branch on format. Beyond structural parsing, it performs index-integrity checks
 (character set, length, duplicates, and wildcard-aware Hamming distance), decodes
 `OverrideCycles` strings to locate unique molecular identifiers [@smith2017umi],
 and models each instrument's optical detection chemistry to flag index pools that
-are not color balanced. The library is typed (`mypy --strict`), tested with an
-automated suite of over 750 unit tests at roughly 98% line coverage, and
-documented with a full user guide and API reference.
+are not color balanced.
 
 ![Architecture of `samplesheet-parser`. A single factory auto-detects the input
 format, either Illumina V1/V2 or an Element AVITI run manifest, and routes it to a
@@ -55,23 +50,40 @@ and writing all operate on the common representation.\label{fig:arch}](images/sa
 
 Core facilities and sequencing labs routinely operate mixed instrument fleets,
 producing sample sheets in several incompatible formats that must be validated
-before a run is committed. Existing open-source tools address only a slice of
-this problem. The widely used `sample-sheet` library [@sample_sheet_clintval]
-reads and writes the IEM V1 format but does not support BCLConvert V2, while
-`samshee` [@samshee] validates V2 sheets against the Illumina schema but does not
-handle V1, convert between formats, or address non-Illumina vendors. In both
-cases the validation is *structural*: it confirms that fields are present and
-well-formed, but cannot catch design errors that are syntactically valid yet
-will fail on the instrument.
+before a run is committed. A single error in any of these files, whether a
+duplicated index, a barcode collision, or an index design that produces no
+optical signal, can invalidate an entire flow cell after the reagents and machine
+time have already been spent. The most damaging errors are precisely those that
+are *syntactically valid* yet fail on the instrument, so structural validation
+alone is not enough: laboratories need tooling that understands each platform's
+formats and its optical chemistry, and that presents a single interface across a
+heterogeneous fleet.
 
-`samplesheet-parser` fills these gaps with three capabilities not available
-together elsewhere:
+# State of the field
 
-1. **Cross-format support and conversion.** A single auto-detecting factory
-   parses IEM V1 and BCLConvert V2 sheets through a shared interface and converts
-   between them where possible, with explicit warnings when V2-only fields cannot
-   be represented in V1. This lets a lab standardize tooling across old and new
-   instruments without rewriting pipelines (\autoref{fig:arch}).
+Existing open-source tools address only a slice of this problem. The widely used
+`sample-sheet` library [@sample_sheet_clintval] reads and writes the IEM V1
+format but does not support BCLConvert V2, while `samshee` [@samshee] validates
+V2 sheets against the Illumina schema but does not handle V1, convert between
+formats, or address non-Illumina vendors. In both cases the validation is
+*structural*: it confirms that fields are present and well-formed, but cannot
+catch design errors that will fail on the instrument, such as an index pool that
+produces no optical signal on two-channel chemistry. `samplesheet-parser` is, to
+our knowledge, the only open-source tool that combines cross-vendor parsing,
+bidirectional V1/V2 conversion, and instrument-aware optical color-balance
+validation in one interface.
+
+# Software design
+
+`samplesheet-parser` is organized around a single auto-detecting factory and a
+structural `Protocol` that every parser satisfies. Three design decisions follow
+from this:
+
+1. **Cross-format support and conversion.** The factory parses IEM V1 and
+   BCLConvert V2 sheets through a shared interface and converts between them where
+   possible, with explicit warnings when V2-only fields cannot be represented in
+   V1. This lets a lab standardize tooling across old and new instruments without
+   rewriting pipelines (\autoref{fig:arch}).
 
 2. **Optical color-balance validation.** Two-channel instruments (for example
    NextSeq and NovaSeq X) read the base `G` as a dark, no-dye signal; an index
@@ -84,27 +96,47 @@ together elsewhere:
    mode, moving a class of run-ending mistakes from post-hoc troubleshooting to
    pre-run validation.
 
-3. **Multi-vendor parsing.** The same factory recognizes Element AVITI
+3. **Multi-vendor extensibility.** The same factory recognizes Element AVITI
    `RunManifest.csv` files and parses them through the identical interface,
    mapping manifest fields onto the shared sample schema. Because AVITI uses an
    avidity chemistry [@arslan2023avidity] in which each base carries its own dye
    and there is no dark base, the color-balance model applies the appropriate
-   rules automatically. The parser is built around a structural `Protocol`, so
-   support for additional platforms can be added without modifying the core.
+   rules automatically. Because the parser is built around a structural
+   `Protocol`, support for additional platforms can be added without modifying the
+   core.
 
 The tool is usable both as a library, for embedding in laboratory information
 management systems and demultiplexing pipelines, and as a `Typer`-based
 command-line application [@typer] with machine-readable JSON output for
-continuous-integration gating of sample sheets before sequencing. It also ships
-a set of nf-core-style Nextflow modules (validate, convert, diff, merge, split,
-filter, and info) so the same operations can be dropped into existing Nextflow
-workflows.
+continuous-integration gating of sample sheets before sequencing. It has no
+runtime dependencies, is fully typed (`mypy --strict`), and is tested with an
+automated suite of over 750 unit tests at roughly 98% line coverage.
+
+# Research impact
+
+By moving optical color-balance checking from post-hoc troubleshooting to pre-run
+validation, `samplesheet-parser` targets a class of failures that waste sequencing
+reagents and instrument time, a concrete cost for the core facilities and
+multi-instrument labs that are its intended users. The software is distributed
+through the channels those users already rely on: it is released on the Python
+Package Index (PyPI) and packaged for BioConda with a corresponding BioContainers
+image, and it ships a set of nf-core-style Nextflow modules (validate, convert,
+diff, merge, split, filter, and info) that have been contributed to and accepted
+into the community `nf-core/modules` repository, so the same operations can be
+dropped into existing Nextflow workflows. Each release is archived on Zenodo with
+a citable DOI. Together these integrations give the tool a credible path to
+adoption within established sequencing-analysis infrastructure.
+
+# AI usage disclosure
+
+Portions of the code, tests, and documentation were developed with the assistance
+of generative AI tools. All such output was reviewed, tested, and verified by the
+author, who takes responsibility for the final content.
 
 # Acknowledgements
 
 The author thanks the open-source bioinformatics community for the public format
-documentation and reference tools that informed this work. Parts of the code,
-tests, and documentation were developed with the assistance of generative AI
-tools; all output was reviewed and verified by the author.
+documentation and reference tools that informed this work, and the nf-core
+community for review of the accompanying Nextflow modules.
 
 # References
