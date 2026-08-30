@@ -44,7 +44,7 @@ are not color balanced.
 ![Architecture of `samplesheet-parser`. A single factory auto-detects the input
 format, either Illumina V1/V2 or an Element AVITI run manifest, and routes it to a
 parser that exposes a shared interface; validation, conversion, diffing, merging,
-and writing all operate on the common representation.\label{fig:arch}](images/samplesheet_parser_arch_v2.3.png)
+and writing all operate on the common representation.\label{fig:arch}](images/samplesheet_parser_arch_latest.png)
 
 # Statement of need
 
