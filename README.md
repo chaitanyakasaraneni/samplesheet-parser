@@ -760,7 +760,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full local testing guide and PR c
   year    = {2026},
   url     = {https://github.com/chaitanyakasaraneni/samplesheet-parser},
   doi     = {10.5281/zenodo.18989694},
-  version = {2.4.0}
+  version = {2.5.2}
 }
 ```
 
