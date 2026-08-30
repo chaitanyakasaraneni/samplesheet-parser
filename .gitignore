@@ -7,7 +7,7 @@ demo_output.txt
 eval/results/
 corpus/**
 images/gen_arch_excalidraw.py
-images/samplesheet_parser_arch_v2.3.excalidraw
+images/samplesheet_parser_arch_latest.excalidraw
 
 # Cache and build artifacts
 __pycache__/
