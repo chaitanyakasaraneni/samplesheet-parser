@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://samplesheet-parser.readthedocs.io
+    about: Usage guide and API reference.
+  - name: Question or usage help
+    url: https://github.com/chaitanyakasaraneni/samplesheet-parser/issues/new
+    about: Open an issue and label it as a question. The maintainer monitors issues.
