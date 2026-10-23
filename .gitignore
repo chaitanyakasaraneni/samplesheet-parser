@@ -53,3 +53,7 @@ uv.lock
 *.tmp
 
 site/
+
+# Demo script output (examples/demo_filter.py, demo_splitter.py)
+examples/sample_sheets/filtered/
+examples/sample_sheets/split/

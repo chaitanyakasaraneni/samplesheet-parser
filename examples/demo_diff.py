@@ -126,7 +126,9 @@ from samplesheet_parser import SampleSheetConverter  # noqa: E402
 
 v1_sheet = SHEETS / "v1_dual_index.csv"
 v2_out = Path("/tmp/diff_v2_converted.csv")
-SampleSheetConverter(str(v1_sheet)).to_v2(str(v2_out))
+# NovaSeq 6000's i5 orientation is ambiguous (workflow A on v1.0 chemistry,
+# workflow B on v1.5), so the converter refuses to guess; pass workflow explicitly.
+SampleSheetConverter(str(v1_sheet), workflow="b").to_v2(str(v2_out))
 
 _print_diff("Scenario 5: Cross-format diff (V1 vs V2 conversion)", v1_sheet, v2_out)
 
