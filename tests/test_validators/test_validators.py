@@ -52,6 +52,29 @@ S3,TCGGACGT,CCTATCCT
 S4,GATGGCTA,GGCTCTGA
 """
 
+# Per-sample OverrideCycles column in [BCLConvert_Data]: one value per sample.
+_PER_SAMPLE_OVERRIDE_CYCLES_V2 = """\
+[Header]
+FileFormatVersion,2
+RunName,PerSampleOverrideCycles
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,OverrideCycles
+1,S1,ATTACTCGAT,TATAGCCTGT,Y151;I10;I10;Y151
+1,S2,TCCGGAGACC,ATAGAGGCAC,Y151;I8N2;I8N2;Y151
+2,S3,CTCTCTACGC,GGCTCTGAGA,Y151;I10;U10;Y151
+"""
+
 
 def _parse_v2(path, content):
     path.write_text(content)
@@ -86,6 +109,13 @@ class TestValidValidation:
     def test_summary_pass(self, v1_minimal):
         result = SampleSheetValidator().validate(_valid_v1(v1_minimal))
         assert result.summary().startswith("PASS")
+
+    def test_per_sample_override_cycles_passes(self, tmp_path):
+        # Per-sample OverrideCycles must not be rejected (no fixed schema).
+        sheet = _parse_v2(tmp_path / "s.csv", _PER_SAMPLE_OVERRIDE_CYCLES_V2)
+        result = SampleSheetValidator().validate(sheet)
+        assert result.is_valid
+        assert result.errors == []
 
 
 class TestColorBalance:
