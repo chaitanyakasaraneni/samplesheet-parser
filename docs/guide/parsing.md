@@ -72,6 +72,29 @@ print(rs.read_structure)
 # {"read1_template": 151, "index2_length": 10, "index2_umi": 9, ...}
 ```
 
+### Per-sample OverrideCycles and custom columns
+
+`[BCLConvert_Data]` may carry columns beyond the standard ones, including a
+**per-sample `OverrideCycles`** column (one read-structure string per sample, as
+produced by some BCLConvert v2 workflows). The parser enforces no fixed column
+schema: any non-standard column is preserved on each sample record and tracked
+in `custom_fields["data"]`, and the sheet still validates.
+
+```python
+sheet = SampleSheetV2("SampleSheet.csv")
+sheet.parse()
+
+# Each sample keeps its own OverrideCycles value:
+for sample in sheet.samples():
+    print(sample["Sample_ID"], sample["OverrideCycles"])
+
+print("OverrideCycles" in sheet.custom_fields["data"])   # True
+```
+
+Note this is distinct from the run-level `OverrideCycles` in
+`[BCLConvert_Settings]` used by `get_umi_length()` / `get_read_structure()`
+above — a per-sample column is carried through as data, not decoded for UMIs.
+
 ## Shared interface
 
 Both `SampleSheetV1` and `SampleSheetV2` satisfy the `SampleSheetParser` Protocol and expose:

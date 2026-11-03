@@ -85,6 +85,23 @@ class TestSampleSheetV2Parsing:
         assert "Custom_Foo" in sheet.custom_fields["data"]
         assert "ExtraCol" in sheet.custom_fields["data"]
 
+    def test_parse_per_sample_override_cycles(self, tmp_path):
+        p = tmp_path / "per_sample_override.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n"
+            "[BCLConvert_Data]\n"
+            "Lane,Sample_ID,Index,Index2,OverrideCycles\n"
+            "1,S1,ATTACTCGAT,TATAGCCTGT,Y151;I10;I10;Y151\n"
+            "1,S2,TCCGGAGACC,ATAGAGGCAC,Y151;I8N2;I8N2;Y151\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert [s["OverrideCycles"] for s in sheet.samples()] == [
+            "Y151;I10;I10;Y151",
+            "Y151;I8N2;I8N2;Y151",
+        ]
+        assert "OverrideCycles" in sheet.custom_fields["data"]
+
     def test_missing_file_format_version_raises(self, tmp_path):
         bad_sheet = tmp_path / "bad.csv"
         bad_sheet.write_text(

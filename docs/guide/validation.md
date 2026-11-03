@@ -38,6 +38,10 @@ for w in result.warnings:
 
 The color-balance checks are **opt-in** — see [Color-balance checking](#color-balance-checking) below. Notes are informational and do not affect `is_valid`; they appear in a `notes` list on the result (and in JSON output).
 
+### No fixed column schema
+
+Validation covers index, adapter, and structural integrity — it does not match the sheet against a fixed column schema. Sheets that carry optional or newer `[BCLConvert_Data]` columns, such as a **per-sample `OverrideCycles`** column, validate rather than being rejected, while the checks above still apply. See [Per-sample OverrideCycles and custom columns](parsing.md#per-sample-overridecycles-and-custom-columns) in the parsing guide.
+
 ## Index distance checking
 
 Indexes that are too similar cause read bleed-through between samples during demultiplexing, a common cause of low-quality runs that a simple duplicate check does not catch.
