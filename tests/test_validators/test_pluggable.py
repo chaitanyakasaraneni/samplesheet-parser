@@ -212,11 +212,90 @@ class TestJsonSchema:
         assert result.is_valid
         assert not any(e.code == "SCHEMA_VIOLATION" for e in result.errors)
 
-    def test_direct_validator_factory_skip_note(self, tmp_path):
-        # Builds the validator directly and runs it; asserts the skip-note path
-        # only when jsonschema is unavailable.
-        if HAS_JSONSCHEMA:
-            return
+    def test_schema_skipped_when_jsonschema_unavailable(self, tmp_path, monkeypatch):
+        # Force the soft-dependency fallback even when jsonschema is installed
+        # (as it is in CI), so the SCHEMA_SKIPPED path is always exercised.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "jsonschema":
+                raise ImportError("forced absent for test")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
         sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
         issues = json_schema_validator({"type": "object"})(sheet)
         assert any(i.code == "SCHEMA_SKIPPED" for i in issues)
+
+
+class _StubSheet:
+    """Minimal stand-in exposing just what illumina_v2_conformance reads.
+
+    Lets the conformance branches be exercised directly, without constructing a
+    sheet the parser would reject (e.g. a bad FileFormatVersion or missing
+    Read1Cycles).
+    """
+
+    def __init__(self, header, reads, samples):
+        self.header = header
+        self.reads = reads
+        self._samples = samples
+
+    def samples(self):
+        return self._samples
+
+
+class TestConformanceBranches:
+    def test_bad_format_version(self):
+        sheet = _StubSheet({"FileFormatVersion": "3", "RunName": "x"}, {"Read1Cycles": 151}, [])
+        codes = {i.code for i in illumina_v2_conformance(sheet)}
+        assert "SPEC_BAD_FORMAT_VERSION" in codes
+
+    def test_missing_read1(self):
+        sheet = _StubSheet({"FileFormatVersion": "2", "RunName": "x"}, {}, [])
+        codes = {i.code for i in illumina_v2_conformance(sheet)}
+        assert "SPEC_MISSING_READ1" in codes
+
+    def test_index2_length_mismatch_and_single_index(self):
+        # Sample A has no Index2 (exercises the "no index" path); Sample B has a
+        # 2 bp Index2 against Index2Cycles=10 (exercises the Index2 mismatch).
+        samples = [
+            {"sample_id": "A", "index": "ACGTACGTAC"},
+            {"sample_id": "B", "index": "ACGTACGTAC", "index2": "AC"},
+        ]
+        sheet = _StubSheet(
+            {"FileFormatVersion": "2", "RunName": "x"},
+            {"Read1Cycles": 151, "Index1Cycles": 10, "Index2Cycles": 10},
+            samples,
+        )
+        issues = illumina_v2_conformance(sheet)
+        index2_mismatches = [
+            i
+            for i in issues
+            if i.code == "SPEC_INDEX_LENGTH_MISMATCH" and i.context.get("field") == "index2"
+        ]
+        assert len(index2_mismatches) == 1
+
+
+class TestPluggableMerge:
+    def test_note_level_issue_merges_into_notes(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+
+        def note_validator(_sheet):
+            return [ValidationIssue("note", "LAB_NOTE", "fyi")]
+
+        result = SampleSheetValidator().validate(sheet, extra_validators=[note_validator])
+        assert result.is_valid
+        assert any(n.code == "LAB_NOTE" for n in result.notes)
+
+    def test_strict_on_v1_sheet_notes_not_applicable(self, v1_minimal):
+        # STRICT runs conformance; on a V1 sheet it returns SPEC_NOT_APPLICABLE,
+        # which flows through the note branch of the merge helper.
+        from samplesheet_parser.parsers.v1 import SampleSheetV1
+
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        result = SampleSheetValidator().validate(sheet, strictness=Strictness.STRICT)
+        assert any(n.code == "SPEC_NOT_APPLICABLE" for n in result.notes)
