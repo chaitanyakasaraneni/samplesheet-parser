@@ -54,9 +54,16 @@ from samplesheet_parser.protocol import SampleSheetParser
 from samplesheet_parser.splitter import SampleSheetSplitter, SplitResult
 from samplesheet_parser.validators import (
     SampleSheetValidator,
+    Strictness,
+    ValidationIssue,
     ValidationResult,
+    Validator,
+    ValidatorError,
     hamming_distance,
+    illumina_v2_conformance,
     index_collision_distance,
+    json_schema_validator,
+    sheet_to_dict,
 )
 from samplesheet_parser.writer import SampleSheetWriter
 
@@ -72,6 +79,13 @@ __all__ = [
     "UMILocation",
     "SampleSheetValidator",
     "ValidationResult",
+    "ValidationIssue",
+    "Strictness",
+    "Validator",
+    "ValidatorError",
+    "illumina_v2_conformance",
+    "json_schema_validator",
+    "sheet_to_dict",
     "hamming_distance",
     "index_collision_distance",
     "Chemistry",

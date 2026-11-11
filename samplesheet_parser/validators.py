@@ -19,7 +19,9 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any
 
 from samplesheet_parser.chemistry import (
@@ -223,6 +225,262 @@ def index_collision_distance(a: str, b: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Pluggable validation: strictness dial, user-supplied validators, JSON Schema
+# ---------------------------------------------------------------------------
+
+#: A pluggable validator: given a parsed sheet, return an iterable of
+#: :class:`ValidationIssue` (or ``None`` for "nothing to report"), or raise
+#: :class:`ValidatorError` to signal a single error. User-supplied rules and
+#: the built-in strict checks both use this shape, so their output merges into
+#: the same :class:`ValidationResult` as the core checks.
+Validator = Callable[[SampleSheetParser], Iterable[ValidationIssue] | None]
+
+
+class Strictness(str, Enum):
+    """A single strict<->lenient dial that cascades to the core checks.
+
+    * ``LENIENT``  - looser index-distance threshold, no colour balance.
+    * ``STANDARD`` - the historical default behaviour.
+    * ``STRICT``   - tighter index distance, conservative colour balance, and
+      the built-in :func:`illumina_v2_conformance` validator turned on.
+
+    An explicit keyword to :meth:`SampleSheetValidator.validate` (e.g.
+    ``min_hamming_distance=5``) always overrides the level's preset, so the dial
+    sets defaults rather than locking values.
+    """
+
+    LENIENT = "lenient"
+    STANDARD = "standard"
+    STRICT = "strict"
+
+
+class ValidatorError(Exception):
+    """Raise from a pluggable validator to report one error.
+
+    Lets a user-supplied function signal a violation without building a
+    :class:`ValidationIssue`; the runner turns it into an error on the result.
+
+    Examples
+    --------
+    >>> def require_project(sheet):
+    ...     for s in sheet.samples():
+    ...         if not s.get("sample_project"):
+    ...             raise ValidatorError(
+    ...                 f"{s.get('sample_id')} has no Sample_Project",
+    ...                 code="LAB_MISSING_PROJECT",
+    ...             )
+    ...     return []
+    """
+
+    def __init__(self, message: str, code: str = "CUSTOM_VALIDATION", **context: Any) -> None:
+        super().__init__(message)
+        self.code = code
+        self.context = context
+
+
+#: Strictness presets, applied to the core checks when the matching keyword is
+#: left unset on :meth:`SampleSheetValidator.validate`.
+_STRICTNESS_PRESETS: dict[Strictness, dict[str, Any]] = {
+    Strictness.LENIENT: {
+        "min_hamming_distance": 2,
+        "check_color_balance": False,
+        "color_balance_mode": ColorBalanceMode.VENDOR_FAITHFUL,
+    },
+    Strictness.STANDARD: {
+        "min_hamming_distance": MIN_HAMMING_DISTANCE,
+        "check_color_balance": False,
+        "color_balance_mode": ColorBalanceMode.VENDOR_FAITHFUL,
+    },
+    Strictness.STRICT: {
+        "min_hamming_distance": MIN_HAMMING_DISTANCE + 1,
+        "check_color_balance": True,
+        "color_balance_mode": ColorBalanceMode.CONSERVATIVE,
+    },
+}
+
+
+def _run_validator(
+    validator: Validator,
+    sheet: SampleSheetParser,
+    result: ValidationResult,
+) -> None:
+    """Run one pluggable validator and merge its output into ``result``."""
+    try:
+        issues = validator(sheet)
+    except ValidatorError as exc:
+        result.add_error(exc.code, str(exc), **exc.context)
+        return
+
+    for issue in issues or ():
+        if issue.level == "error":
+            result.add_error(issue.code, issue.message, **issue.context)
+        elif issue.level == "warning":
+            result.add_warning(issue.code, issue.message, **issue.context)
+        else:
+            result.add_note(issue.code, issue.message, **issue.context)
+
+
+def sheet_to_dict(sheet: SampleSheetParser) -> dict[str, Any]:
+    """Return a minimal JSON-friendly view of a parsed sheet.
+
+    This is the document a JSON Schema is checked against (see
+    :func:`json_schema_validator`). It is intentionally small - header, reads,
+    settings, and the per-sample records - and is the natural seed for a fuller
+    ``to_json()`` on the parsers.
+    """
+    return {
+        "header": dict(getattr(sheet, "header", None) or {}),
+        "reads": dict(getattr(sheet, "reads", None) or {}),
+        "settings": dict(getattr(sheet, "settings", None) or {}),
+        "samples": list(sheet.samples()),
+    }
+
+
+def _sample_index(sample: Mapping[str, Any], *keys: str) -> str | None:
+    for key in keys:
+        value = sample.get(key)
+        if value:
+            return str(value)
+    return None
+
+
+def illumina_v2_conformance(sheet: SampleSheetParser) -> list[ValidationIssue]:
+    """Flag a BCLConvert v2 sheet that departs from the Illumina v2 spec.
+
+    This is the strict counterpart to the lenient-by-default structural
+    behaviour: it enforces a subset of the Illumina v2 Settings specification
+    the way samshee's default validators do, expressed as a plain pluggable
+    validator. It is **not** part of the core checks; it is turned on by
+    :attr:`Strictness.STRICT` (or by passing it in ``extra_validators``), so
+    tolerant parsing - including per-sample ``OverrideCycles`` columns - stays
+    the default.
+
+    Checks
+    ------
+    * ``SPEC_NOT_APPLICABLE``        - no ``FileFormatVersion`` (V1 / AVITI): skipped.
+    * ``SPEC_BAD_FORMAT_VERSION``    - ``FileFormatVersion`` is not ``2``.
+    * ``SPEC_MISSING_RUNNAME``       - ``[Header]`` has no ``RunName`` (warning).
+    * ``SPEC_MISSING_READ1``         - ``[Reads]`` has no positive ``Read1Cycles``.
+    * ``SPEC_INDEX_LENGTH_MISMATCH`` - an index length does not match the
+      declared ``Index1Cycles`` / ``Index2Cycles``.
+    """
+    issues: list[ValidationIssue] = []
+
+    header: dict[str, Any] = dict(getattr(sheet, "header", None) or {})
+    reads: dict[str, Any] = dict(getattr(sheet, "reads", None) or {})
+
+    if "FileFormatVersion" not in header:
+        return [
+            ValidationIssue(
+                "note",
+                "SPEC_NOT_APPLICABLE",
+                "Illumina v2 conformance check skipped " "(no FileFormatVersion in [Header]).",
+            )
+        ]
+
+    if str(header.get("FileFormatVersion")) != "2":
+        issues.append(
+            ValidationIssue(
+                "error",
+                "SPEC_BAD_FORMAT_VERSION",
+                f"FileFormatVersion must be 2, found {header.get('FileFormatVersion')!r}.",
+            )
+        )
+
+    if not header.get("RunName"):
+        issues.append(
+            ValidationIssue(
+                "warning",
+                "SPEC_MISSING_RUNNAME",
+                "[Header] has no RunName (recommended by the Illumina v2 spec).",
+            )
+        )
+
+    read1 = reads.get("Read1Cycles")
+    if not read1 or int(read1) <= 0:
+        issues.append(
+            ValidationIssue(
+                "error",
+                "SPEC_MISSING_READ1",
+                "[Reads] must declare a positive Read1Cycles.",
+            )
+        )
+
+    index1_cycles = reads.get("Index1Cycles")
+    index2_cycles = reads.get("Index2Cycles")
+    for sample in sheet.samples():
+        sid = sample.get("sample_id") or sample.get("Sample_ID") or "?"
+        idx1 = _sample_index(sample, "index", "Index")
+        idx2 = _sample_index(sample, "index2", "Index2")
+        if idx1 and index1_cycles and len(idx1) != int(index1_cycles):
+            issues.append(
+                ValidationIssue(
+                    "error",
+                    "SPEC_INDEX_LENGTH_MISMATCH",
+                    f"Index '{idx1}' ({len(idx1)} bp) does not match "
+                    f"Index1Cycles={index1_cycles}.",
+                    {"sample_id": sid, "field": "index"},
+                )
+            )
+        if idx2 and index2_cycles and len(idx2) != int(index2_cycles):
+            issues.append(
+                ValidationIssue(
+                    "error",
+                    "SPEC_INDEX_LENGTH_MISMATCH",
+                    f"Index2 '{idx2}' ({len(idx2)} bp) does not match "
+                    f"Index2Cycles={index2_cycles}.",
+                    {"sample_id": sid, "field": "index2"},
+                )
+            )
+
+    return issues
+
+
+def json_schema_validator(schema: Mapping[str, Any]) -> Validator:
+    """Build a validator that checks :func:`sheet_to_dict` against ``schema``.
+
+    Accepts any JSON Schema (draft 2020-12), including a schema that ``$ref``\\ s
+    an external document such as a samshee ``urn:samshee:illuminav2/v1``
+    reference, so an existing schema can be carried over.
+
+    ``jsonschema`` is a **soft** dependency: when it is not installed the check
+    degrades to a ``SCHEMA_SKIPPED`` note instead of failing, keeping the
+    core dependency-free. Install it with ``pip install jsonschema`` (or the
+    ``samplesheet-parser[schema]`` extra) to enable the check.
+    """
+
+    def _validate(sheet: SampleSheetParser) -> list[ValidationIssue]:
+        try:
+            import jsonschema
+        except ImportError:
+            return [
+                ValidationIssue(
+                    "note",
+                    "SCHEMA_SKIPPED",
+                    "jsonschema is not installed; the JSON Schema check was skipped. "
+                    "Install `jsonschema` (or the `samplesheet-parser[schema]` extra) "
+                    "to enable schema validation.",
+                )
+            ]
+
+        document = sheet_to_dict(sheet)
+        validator = jsonschema.Draft202012Validator(dict(schema))
+        issues: list[ValidationIssue] = []
+        for error in sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path)):
+            issues.append(
+                ValidationIssue(
+                    "error",
+                    "SCHEMA_VIOLATION",
+                    str(error.message),
+                    {"path": "/".join(str(p) for p in error.absolute_path)},
+                )
+            )
+        return issues
+
+    return _validate
+
+
+# ---------------------------------------------------------------------------
 # Validator
 # ---------------------------------------------------------------------------
 
@@ -277,10 +535,13 @@ class SampleSheetValidator:
         self,
         sheet: SampleSheetParser,
         *,
-        min_hamming_distance: int = MIN_HAMMING_DISTANCE,
-        check_color_balance: bool = False,
+        strictness: Strictness | str = Strictness.STANDARD,
+        extra_validators: Sequence[Validator] = (),
+        schema: Mapping[str, Any] | None = None,
+        min_hamming_distance: int | None = None,
+        check_color_balance: bool | None = None,
         instrument: str | None = None,
-        color_balance_mode: ColorBalanceMode | str = ColorBalanceMode.VENDOR_FAITHFUL,
+        color_balance_mode: ColorBalanceMode | str | None = None,
         min_signal_fraction: float = DEFAULT_MIN_SIGNAL_FRACTION,
     ) -> ValidationResult:
         """Run all validation checks on a parsed sample sheet.
@@ -290,18 +551,38 @@ class SampleSheetValidator:
         sheet:
             A parsed :class:`SampleSheetV1` or :class:`SampleSheetV2`
             instance (i.e., :meth:`parse` has been called).
+        strictness:
+            The overall strict<->lenient level (see :class:`Strictness`).
+            Defaults to :attr:`Strictness.STANDARD`, which reproduces the
+            historical behaviour exactly. The level sets the defaults for
+            ``min_hamming_distance``, ``check_color_balance``, and
+            ``color_balance_mode`` when those are left unset, and
+            :attr:`Strictness.STRICT` additionally runs
+            :func:`illumina_v2_conformance`. Any explicit keyword below
+            overrides the level's preset.
+        extra_validators:
+            A sequence of pluggable validators (see :data:`Validator`) run
+            after the core checks. Each may return :class:`ValidationIssue`
+            objects or raise :class:`ValidatorError`; their output merges into
+            this result. Use this for lab-specific or project-specific rules.
+        schema:
+            An optional JSON Schema (draft 2020-12) checked against
+            :func:`sheet_to_dict`. Requires the soft ``jsonschema`` dependency;
+            without it the check becomes a ``SCHEMA_SKIPPED`` note. See
+            :func:`json_schema_validator`.
         min_hamming_distance:
             Minimum Hamming distance required between any two index sequences
             in the same lane. Pairs below this threshold produce an
-            ``INDEX_DISTANCE_TOO_LOW`` warning. Defaults to
-            :data:`MIN_HAMMING_DISTANCE` (3). Set higher (e.g. ``4``) for
+            ``INDEX_DISTANCE_TOO_LOW`` warning. When unset (``None``), resolved
+            from ``strictness`` (3 at STANDARD). Set higher (e.g. ``4``) for
             stricter demultiplexing requirements with longer indexes.
         check_color_balance:
             Opt in to per-cycle index colour-balance checking against the
             instrument's optical chemistry (see :meth:`_check_color_balance`).
-            Off by default because it can turn an otherwise-valid low-plex
-            pool into an error; enable it when the sheet declares (or you pass)
-            a known instrument.
+            When unset (``None``), resolved from ``strictness`` (off except at
+            STRICT). Off by default because it can turn an otherwise-valid
+            low-plex pool into an error; enable it when the sheet declares (or
+            you pass) a known instrument.
         instrument:
             Instrument name used to resolve the optical chemistry for the
             colour-balance check. Defaults to the instrument declared in the
@@ -317,6 +598,18 @@ class SampleSheetValidator:
         ValidationResult
             Structured result with ``is_valid``, ``errors``, and ``warnings``.
         """
+        level = Strictness(strictness)
+        preset = _STRICTNESS_PRESETS[level]
+        resolved_min_distance: int = (
+            preset["min_hamming_distance"] if min_hamming_distance is None else min_hamming_distance
+        )
+        resolved_check_cb: bool = (
+            preset["check_color_balance"] if check_color_balance is None else check_color_balance
+        )
+        resolved_cb_mode: ColorBalanceMode | str = (
+            preset["color_balance_mode"] if color_balance_mode is None else color_balance_mode
+        )
+
         result = ValidationResult()
         samples = sheet.samples()
 
@@ -326,18 +619,29 @@ class SampleSheetValidator:
 
         self._check_index_sequences(samples, result)
         self._check_duplicate_indices(samples, result)
-        self._check_index_distances(samples, result, min_distance=min_hamming_distance)
+        self._check_index_distances(samples, result, min_distance=resolved_min_distance)
         self._check_duplicate_sample_ids(samples, result)
         self._check_adapters(sheet, result)
-        if check_color_balance:
+        if resolved_check_cb:
             self._check_color_balance(
                 sheet,
                 samples,
                 result,
                 instrument=instrument,
-                mode=color_balance_mode,
+                mode=resolved_cb_mode,
                 min_signal_fraction=min_signal_fraction,
             )
+
+        # Pluggable validators: strict spec conformance (at STRICT), then any
+        # user-supplied validators, then an optional JSON Schema.
+        chain: list[Validator] = []
+        if level is Strictness.STRICT:
+            chain.append(illumina_v2_conformance)
+        chain.extend(extra_validators)
+        if schema is not None:
+            chain.append(json_schema_validator(schema))
+        for validator in chain:
+            _run_validator(validator, sheet, result)
 
         return result
 
