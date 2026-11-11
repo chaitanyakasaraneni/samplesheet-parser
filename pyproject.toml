@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "samplesheet-parser"
 version = "2.5.2"
-description = "Multi-vendor, format-agnostic parser for sequencing sample sheets — Illumina IEM V1 & BCLConvert V2 plus Element AVITI run manifests, with index validation and color-balance checking"
+description = "Multi-vendor, format-agnostic parser for sequencing sample sheets - Illumina IEM V1 & BCLConvert V2 plus Element AVITI run manifests, with index validation and color-balance checking"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [{ name = "Chaitanya Kasaraneni", email = "kc.kasaraneni@gmail.com" }]

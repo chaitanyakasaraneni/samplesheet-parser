@@ -9,7 +9,7 @@ sheet = SampleSheetFactory().create_parser("SampleSheet.csv", parse=True)
 result = SampleSheetValidator().validate(sheet)
 
 print(result.is_valid)     # True / False
-print(result.summary())    # "PASS — 0 error(s), 0 warning(s)"
+print(result.summary())    # "PASS - 0 error(s), 0 warning(s)"
 
 for err in result.errors:
     print(err)
@@ -36,11 +36,11 @@ for w in result.warnings:
 | `COLOR_BALANCE_ADVISORY` | warning | AVITI low-diversity advisory in `vendor_faithful` mode (opt-in) |
 | `COLOR_BALANCE_SKIPPED` | note | Color balance was requested but the instrument chemistry could not be resolved, so the check was not run (opt-in) |
 
-The color-balance checks are **opt-in** — see [Color-balance checking](#color-balance-checking) below. Notes are informational and do not affect `is_valid`; they appear in a `notes` list on the result (and in JSON output).
+The color-balance checks are **opt-in** - see [Color-balance checking](#color-balance-checking) below. Notes are informational and do not affect `is_valid`; they appear in a `notes` list on the result (and in JSON output).
 
 ### No fixed column schema
 
-Validation covers index, adapter, and structural integrity — it does not match the sheet against a fixed column schema. Sheets that carry optional or newer `[BCLConvert_Data]` columns, such as a **per-sample `OverrideCycles`** column, validate rather than being rejected, while the checks above still apply. See [Per-sample OverrideCycles and custom columns](parsing.md#per-sample-overridecycles-and-custom-columns) in the parsing guide.
+Validation covers index, adapter, and structural integrity - it does not match the sheet against a fixed column schema. Sheets that carry optional or newer `[BCLConvert_Data]` columns, such as a **per-sample `OverrideCycles`** column, validate rather than being rejected, while the checks above still apply. See [Per-sample OverrideCycles and custom columns](parsing.md#per-sample-overridecycles-and-custom-columns) in the parsing guide.
 
 ## Strictness, custom rules, and JSON Schema
 
@@ -98,7 +98,7 @@ result = SampleSheetValidator().validate(sheet, extra_validators=[require_projec
 ### JSON Schema
 
 Pass a JSON Schema (draft 2020-12) as `schema`; it is checked against a dict
-view of the sheet (`sheet_to_dict()` — `header`, `reads`, `settings`,
+view of the sheet (`sheet_to_dict()` - `header`, `reads`, `settings`,
 `samples`). A schema may `$ref` an external document, including a samshee
 `urn:samshee:illuminav2/v1` reference, so an existing schema carries over.
 
@@ -132,7 +132,7 @@ The standalone helpers are also available: `hamming_distance(a, b)` for the lite
 
 ## Color-balance checking
 
-Optical sequencers read each index base by its fluorescent signal, and the detection differs by instrument: Illumina four-channel/two-laser (MiSeq, HiSeq), two-channel (NextSeq, NovaSeq 6000, NovaSeq X), one-channel (iSeq), and Element AVITI avidity (per-base dye). On two-channel chemistry the base `G` is "dark" — no dye — so an index cycle where the **entire pool** reads `G` emits no signal and the cycle fails to register, miscalling every barcode at that position. A Hamming-distance check cannot catch this because the indexes may still be perfectly distinct.
+Optical sequencers read each index base by its fluorescent signal, and the detection differs by instrument: Illumina four-channel/two-laser (MiSeq, HiSeq), two-channel (NextSeq, NovaSeq 6000, NovaSeq X), one-channel (iSeq), and Element AVITI avidity (per-base dye). On two-channel chemistry the base `G` is "dark" - no dye - so an index cycle where the **entire pool** reads `G` emits no signal and the cycle fails to register, miscalling every barcode at that position. A Hamming-distance check cannot catch this because the indexes may still be perfectly distinct.
 
 `samplesheet-parser` models each instrument's chemistry and scores the pool cycle-by-cycle. The check is **opt-in** because it can turn a passing sheet into a failing one, and it needs to know the instrument:
 
@@ -148,7 +148,7 @@ result = SampleSheetValidator().validate(
 ### Modes
 
 - **`vendor_faithful`** (default) encodes each platform's published rule exactly.
-- **`conservative`** is stricter than the published minimum (the behavior before modes existed — pass `color_balance_mode="conservative"` to keep it).
+- **`conservative`** is stricter than the published minimum (the behavior before modes existed - pass `color_balance_mode="conservative"` to keep it).
 
 ### Rules by chemistry
 
@@ -164,13 +164,13 @@ samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
 samplesheet validate SampleSheet.csv --color-balance --color-balance-mode conservative
 ```
 
-The underlying API — `Chemistry`, `ColorBalanceMode`, `chemistry_for_instrument()`, and `analyze_color_balance(..., mode=...)` returning a `ColorBalanceReport` — is public and usable on its own.
+The underlying API - `Chemistry`, `ColorBalanceMode`, `chemistry_for_instrument()`, and `analyze_color_balance(..., mode=...)` returning a `ColorBalanceReport` - is public and usable on its own.
 
 ## Structured results
 
 ```python
-result.is_valid          # bool — False if any errors present
-result.summary()         # str — one-line human-readable summary
+result.is_valid          # bool - False if any errors present
+result.summary()         # str - one-line human-readable summary
 
 for issue in result.errors:
     print(issue.code)      # e.g. "DUPLICATE_INDEX"
