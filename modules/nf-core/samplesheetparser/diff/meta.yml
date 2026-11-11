@@ -3,7 +3,7 @@ description: |
   Compare two Illumina SampleSheet.csv files (any combination of V1 and V2)
   and emit a structured JSON diff covering header changes, added/removed
   samples, and per-sample field changes. Exits 0 if identical, 1 if
-  differences are detected — useful as a CI pre-run guard.
+  differences are detected - useful as a CI pre-run guard.
 keywords:
   - illumina
   - samplesheet

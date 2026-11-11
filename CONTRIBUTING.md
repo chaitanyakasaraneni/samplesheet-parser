@@ -14,7 +14,7 @@ Thanks for contributing! This guide explains how to set up a local development e
   output you got versus what you expected.
 - **Have a usage question or want to discuss an idea?** Open an issue on the
   [tracker](https://github.com/chaitanyakasaraneni/samplesheet-parser/issues)
-  and label it as a question — the maintainer monitors issues and is happy to
+  and label it as a question - the maintainer monitors issues and is happy to
   help.
 - **Security-sensitive reports** should not be filed as public issues. Please
   email the maintainer directly at kc.kasaraneni@gmail.com instead.
@@ -109,7 +109,7 @@ Output : tests/fixtures/outputs/SampleSheet_v1_converted_to_v2.csv
 ✓ All conversions passed. Attach the files in tests/fixtures/outputs/ to your PR.
 ```
 
-Exit code `0` means all conversions passed. Exit code `1` means something failed — the error is printed to stderr.
+Exit code `0` means all conversions passed. Exit code `1` means something failed - the error is printed to stderr.
 
 ---
 
@@ -132,9 +132,9 @@ Run `python scripts/demo_converter.py` and attach **all four output files** from
 | File | What it shows |
 |---|---|
 | `SampleSheet_v1_converted_to_v2.csv` | V1 → V2 output |
-| `SampleSheet_v2_converted_to_v1.csv` | V2 → V1 output (lossy — note dropped fields in logs) |
-| `SampleSheet_v1_roundtrip.csv` | V1 → V2 → V1 — sample IDs must match the original |
-| `SampleSheet_v2_roundtrip.csv` | V2 → V1 → V2 — sample IDs must match the original |
+| `SampleSheet_v2_converted_to_v1.csv` | V2 → V1 output (lossy - note dropped fields in logs) |
+| `SampleSheet_v1_roundtrip.csv` | V1 → V2 → V1 - sample IDs must match the original |
+| `SampleSheet_v2_roundtrip.csv` | V2 → V1 → V2 - sample IDs must match the original |
 
 To attach files to a GitHub PR description or comment, drag-and-drop them into the text box, or use the paperclip icon. `.csv` files can be attached directly.
 
@@ -173,7 +173,7 @@ Before marking a PR ready for review, confirm:
 
 - [ ] `pytest` passes locally with no failures
 - [ ] Coverage has not decreased (run `pytest` and check the `TOTAL` line)
-- [ ] New behaviour has tests — aim for one test per logical case, not per line
+- [ ] New behaviour has tests - aim for one test per logical case, not per line
 - [ ] For converter changes: demo script passes and output files are attached
 - [ ] `ruff check .` passes (no lint errors)
 - [ ] `black --check .` passes (code is formatted)

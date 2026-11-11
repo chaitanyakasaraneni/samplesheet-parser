@@ -1,10 +1,10 @@
 # Splitting
 
 `SampleSheetSplitter` splits a combined sheet into one file per project or per
-lane — the inverse of [`SampleSheetMerger`](merging.md).  Header, reads, and
+lane - the inverse of [`SampleSheetMerger`](merging.md).  Header, reads, and
 settings are copied into every output file; only the sample rows are divided.
 
-## Basic usage — split by project
+## Basic usage - split by project
 
 ```python
 from samplesheet_parser import SampleSheetSplitter
@@ -94,9 +94,9 @@ for w in result.warnings:
 ## Inspecting SplitResult
 
 ```python
-result.output_files     # dict[str, Path] — group key → output file path
-result.sample_counts    # dict[str, int]  — group key → sample count
-result.warnings         # list[str]       — non-fatal issues
-result.source_version   # str             — "V1" or "V2"
-result.summary()        # str             — one-line human-readable summary
+result.output_files     # dict[str, Path] - group key → output file path
+result.sample_counts    # dict[str, int]  - group key → sample count
+result.warnings         # list[str]       - non-fatal issues
+result.source_version   # str             - "V1" or "V2"
+result.summary()        # str             - one-line human-readable summary
 ```
