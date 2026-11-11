@@ -368,7 +368,7 @@ def _write_summary(
     # Headline before/after: tool-vs-reference disagreements per mode.
     vf = res.disagree_vs_reference.get("vendor_faithful", 0)
     cons = res.disagree_vs_reference.get("conservative", 0)
-    lines.append("## Tool vs. published vendor guidance — before/after by mode")
+    lines.append("## Tool vs. published vendor guidance - before/after by mode")
     lines.append("")
     lines.append(
         "Prior single-mode run (before this change): **37** tool-vs-reference "
@@ -408,7 +408,7 @@ def _write_summary(
     lines.append("")
     lines.append(
         "These pools receive a different pass/fail verdict depending on chemistry "
-        "— the paper's key result."
+        "- the paper's key result."
     )
     lines.append("")
     if by_class:
@@ -434,7 +434,7 @@ def _write_summary(
     lines.append("")
     if not dis:
         lines.append(
-            "**Zero disagreements** in either mode — the tool agrees with the "
+            "**Zero disagreements** in either mode - the tool agrees with the "
             "published vendor rule on every (pool, chemistry). (Stated explicitly; "
             "not assumed.)"
         )
@@ -442,7 +442,7 @@ def _write_summary(
     else:
         lines.append(
             f"**{len(dis)}** (pool, chemistry, mode) tool-vs-reference disagreements "
-            "— surfaced, not hidden. Full list in `disagreements.csv`."
+            "- surfaced, not hidden. Full list in `disagreements.csv`."
         )
         lines.append("")
         lines.append("| pool_id | chemistry | mode | tool | def | ref | reason (reference rule) |")

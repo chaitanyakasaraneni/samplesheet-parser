@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-demo_writer.py — SampleSheetWriter usage examples.
+demo_writer.py - SampleSheetWriter usage examples.
 
 Demonstrates building and editing sample sheets programmatically using the
 fluent SampleSheetWriter API.
 
-    Scenario 1: Build V1 from scratch   — minimal sheet for bcl2fastq
-    Scenario 2: Build V2 from scratch   — NovaSeq X sheet with OverrideCycles
-    Scenario 3: Edit an existing sheet  — load, modify a sample index, write
-    Scenario 4: Remove a sample         — filter out a sample before submission
+    Scenario 1: Build V1 from scratch   - minimal sheet for bcl2fastq
+    Scenario 2: Build V2 from scratch   - NovaSeq X sheet with OverrideCycles
+    Scenario 3: Edit an existing sheet  - load, modify a sample index, write
+    Scenario 4: Remove a sample         - filter out a sample before submission
 
 Run from the repo root::
 
@@ -123,7 +123,7 @@ _print_csv(out_v2)
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 3: Edit existing sheet — fix a sample index")
+print("Scenario 3: Edit existing sheet - fix a sample index")
 print("=" * 60)
 
 src = SHEETS / "v1_dual_index.csv"
@@ -157,10 +157,10 @@ print("=" * 60)
 
 src_sheet = SampleSheetFactory().create_parser(src, parse=True)
 writer = SampleSheetWriter.from_sheet(src_sheet)
-print(f"  Before removal: {writer.sample_count} samples — {writer.sample_ids}")
+print(f"  Before removal: {writer.sample_count} samples - {writer.sample_ids}")
 
 writer.remove_sample("Sample3")
-print(f"  After  removal: {writer.sample_count} samples — {writer.sample_ids}")
+print(f"  After  removal: {writer.sample_count} samples - {writer.sample_ids}")
 
 out_removed = writer.write(OUT / "writer_v1_removed.csv")
 print(f"  Written → {out_removed.name}")

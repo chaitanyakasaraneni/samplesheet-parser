@@ -2,7 +2,7 @@ name: samplesheetparser_validate
 description: |
   Validate an Illumina SampleSheet.csv (V1 or V2) for index, adapter, and
   structural issues. Format is auto-detected. Exits 0 if valid, 1 if errors
-  are found — causing the pipeline to fail early with a clear message rather
+  are found - causing the pipeline to fail early with a clear message rather
   than discovering demultiplexing problems downstream.
 keywords:
   - illumina

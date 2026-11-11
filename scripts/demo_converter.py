@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-demo_converter.py — local smoke test for SampleSheetConverter.
+demo_converter.py - local smoke test for SampleSheetConverter.
 
 Run this script from the repo root after installing the package in dev mode:
 
@@ -25,19 +25,20 @@ from pathlib import Path
 # Resolve paths relative to repo root regardless of cwd
 # ---------------------------------------------------------------------------
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURES  = REPO_ROOT / "tests" / "fixtures"
-OUTPUTS   = FIXTURES / "outputs"
+FIXTURES = REPO_ROOT / "tests" / "fixtures"
+OUTPUTS = FIXTURES / "outputs"
 OUTPUTS.mkdir(parents=True, exist_ok=True)
 
 INPUT_V1 = FIXTURES / "SampleSheet_v1_dual_index.csv"
 INPUT_V2 = FIXTURES / "SampleSheet_v2_dual_index.csv"
 
-OUT_V1_TO_V2      = OUTPUTS / "SampleSheet_v1_converted_to_v2.csv"
-OUT_V2_TO_V1      = OUTPUTS / "SampleSheet_v2_converted_to_v1.csv"
-OUT_ROUNDTRIP_V1  = OUTPUTS / "SampleSheet_v1_roundtrip.csv"
-OUT_ROUNDTRIP_V2  = OUTPUTS / "SampleSheet_v2_roundtrip.csv"
+OUT_V1_TO_V2 = OUTPUTS / "SampleSheet_v1_converted_to_v2.csv"
+OUT_V2_TO_V1 = OUTPUTS / "SampleSheet_v2_converted_to_v1.csv"
+OUT_ROUNDTRIP_V1 = OUTPUTS / "SampleSheet_v1_roundtrip.csv"
+OUT_ROUNDTRIP_V2 = OUTPUTS / "SampleSheet_v2_roundtrip.csv"
 
 # ---------------------------------------------------------------------------
+
 
 def _separator(title: str) -> None:
     print(f"\n{'─' * 60}")
@@ -56,7 +57,7 @@ def run() -> int:
         from samplesheet_parser.parsers.v2 import SampleSheetV2
     except ImportError as exc:
         print(
-            f"ERROR: could not import samplesheet_parser — "
+            f"ERROR: could not import samplesheet_parser - "
             f"did you run 'pip install -e .[dev]'?\n{exc}",
             file=sys.stderr,
         )
@@ -113,7 +114,7 @@ def run() -> int:
     orig_v1.parse()
 
     orig_ids = {s["sample_id"] for s in orig_v1.samples()}
-    rt_ids   = {s["sample_id"] for s in rt_v1.samples()}
+    rt_ids = {s["sample_id"] for s in rt_v1.samples()}
 
     if orig_ids == rt_ids:
         print(f"✓ Sample IDs match after V1→V2→V1 round-trip: {sorted(orig_ids)}")
@@ -139,7 +140,7 @@ def run() -> int:
     orig_v2.parse()
 
     orig_ids_v2 = {s["sample_id"] for s in orig_v2.samples()}
-    rt_ids_v2   = {s["sample_id"] for s in rt_v2.samples()}
+    rt_ids_v2 = {s["sample_id"] for s in rt_v2.samples()}
 
     if orig_ids_v2 == rt_ids_v2:
         print(f"✓ Sample IDs match after V2→V1→V2 round-trip: {sorted(orig_ids_v2)}")
@@ -162,7 +163,7 @@ def run() -> int:
 
     if errors:
         print(f"\n{'─'*60}")
-        print(f"FAILED — {len(errors)} error(s):")
+        print(f"FAILED - {len(errors)} error(s):")
         for e in errors:
             print(f"  {e}")
         return 1

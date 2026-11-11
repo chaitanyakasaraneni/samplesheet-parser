@@ -23,7 +23,7 @@ print(result.summary())
 ```python
 result = SampleSheetFilter("SampleSheet_combined.csv").filter(
     "lane1.csv",
-    lane=1,       # int or str — both accepted
+    lane=1,       # int or str - both accepted
 )
 ```
 
@@ -35,7 +35,7 @@ Exact match or glob pattern (case-sensitive on all platforms):
 # Exact match
 result = SampleSheetFilter("combined.csv").filter("ctrl.csv", sample_id="CTRL_001")
 
-# Glob pattern — keeps all samples whose ID starts with "CTRL_"
+# Glob pattern - keeps all samples whose ID starts with "CTRL_"
 result = SampleSheetFilter("combined.csv").filter("ctrls.csv", sample_id="CTRL_*")
 
 # Character range pattern
@@ -44,7 +44,7 @@ result = SampleSheetFilter("combined.csv").filter("out.csv", sample_id="SAMPLE_0
 
 ## Multiple criteria (ANDed)
 
-All provided criteria must match — a sample is kept only if it satisfies
+All provided criteria must match - a sample is kept only if it satisfies
 **every** criterion:
 
 ```python
@@ -71,7 +71,7 @@ When no samples match, no file is written and `output_path` is `None`:
 result = SampleSheetFilter("combined.csv").filter("out.csv", project="NonExistent")
 
 if result.matched_count == 0:
-    print("No samples matched — output not written.")
+    print("No samples matched - output not written.")
 
 print(result.output_path)   # None
 ```
@@ -93,9 +93,9 @@ result = SampleSheetFilter(
 ## Inspecting FilterResult
 
 ```python
-result.matched_count    # int       — samples that passed all criteria
-result.total_count      # int       — total samples in the input sheet
-result.output_path      # Path | None — None when no samples matched
-result.source_version   # str       — "V1" or "V2"
-result.summary()        # str       — one-line human-readable summary
+result.matched_count    # int       - samples that passed all criteria
+result.total_count      # int       - total samples in the input sheet
+result.output_path      # Path | None - None when no samples matched
+result.source_version   # str       - "V1" or "V2"
+result.summary()        # str       - one-line human-readable summary
 ```

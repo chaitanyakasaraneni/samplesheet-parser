@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-demo_diff.py — SampleSheetDiff usage examples.
+demo_diff.py - SampleSheetDiff usage examples.
 
-Demonstrates comparing two sample sheets — same format or cross-format —
+Demonstrates comparing two sample sheets - same format or cross-format -
 to detect header changes, added/removed samples, and per-field sample diffs.
 
-    Scenario 1: Identical sheets   — diff reports no changes (exit-0 analogue)
-    Scenario 2: Header change      — experiment name updated between runs
-    Scenario 3: Sample added       — a new sample appears in the newer sheet
-    Scenario 4: Sample field change — an index was corrected
-    Scenario 5: Cross-format diff  — compare a V1 sheet against its V2 conversion
+    Scenario 1: Identical sheets   - diff reports no changes (exit-0 analogue)
+    Scenario 2: Header change      - experiment name updated between runs
+    Scenario 3: Sample added       - a new sample appears in the newer sheet
+    Scenario 4: Sample field change - an index was corrected
+    Scenario 5: Cross-format diff  - compare a V1 sheet against its V2 conversion
 
 Run from the repo root::
 
@@ -83,7 +83,7 @@ def _print_diff(label: str, old: Path, new: Path) -> None:
         print("\n  Per-sample field changes:")
         for sc in result.sample_changes:
             for field, (old_val, new_val) in sc.changes.items():
-                print(f"    {sc.sample_id} — {field}: {old_val!r} → {new_val!r}")
+                print(f"    {sc.sample_id} - {field}: {old_val!r} → {new_val!r}")
 
 
 # ---------------------------------------------------------------------------

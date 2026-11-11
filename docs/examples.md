@@ -40,7 +40,7 @@ sheet = SampleSheetFactory().create_parser("SampleSheet.csv", parse=True)
 result = SampleSheetValidator().validate(sheet)
 
 print(result.summary())
-# PASS — 0 error(s), 2 warning(s)
+# PASS - 0 error(s), 2 warning(s)
 
 for w in result.warnings:
     print(f"[{w.code}] {w.message}")
@@ -74,7 +74,7 @@ print(sheet.index_type())   # "dual"
 for s in sheet.samples():
     print(s["sample_id"], s["index"], s["index2"])
 
-# Color balance works here too — AVITI resolves to four-channel chemistry,
+# Color balance works here too - AVITI resolves to four-channel chemistry,
 # so zero-diversity cycles surface as COLOR_BALANCE_LOW warnings.
 result = SampleSheetValidator().validate(sheet, check_color_balance=True)
 print(result.summary())
@@ -92,11 +92,11 @@ converter = SampleSheetConverter("SampleSheet_v1.csv")
 out = converter.to_v2("SampleSheet_v2.csv")
 print(f"Converted {converter.source_version.value} → {out.name}")
 
-# V2 → V1  (lossy — V2-only fields are dropped with a warning)
+# V2 → V1  (lossy - V2-only fields are dropped with a warning)
 converter = SampleSheetConverter("SampleSheet_v2.csv")
 converter.to_v1("SampleSheet_v1.csv")
 
-# Roundtrip — V1 → V2 → V1
+# Roundtrip - V1 → V2 → V1
 from samplesheet_parser import SampleSheetFactory
 
 SampleSheetConverter("original_v1.csv").to_v2("tmp_v2.csv")
@@ -134,10 +134,10 @@ print("Removed:", result.samples_removed)
 # Per-sample field changes
 for sc in result.sample_changes:
     for field, (old_val, new_val) in sc.changes.items():
-        print(f"{sc.sample_id} — {field}: {old_val!r} → {new_val!r}")
+        print(f"{sc.sample_id} - {field}: {old_val!r} → {new_val!r}")
 ```
 
-Cross-format diff (V1 vs its V2 conversion) works the same way — V1-only
+Cross-format diff (V1 vs its V2 conversion) works the same way - V1-only
 metadata columns are suppressed to avoid format-noise:
 
 ```python
@@ -216,7 +216,7 @@ writer.write("SampleSheet_repopulated.csv")
 from samplesheet_parser import SampleSheetMerger
 from samplesheet_parser.enums import SampleSheetVersion
 
-# Clean merge — two V1 sheets → combined V2
+# Clean merge - two V1 sheets → combined V2
 result = (
     SampleSheetMerger(target_version=SampleSheetVersion.V2)
     .add("ProjectA.csv")
@@ -224,7 +224,7 @@ result = (
     .merge("combined.csv")
 )
 print(result.summary())
-# Merged 2 sheet(s) → combined.csv (8 samples) — 0 conflict(s), 0 warning(s)
+# Merged 2 sheet(s) → combined.csv (8 samples) - 0 conflict(s), 0 warning(s)
 ```
 
 ### Handling index collisions
@@ -256,7 +256,7 @@ for w in result.warnings:
 
 ## Splitting
 
-`SampleSheetSplitter` is the inverse of `SampleSheetMerger` — it divides a
+`SampleSheetSplitter` is the inverse of `SampleSheetMerger` - it divides a
 combined sheet back into per-project or per-lane files.
 
 ### Split by project
@@ -328,7 +328,7 @@ print(result.summary())
 result = SampleSheetFilter("combined.csv").filter("lane1.csv", lane=1)
 ```
 
-### Filter by sample ID — glob patterns
+### Filter by sample ID - glob patterns
 
 ```python
 # Exact match
@@ -358,7 +358,7 @@ print(f"Matched {result.matched_count} of {result.total_count}")
 ```python
 result = SampleSheetFilter("combined.csv").filter("out.csv", project="Ghost")
 print(result.matched_count)   # 0
-print(result.output_path)     # None — file not written
+print(result.output_path)     # None - file not written
 ```
 
 ---
@@ -381,7 +381,7 @@ trimmed = normalize_index_lengths(samples, strategy="trim")
 padded = normalize_index_lengths(samples, strategy="pad")
 ```
 
-Dual-index sheets — both I7 and I5 lengths are normalized independently:
+Dual-index sheets - both I7 and I5 lengths are normalized independently:
 
 ```python
 dual = [

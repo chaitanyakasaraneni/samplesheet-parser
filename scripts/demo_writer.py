@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-demo_writer.py — local smoke test for SampleSheetWriter.
+demo_writer.py - local smoke test for SampleSheetWriter.
 
 Run this script from the repo root after installing the package in dev mode:
 
@@ -23,15 +23,15 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FIXTURES  = REPO_ROOT / "tests" / "fixtures"
-OUTPUTS   = FIXTURES / "outputs"
+FIXTURES = REPO_ROOT / "tests" / "fixtures"
+OUTPUTS = FIXTURES / "outputs"
 OUTPUTS.mkdir(parents=True, exist_ok=True)
 
 INPUT_V2 = FIXTURES / "SampleSheet_v2_dual_index.csv"
 
-OUT_V2_SCRATCH    = OUTPUTS / "SampleSheet_writer_v2_scratch.csv"
-OUT_V1_SCRATCH    = OUTPUTS / "SampleSheet_writer_v1_scratch.csv"
-OUT_V2_EDITED     = OUTPUTS / "SampleSheet_writer_v2_edited.csv"
+OUT_V2_SCRATCH = OUTPUTS / "SampleSheet_writer_v2_scratch.csv"
+OUT_V1_SCRATCH = OUTPUTS / "SampleSheet_writer_v1_scratch.csv"
+OUT_V2_EDITED = OUTPUTS / "SampleSheet_writer_v2_edited.csv"
 
 
 def _separator(title: str) -> None:
@@ -47,7 +47,7 @@ def run() -> int:
         from samplesheet_parser.writer import SampleSheetWriter
     except ImportError as exc:
         print(
-            f"ERROR: could not import samplesheet_parser — "
+            f"ERROR: could not import samplesheet_parser - "
             f"did you run 'pip install -e .[dev]'?\n{exc}",
             file=sys.stderr,
         )
@@ -56,7 +56,7 @@ def run() -> int:
     errors: list[str] = []
 
     # ------------------------------------------------------------------
-    # Scenario 1 — Build V2 sheet from scratch
+    # Scenario 1 - Build V2 sheet from scratch
     # ------------------------------------------------------------------
     _separator("1/3  Build V2 sheet from scratch")
 
@@ -72,12 +72,15 @@ def run() -> int:
     writer.set_override_cycles("Y151;I10;I10;Y151")
     writer.set_software_version("4.2.7")
 
-    for i, (idx, idx2) in enumerate([
-        ("ATTACTCGAT", "TATAGCCTGT"),
-        ("TCCGGAGACC", "ATAGAGGCAC"),
-        ("TAGGCATGCC", "CCTATCCTGT"),
-        ("CTCTCTACTT", "GGCTCTGACC"),
-    ], start=1):
+    for i, (idx, idx2) in enumerate(
+        [
+            ("ATTACTCGAT", "TATAGCCTGT"),
+            ("TCCGGAGACC", "ATAGAGGCAC"),
+            ("TAGGCATGCC", "CCTATCCTGT"),
+            ("CTCTCTACTT", "GGCTCTGACC"),
+        ],
+        start=1,
+    ):
         writer.add_sample(
             f"SAMPLE_00{i}",
             index=idx,
@@ -89,9 +92,7 @@ def run() -> int:
     writer.write(OUT_V2_SCRATCH)
     print(OUT_V2_SCRATCH.read_text())
 
-    sheet = SampleSheetFactory().create_parser(
-        OUT_V2_SCRATCH, parse=True, clean=False
-    )
+    sheet = SampleSheetFactory().create_parser(OUT_V2_SCRATCH, parse=True, clean=False)
     if len(sheet.records) != 4:
         msg = f"✗ Expected 4 samples, got {len(sheet.records)}"
         print(msg, file=sys.stderr)
@@ -106,7 +107,7 @@ def run() -> int:
         print(f"✓ FileFormatVersion = {sheet.header.get('FileFormatVersion')}")
 
     # ------------------------------------------------------------------
-    # Scenario 2 — Build V1 sheet from scratch
+    # Scenario 2 - Build V1 sheet from scratch
     # ------------------------------------------------------------------
     _separator("2/3  Build V1 sheet from scratch")
 
@@ -119,12 +120,15 @@ def run() -> int:
     writer_v1.set_reads(read1=151, read2=151)
     writer_v1.set_adapter("CTGTCTCTTATACACATCT")
 
-    for i, (idx, idx2, i7, i5) in enumerate([
-        ("ATTACTCG", "TATAGCCT", "D701", "D501"),
-        ("TCCGGAGA", "ATAGAGGC", "D702", "D502"),
-        ("TAGGCATG", "CCTATCCT", "D703", "D503"),
-        ("CTCTCTAC", "GGCTCTGA", "D704", "D504"),
-    ], start=1):
+    for i, (idx, idx2, i7, i5) in enumerate(
+        [
+            ("ATTACTCG", "TATAGCCT", "D701", "D501"),
+            ("TCCGGAGA", "ATAGAGGC", "D702", "D502"),
+            ("TAGGCATG", "CCTATCCT", "D703", "D503"),
+            ("CTCTCTAC", "GGCTCTGA", "D704", "D504"),
+        ],
+        start=1,
+    ):
         writer_v1.add_sample(
             f"SAMPLE_00{i}",
             index=idx,
@@ -138,9 +142,7 @@ def run() -> int:
     writer_v1.write(OUT_V1_SCRATCH)
     print(OUT_V1_SCRATCH.read_text())
 
-    sheet_v1 = SampleSheetFactory().create_parser(
-        OUT_V1_SCRATCH, parse=True, clean=False
-    )
+    sheet_v1 = SampleSheetFactory().create_parser(OUT_V1_SCRATCH, parse=True, clean=False)
     if len(sheet_v1.records) != 4:
         msg = f"✗ Expected 4 samples, got {len(sheet_v1.records)}"
         print(msg, file=sys.stderr)
@@ -155,14 +157,12 @@ def run() -> int:
         print(f"✓ IEMFileVersion = {sheet_v1.iem_version}")
 
     # ------------------------------------------------------------------
-    # Scenario 3 — Load existing sheet, remove + update + write back
+    # Scenario 3 - Load existing sheet, remove + update + write back
     # ------------------------------------------------------------------
     _separator("3/3  Load existing V2 sheet, edit, write back")
     print(f"Input: {INPUT_V2}\n")
 
-    src_sheet = SampleSheetFactory().create_parser(
-        INPUT_V2, parse=True, clean=False
-    )
+    src_sheet = SampleSheetFactory().create_parser(INPUT_V2, parse=True, clean=False)
     original_count = len(src_sheet.records)
 
     editor = SampleSheetWriter.from_sheet(src_sheet)
@@ -180,41 +180,31 @@ def run() -> int:
     print(f"\nWritten to: {OUT_V2_EDITED}")
     print(OUT_V2_EDITED.read_text())
 
-    edited_sheet = SampleSheetFactory().create_parser(
-        OUT_V2_EDITED, parse=True, clean=False
-    )
+    edited_sheet = SampleSheetFactory().create_parser(OUT_V2_EDITED, parse=True, clean=False)
     expected_count = original_count - 1
 
     if len(edited_sheet.records) != expected_count:
         msg = (
-            f"✗ Expected {expected_count} samples after remove, "
-            f"got {len(edited_sheet.records)}"
+            f"✗ Expected {expected_count} samples after remove, " f"got {len(edited_sheet.records)}"
         )
         print(msg, file=sys.stderr)
         errors.append(msg)
     else:
         print(f"✓ Sample count correct after remove: {len(edited_sheet.records)}")
 
-    s2 = next(
-        (r for r in edited_sheet.records if r["Sample_ID"] == "SAMPLE_002"), None
-    )
+    s2 = next((r for r in edited_sheet.records if r["Sample_ID"] == "SAMPLE_002"), None)
     if s2 is None:
         msg = "✗ SAMPLE_002 not found in edited sheet"
         print(msg, file=sys.stderr)
         errors.append(msg)
     elif s2.get("Index") != "GGGGGGGGGG":
-        msg = (
-            f"✗ SAMPLE_002 index not updated — "
-            f"expected GGGGGGGGGG, got {s2.get('Index')}"
-        )
+        msg = f"✗ SAMPLE_002 index not updated - " f"expected GGGGGGGGGG, got {s2.get('Index')}"
         print(msg, file=sys.stderr)
         errors.append(msg)
     else:
         print(f"✓ SAMPLE_002 index correctly updated to {s2.get('Index')}")
 
-    removed = next(
-        (r for r in edited_sheet.records if r["Sample_ID"] == "SAMPLE_008"), None
-    )
+    removed = next((r for r in edited_sheet.records if r["Sample_ID"] == "SAMPLE_008"), None)
     if removed is not None:
         msg = "✗ SAMPLE_008 still present after remove"
         print(msg, file=sys.stderr)
@@ -232,7 +222,7 @@ def run() -> int:
 
     if errors:
         print(f"\n{'─'*60}")
-        print(f"FAILED — {len(errors)} error(s):")
+        print(f"FAILED - {len(errors)} error(s):")
         for e in errors:
             print(f"  {e}")
         return 1
