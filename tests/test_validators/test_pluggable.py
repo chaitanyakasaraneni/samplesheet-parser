@@ -405,3 +405,87 @@ class TestSchemaRegistry:
             assert any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
         else:
             assert any(n.code == "SCHEMA_SKIPPED" for n in result.notes)
+
+
+class _SectionStub:
+    """Stub exposing just the attributes sheet_to_sections reads, for branch
+    coverage of its non-v2 (Data) and Cloud_Data paths."""
+
+    def __init__(self, *, records=None, cloud_data=None, samples=None):
+        if records is not None:
+            self.records = records
+        if cloud_data is not None:
+            self.cloud_data = cloud_data
+        self._samples = samples or []
+
+    def samples(self):
+        return self._samples
+
+
+class TestSheetToSectionsBranches:
+    def test_falls_back_to_data_without_records(self):
+        # No `records` attribute: rows come from samples() under a generic Data key.
+        stub = _SectionStub(samples=[{"sample_id": "A", "index": "ACGT"}])
+        sec = sheet_to_sections(stub)
+        assert sec["Data"] == [{"sample_id": "A", "index": "ACGT"}]
+
+    def test_includes_cloud_data(self):
+        stub = _SectionStub(
+            records=[{"Sample_ID": "A", "Index": "ACGTACGTAC"}],
+            cloud_data=[{"Sample_ID": "A", "ProjectName": "P"}],
+        )
+        sec = sheet_to_sections(stub)
+        assert "BCLConvert_Data" in sec
+        assert sec["Cloud_Data"] == [{"Sample_ID": "A", "ProjectName": "P"}]
+
+
+class TestRegistryAndSchemaEdgeCases:
+    def test_build_registry_none_without_referencing(self, monkeypatch):
+        # When `referencing` cannot be imported, build_registry degrades to None.
+        import builtins
+
+        from samplesheet_parser import build_registry
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "referencing":
+                raise ImportError("forced absent for test")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        assert build_registry() is None
+
+    def test_validation_without_registry_uses_plain_validator(self, tmp_path, monkeypatch):
+        # Force build_registry() -> None so the no-registry validator path runs.
+        if not HAS_JSONSCHEMA:
+            return
+        import samplesheet_parser.validators as validators_mod
+
+        monkeypatch.setattr(validators_mod, "build_registry", lambda: None)
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        schema = {
+            "type": "object",
+            "properties": {"Header": {"type": "object", "required": ["RunName"]}},
+        }
+        result = SampleSheetValidator().validate(sheet, schema=schema)
+        # Conformant sheet; the point is the plain-validator branch ran cleanly.
+        assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        assert not any(e.code == "SCHEMA_INVALID" for e in result.errors)
+
+    def test_malformed_schema_reports_schema_invalid(self, tmp_path, monkeypatch):
+        # Force validator construction to raise, exercising the SCHEMA_INVALID guard.
+        if not HAS_JSONSCHEMA:
+            return
+        import jsonschema
+
+        import samplesheet_parser.validators as validators_mod
+
+        def boom(*args, **kwargs):
+            raise jsonschema.exceptions.SchemaError("forced bad schema")
+
+        monkeypatch.setattr(validators_mod, "build_registry", lambda: None)
+        monkeypatch.setattr(jsonschema, "Draft202012Validator", boom)
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        result = SampleSheetValidator().validate(sheet, schema={"type": "object"})
+        assert any(e.code == "SCHEMA_INVALID" for e in result.errors)
