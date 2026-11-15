@@ -2,13 +2,17 @@
 validators, strict Illumina v2 conformance, and optional JSON Schema."""
 
 from samplesheet_parser import (
+    ILLUMINA_V2_URN,
+    SAMSHEE_V2_URN,
     SampleSheetValidator,
     Strictness,
     ValidationIssue,
     ValidatorError,
     illumina_v2_conformance,
+    illumina_v2_schema_validator,
     json_schema_validator,
     sheet_to_dict,
+    sheet_to_sections,
 )
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 
@@ -186,11 +190,12 @@ class TestJsonSchema:
         assert len(doc["samples"]) == 2
 
     def test_schema_required_field(self, tmp_path):
-        # Schema requires header.RunName; the nonconformant sheet lacks it.
+        # Schema validates the sectioned view (Header section); the nonconformant
+        # sheet has no RunName.
         sheet = _parse_v2(tmp_path / "s.csv", _NONCONFORMANT_V2)
         schema = {
             "type": "object",
-            "properties": {"header": {"type": "object", "required": ["RunName"]}},
+            "properties": {"Header": {"type": "object", "required": ["RunName"]}},
         }
         result = SampleSheetValidator().validate(sheet, schema=schema)
         if HAS_JSONSCHEMA:
@@ -205,7 +210,7 @@ class TestJsonSchema:
         sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
         schema = {
             "type": "object",
-            "properties": {"header": {"type": "object", "required": ["RunName"]}},
+            "properties": {"Header": {"type": "object", "required": ["RunName"]}},
         }
         result = SampleSheetValidator().validate(sheet, schema=schema)
         # Conformant sheet satisfies the schema (or the check is skipped).
@@ -299,3 +304,104 @@ class TestPluggableMerge:
         sheet.parse()
         result = SampleSheetValidator().validate(sheet, strictness=Strictness.STRICT)
         assert any(n.code == "SPEC_NOT_APPLICABLE" for n in result.notes)
+
+
+# Parses fine, but violates the v2 schema: FileFormatVersion is 3, and the
+# schema's Header.FileFormatVersion enum requires "2". Index lengths match the
+# declared cycles, so this isolates a schema-only structural failure.
+_SCHEMA_INVALID_V2 = """\
+[Header]
+FileFormatVersion,3
+RunName,SchemaInvalid
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2
+1,Sample1,ATTACTCGAT,TATAGCCTGT
+1,Sample2,TCCGGAGACC,ATAGAGGCAC
+"""
+
+
+class TestSheetToSections:
+    def test_sections_shape(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        sec = sheet_to_sections(sheet)
+        assert "Header" in sec and "Reads" in sec and "BCLConvert_Data" in sec
+        assert sec["Header"]["RunName"] == "ConformantRun"
+        # Reads values are integers in the sectioned view.
+        assert sec["Reads"]["Read1Cycles"] == 151
+        # Data rows keep their original column names.
+        assert sec["BCLConvert_Data"][0]["Sample_ID"] == "Sample1"
+
+
+class TestIlluminaV2SchemaValidator:
+    def test_conformant_sheet_passes_schema(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        issues = illumina_v2_schema_validator()(sheet)
+        assert not any(i.code == "SPEC_SCHEMA_VIOLATION" for i in issues)
+
+    def test_bad_format_version_fails_schema(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _SCHEMA_INVALID_V2)
+        issues = illumina_v2_schema_validator()(sheet)
+        if HAS_JSONSCHEMA:
+            assert any(i.code == "SPEC_SCHEMA_VIOLATION" for i in issues)
+        else:
+            assert any(i.code == "SCHEMA_SKIPPED" for i in issues)
+
+    def test_skips_non_v2(self, v1_minimal):
+        from samplesheet_parser.parsers.v1 import SampleSheetV1
+
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        issues = illumina_v2_schema_validator()(sheet)
+        assert any(i.code == "SPEC_NOT_APPLICABLE" for i in issues)
+
+    def test_strict_runs_schema_check(self, tmp_path):
+        # STRICT appends the schema validator; a missing Index column fails it.
+        sheet = _parse_v2(tmp_path / "s.csv", _SCHEMA_INVALID_V2)
+        result = SampleSheetValidator().validate(sheet, strictness=Strictness.STRICT)
+        if HAS_JSONSCHEMA:
+            assert not result.is_valid
+            assert any(e.code == "SPEC_SCHEMA_VIOLATION" for e in result.errors)
+
+
+class TestSchemaRegistry:
+    def test_ref_to_project_urn_resolves(self, tmp_path):
+        # A user schema that $refs the bundled URN must resolve offline and pass
+        # a conformant sheet.
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        result = SampleSheetValidator().validate(sheet, schema={"$ref": ILLUMINA_V2_URN})
+        assert result.is_valid
+        assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+
+    def test_ref_to_samshee_urn_alias_resolves(self, tmp_path):
+        # The samshee compatibility alias resolves to the bundled schema, so a
+        # samshee-authored $ref keeps working and flags a bad sheet.
+        sheet = _parse_v2(tmp_path / "s.csv", _SCHEMA_INVALID_V2)
+        result = SampleSheetValidator().validate(sheet, schema={"$ref": SAMSHEE_V2_URN})
+        if HAS_JSONSCHEMA:
+            assert not result.is_valid
+            assert any(e.code == "SCHEMA_VIOLATION" for e in result.errors)
+            assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        else:
+            assert any(n.code == "SCHEMA_SKIPPED" for n in result.notes)
+
+    def test_unresolvable_ref_is_reported_not_raised(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        result = SampleSheetValidator().validate(
+            sheet, schema={"$ref": "urn:nope:does-not-exist/v1"}
+        )
+        if HAS_JSONSCHEMA:
+            assert not result.is_valid
+            assert any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        else:
+            assert any(n.code == "SCHEMA_SKIPPED" for n in result.notes)
