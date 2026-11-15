@@ -360,10 +360,18 @@ if _TYPER_AVAILABLE:
                 )
                 raise typer.Exit(code=2) from exc
             try:
-                schema_doc = json.loads(schema.read_text())
+                loaded = json.loads(schema.read_text())
             except (OSError, json.JSONDecodeError) as exc:
                 typer.echo(f"Error: could not read JSON schema {schema}: {exc}", err=True)
                 raise typer.Exit(code=2) from exc
+            if not isinstance(loaded, dict):
+                typer.echo(
+                    f"Error: schema {schema} must be a JSON object, "
+                    f"got {type(loaded).__name__}.",
+                    err=True,
+                )
+                raise typer.Exit(code=2)
+            schema_doc = loaded
 
         try:
             factory = SampleSheetFactory()

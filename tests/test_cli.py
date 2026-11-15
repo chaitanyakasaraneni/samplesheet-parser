@@ -669,14 +669,43 @@ class TestCLIValidate:
         result = runner.invoke(app, ["validate", str(p), "--schema", str(tmp_path / "nope.json")])
         assert result.exit_code == 2
 
-    def test_schema_requires_jsonschema_extra(self, tmp_path: Path) -> None:
-        if _HAS_JSONSCHEMA:
-            pytest.skip("jsonschema is installed; the missing-extra path cannot be exercised")
+    def test_schema_requires_jsonschema_extra(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Force the jsonschema import to fail even when it is installed (as in
+        # CI), so the missing-extra exit path is always exercised.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "jsonschema":
+                raise ImportError("forced absent for test")
+            return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
         p = _write(tmp_path, "sheet.csv", _V2_C)
         schema = _write(tmp_path, "schema.json", '{"type": "object"}')
         result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
         assert result.exit_code == 2
         assert "jsonschema" in result.output
+
+    def test_schema_invalid_json_exits_2(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("without jsonschema the import guard fires before JSON is parsed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = _write(tmp_path, "schema.json", "{not valid json")
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 2
+
+    def test_schema_non_object_exits_2(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("without jsonschema the import guard fires before JSON is parsed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = _write(tmp_path, "schema.json", "[1, 2, 3]")
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 2
+        assert "must be a JSON object" in result.output
 
     def test_schema_violation_fails(self, tmp_path: Path) -> None:
         if not _HAS_JSONSCHEMA:
