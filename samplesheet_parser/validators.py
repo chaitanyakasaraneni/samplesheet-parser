@@ -464,19 +464,24 @@ def _validate_against_schema(
             )
         ]
 
+    # Validate the schema itself first: the validator constructor does not
+    # reliably reject a malformed schema, so without this check a bad schema
+    # would instead surface later as a reference error with the wrong code.
+    try:
+        jsonschema.Draft202012Validator.check_schema(dict(schema))
+    except jsonschema.exceptions.SchemaError as exc:
+        return [ValidationIssue("error", "SCHEMA_INVALID", f"Invalid JSON Schema: {exc}")]
+
     document = sheet_to_sections(sheet)
     registry = build_registry()
-    try:
-        if registry is not None:
-            validator = jsonschema.Draft202012Validator(dict(schema), registry=registry)
-        else:
-            validator = jsonschema.Draft202012Validator(dict(schema))
-    except Exception as exc:  # malformed schema
-        return [ValidationIssue("error", "SCHEMA_INVALID", f"Invalid JSON Schema: {exc}")]
+    if registry is not None:
+        validator = jsonschema.Draft202012Validator(dict(schema), registry=registry)
+    else:
+        validator = jsonschema.Draft202012Validator(dict(schema))
 
     try:
         errors = list(validator.iter_errors(document))
-    except Exception as exc:  # unresolvable $ref, etc.
+    except Exception as exc:  # unresolvable $ref
         return [
             ValidationIssue(
                 "error",
@@ -686,23 +691,26 @@ class SampleSheetValidator:
         samples = sheet.samples()
 
         self._check_empty(samples, result)
-        if not samples:
-            return result  # no point continuing
 
-        self._check_index_sequences(samples, result)
-        self._check_duplicate_indices(samples, result)
-        self._check_index_distances(samples, result, min_distance=resolved_min_distance)
-        self._check_duplicate_sample_ids(samples, result)
-        self._check_adapters(sheet, result)
-        if resolved_check_cb:
-            self._check_color_balance(
-                sheet,
-                samples,
-                result,
-                instrument=instrument,
-                mode=resolved_cb_mode,
-                min_signal_fraction=min_signal_fraction,
-            )
+        # Sample-dependent core checks only run when there are samples; the
+        # pluggable and schema validators below still run on an empty sheet, so
+        # a strict schema (e.g. BCLConvert_Data minItems) or a user-supplied
+        # validator is not silently skipped.
+        if samples:
+            self._check_index_sequences(samples, result)
+            self._check_duplicate_indices(samples, result)
+            self._check_index_distances(samples, result, min_distance=resolved_min_distance)
+            self._check_duplicate_sample_ids(samples, result)
+            self._check_adapters(sheet, result)
+            if resolved_check_cb:
+                self._check_color_balance(
+                    sheet,
+                    samples,
+                    result,
+                    instrument=instrument,
+                    mode=resolved_cb_mode,
+                    min_signal_fraction=min_signal_fraction,
+                )
 
         # Pluggable validators: strict spec conformance (at STRICT), then any
         # user-supplied validators, then an optional JSON Schema.

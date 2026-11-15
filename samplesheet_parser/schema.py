@@ -114,9 +114,14 @@ def sheet_to_sections(sheet: Any) -> dict[str, Any]:
     original column names (e.g. ``Sample_ID``, ``Index``), so a schema written
     in terms of the sheet's real sections and columns applies directly.
 
-    Best-effort across parser types: only the sections a given sheet exposes are
-    included. For non-v2 sheets (no ``records`` attribute) the data rows are
-    emitted under a generic ``Data`` key from :meth:`samples`.
+    Projects the recognized sections only: ``Header``, ``Reads``,
+    ``BCLConvert_Settings``, ``BCLConvert_Data`` (v2), and ``Cloud_Data``. A v2
+    sheet (``FileFormatVersion`` in ``[Header]``) always projects a
+    ``BCLConvert_Data`` array, even when empty, so a schema can tell an empty
+    data section from a missing one. Non-v2 sheets (e.g. IEM V1) emit their data
+    rows under a generic ``Data`` key. Other custom sections a sheet may carry
+    are not included in this view yet, so a schema requiring one of those cannot
+    be checked against it.
     """
     out: dict[str, Any] = {}
 
@@ -132,9 +137,16 @@ def sheet_to_sections(sheet: Any) -> dict[str, Any]:
     if settings:
         out["BCLConvert_Settings"] = dict(settings)
 
+    # Detect v2 by its header marker, not by the presence of a `records`
+    # attribute: V1 sheets expose `records` too. A v2 sheet always projects a
+    # BCLConvert_Data array (even empty) so an empty data section is
+    # distinguishable from a missing one.
+    is_v2 = header is not None and "FileFormatVersion" in header
     records = getattr(sheet, "records", None)
-    if records:
-        out["BCLConvert_Data"] = [dict(r) for r in records]
+    if is_v2:
+        out["BCLConvert_Data"] = [dict(r) for r in (records or [])]
+    elif records:
+        out["Data"] = [dict(r) for r in records]
     else:
         samples = sheet.samples()
         if samples:

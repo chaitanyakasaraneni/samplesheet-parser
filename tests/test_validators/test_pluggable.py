@@ -409,9 +409,11 @@ class TestSchemaRegistry:
 
 class _SectionStub:
     """Stub exposing just the attributes sheet_to_sections reads, for branch
-    coverage of its non-v2 (Data) and Cloud_Data paths."""
+    coverage of its v2/non-v2 (Data) and Cloud_Data paths."""
 
-    def __init__(self, *, records=None, cloud_data=None, samples=None):
+    def __init__(self, *, header=None, records=None, cloud_data=None, samples=None):
+        if header is not None:
+            self.header = header
         if records is not None:
             self.records = records
         if cloud_data is not None:
@@ -431,12 +433,30 @@ class TestSheetToSectionsBranches:
 
     def test_includes_cloud_data(self):
         stub = _SectionStub(
+            header={"FileFormatVersion": "2"},
             records=[{"Sample_ID": "A", "Index": "ACGTACGTAC"}],
             cloud_data=[{"Sample_ID": "A", "ProjectName": "P"}],
         )
         sec = sheet_to_sections(stub)
         assert "BCLConvert_Data" in sec
         assert sec["Cloud_Data"] == [{"Sample_ID": "A", "ProjectName": "P"}]
+
+    def test_v1_records_use_generic_data_key(self, v1_minimal):
+        # V1 exposes `records` too, but it is not a v2 BCLConvert_Data section.
+        from samplesheet_parser.parsers.v1 import SampleSheetV1
+
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        sec = sheet_to_sections(sheet)
+        assert "BCLConvert_Data" not in sec
+        assert "Data" in sec
+
+    def test_empty_v2_data_still_projected(self):
+        # An empty [BCLConvert_Data] on a v2 sheet projects an empty array, not a
+        # missing section, so a schema can distinguish empty from absent.
+        stub = _SectionStub(header={"FileFormatVersion": "2"}, records=[])
+        sec = sheet_to_sections(stub)
+        assert sec["BCLConvert_Data"] == []
 
 
 class TestRegistryAndSchemaEdgeCases:
@@ -473,19 +493,29 @@ class TestRegistryAndSchemaEdgeCases:
         assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
         assert not any(e.code == "SCHEMA_INVALID" for e in result.errors)
 
-    def test_malformed_schema_reports_schema_invalid(self, tmp_path, monkeypatch):
-        # Force validator construction to raise, exercising the SCHEMA_INVALID guard.
-        if not HAS_JSONSCHEMA:
-            return
-        import jsonschema
-
-        import samplesheet_parser.validators as validators_mod
-
-        def boom(*args, **kwargs):
-            raise jsonschema.exceptions.SchemaError("forced bad schema")
-
-        monkeypatch.setattr(validators_mod, "build_registry", lambda: None)
-        monkeypatch.setattr(jsonschema, "Draft202012Validator", boom)
+    def test_malformed_schema_reports_schema_invalid(self, tmp_path):
+        # A genuinely malformed schema (`type` must be a string/array) is caught
+        # by check_schema and reported as SCHEMA_INVALID, not SCHEMA_REF_UNRESOLVED.
         sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
-        result = SampleSheetValidator().validate(sheet, schema={"type": "object"})
-        assert any(e.code == "SCHEMA_INVALID" for e in result.errors)
+        result = SampleSheetValidator().validate(sheet, schema={"type": 123})
+        if HAS_JSONSCHEMA:
+            assert any(e.code == "SCHEMA_INVALID" for e in result.errors)
+            assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        else:
+            assert any(n.code == "SCHEMA_SKIPPED" for n in result.notes)
+
+
+class TestEmptySheetRunsValidators:
+    def test_pluggable_chain_runs_on_empty_sheet(self):
+        # An empty sheet still reports EMPTY_SAMPLES, but the pluggable chain
+        # (here a custom validator) must not be silently skipped.
+        class _EmptySheet:
+            def samples(self):
+                return []
+
+        def marker(_sheet):
+            return [ValidationIssue("warning", "RAN_ANYWAY", "ran on empty sheet")]
+
+        result = SampleSheetValidator().validate(_EmptySheet(), extra_validators=[marker])
+        assert any(e.code == "EMPTY_SAMPLES" for e in result.errors)
+        assert any(w.code == "RAN_ANYWAY" for w in result.warnings)
