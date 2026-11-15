@@ -16,9 +16,12 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 **Docs:** https://samplesheet-parser.readthedocs.io/ | **PyPI:** https://pypi.org/project/samplesheet-parser/
 
-![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_latest.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_latest_dark.png">
+  <img alt="samplesheet-parser overview" src="https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_latest.png">
+</picture>
 
-*`SampleSheetFactory` auto-detects the format - Illumina V1/V2 or an Element AVITI run manifest - and routes to the correct parser. All formats share a common interface - `SampleSheetConverter` handles bidirectional conversion between the Illumina formats, `SampleSheetValidator` catches index, adapter, and color-balance issues, `SampleSheetDiff` compares two sheets across any combination of formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
+*`SampleSheetFactory` auto-detects the format - Illumina V1/V2 or an Element AVITI run manifest - and routes to the correct parser. All formats share a common interface - `SampleSheetConverter` handles bidirectional conversion between the Illumina formats, `SampleSheetValidator` catches index, adapter, and color-balance issues (with optional strictness levels and JSON Schema validation), `SampleSheetDiff` compares two sheets across any combination of formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
 
 ---
 
