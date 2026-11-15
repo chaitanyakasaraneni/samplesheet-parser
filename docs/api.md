@@ -59,7 +59,7 @@ Both parsers satisfy `SampleSheetParser` and expose:
 | Method / attribute | Returns | Description |
 |---|---|---|
 | `parse(do_clean=True)` | `None` | Parse all sections |
-| `clean()` | `str` | Return cleaned content as a string — source file is **never** modified |
+| `clean()` | `str` | Return cleaned content as a string - source file is **never** modified |
 | `samples()` | `list[dict]` | One record per unique `(sample_id, lane)` pair |
 | `index_type()` | `str` | `"dual"`, `"single"`, or `"none"` |
 | `parse_custom_section(name, *, required=False)` | `dict[str, str]` | Parse any non-standard section as key/value pairs |
@@ -137,7 +137,7 @@ instrument is read from the sheet header when present, or supplied with
 [`ColorBalanceMode`](#samplesheet_parserchemistry)). It emits
 `COLOR_BALANCE_NO_SIGNAL` (error), `COLOR_BALANCE_LOW` (warning),
 `COLOR_BALANCE_ADVISORY` (warning, AVITI), and `COLOR_BALANCE_SKIPPED` (note)
-issues — see
+issues - see
 [Validation → Color-balance checking](guide/validation.md#color-balance-checking).
 
 ### ValidationResult
@@ -186,13 +186,13 @@ issues — see
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `SampleSheetWriter(version=)` | — | Instantiate for `SampleSheetVersion.V1` or `.V2` |
+| `SampleSheetWriter(version=)` | - | Instantiate for `SampleSheetVersion.V1` or `.V2` |
 | `from_sheet(sheet, version=)` | `SampleSheetWriter` | Load a parsed sheet for editing; optionally change format |
 | `set_header(*, run_name, platform, ...)` | `self` | Set header fields (fluent) |
 | `set_reads(*, read1, read2, index1, index2)` | `self` | Set read cycle counts (fluent) |
 | `set_adapter(adapter_read1, adapter_read2)` | `self` | Set adapter sequences (fluent) |
-| `set_override_cycles(override)` | `self` | Set `OverrideCycles` — V2 only (fluent) |
-| `set_software_version(version)` | `self` | Set `SoftwareVersion` — V2 only (fluent) |
+| `set_override_cycles(override)` | `self` | Set `OverrideCycles` - V2 only (fluent) |
+| `set_software_version(version)` | `self` | Set `SoftwareVersion` - V2 only (fluent) |
 | `set_setting(key, value)` | `self` | Set an arbitrary settings key/value (fluent) |
 | `add_sample(sample_id, *, index, ...)` | `self` | Append a sample row (fluent) |
 | `remove_sample(sample_id, *, lane=)` | `self` | Remove sample(s) by ID, optionally scoped to a lane (fluent) |
@@ -209,7 +209,7 @@ issues — see
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `SampleSheetMerger(target_version=, min_hamming_distance=3)` | — | Instantiate with target format and optional Hamming threshold |
+| `SampleSheetMerger(target_version=, min_hamming_distance=3)` | - | Instantiate with target format and optional Hamming threshold |
 | `add(path)` | `self` | Register an input sheet path (fluent) |
 | `merge(output_path, *, validate=True, abort_on_conflicts=True)` | `MergeResult` | Run the merge and write output |
 
@@ -231,7 +231,7 @@ issues — see
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `SampleSheetSplitter(path, *, by="project", target_version=None, unassigned_label="unassigned")` | — | Instantiate with input path and grouping strategy |
+| `SampleSheetSplitter(path, *, by="project", target_version=None, unassigned_label="unassigned")` | - | Instantiate with input path and grouping strategy |
 | `split(output_dir, *, prefix="", suffix="_SampleSheet.csv", validate=True)` | `SplitResult` | Parse input and write one file per group |
 
 ### SplitResult
@@ -250,10 +250,10 @@ issues — see
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `SampleSheetFilter(path, *, target_version=None)` | — | Instantiate with input path |
+| `SampleSheetFilter(path, *, target_version=None)` | - | Instantiate with input path |
 | `filter(output_path, *, project=None, lane=None, sample_id=None, validate=True)` | `FilterResult` | Write filtered copy to `output_path`; at least one criterion required |
 
-`sample_id` supports glob patterns (e.g. `"CTRL_*"`) via `fnmatch.fnmatchcase` — matching is always case-sensitive.
+`sample_id` supports glob patterns (e.g. `"CTRL_*"`) via `fnmatch.fnmatchcase` - matching is always case-sensitive.
 
 ### FilterResult
 
@@ -318,10 +318,10 @@ from samplesheet_parser import (
 | `chemistry_for_instrument(name)` | `Chemistry \| None` | Resolve an instrument name to its chemistry; `None` if unknown. `"AVITI"` → `AVIDITY` |
 | `analyze_color_balance(index1, index2=None, *, chemistry, mode="vendor_faithful", min_signal_fraction=0.1)` | `ColorBalanceReport` | Score index pools cycle-by-cycle |
 
-Rules by chemistry: **2-/1-channel** — all-`G` cycle fails (both modes); a
+Rules by chemistry: **2-/1-channel** - all-`G` cycle fails (both modes); a
 single-channel cycle fails only in `conservative` (Illumina's minimum is "at
-least one channel"). **4-channel** — a cycle missing the green `{G,T}` or red
-`{A,C}` laser fails (both modes). **avidity** — low diversity is an advisory in
+least one channel"). **4-channel** - a cycle missing the green `{G,T}` or red
+`{A,C}` laser fails (both modes). **avidity** - low diversity is an advisory in
 `vendor_faithful`, a failure in `conservative`.
 
 ### ColorBalanceReport
@@ -372,7 +372,7 @@ Computes the Hamming distance between two equal-length index sequences, counting
 ```python
 hamming_distance("ATTACTCG", "ATTACTCG")   # 0
 hamming_distance("ATTACTCG", "ATTACTCC")   # 1
-hamming_distance("ATTNCNCG", "ATTACTCG")   # 0  — N matches anything
+hamming_distance("ATTNCNCG", "ATTACTCG")   # 0  - N matches anything
 ```
 
 Used internally by `SampleSheetValidator` when checking index collision thresholds. Accepts sequences of different lengths (returns `None`) but in practice all samples in a valid sheet have uniform index lengths after normalization.

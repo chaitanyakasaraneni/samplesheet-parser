@@ -166,7 +166,7 @@ samplesheet diff old/SampleSheet.csv new/SampleSheet.csv --format json
 
 **Exit codes:** `0` = identical, `1` = differences detected, `2` = parse/usage error.
 
-Useful in CI pre-run checks — gate a pipeline on sheet changes.
+Useful in CI pre-run checks - gate a pipeline on sheet changes.
 
 ---
 
@@ -249,9 +249,9 @@ samplesheet filter combined.csv --project ProjectA --output out.csv --format jso
 
 | Option | Default | Description |
 |---|---|---|
-| `--project` / `-p` | — | Keep only samples matching this `Sample_Project` |
-| `--lane` / `-l` | — | Keep only samples from this lane |
-| `--sample-id` / `-s` | — | Keep only samples matching this ID or glob pattern |
+| `--project` / `-p` | - | Keep only samples matching this `Sample_Project` |
+| `--lane` / `-l` | - | Keep only samples from this lane |
+| `--sample-id` / `-s` | - | Keep only samples matching this ID or glob pattern |
 | `--output` / `-o` | `SampleSheet_filtered.csv` | Output file path |
 | `--to` | `v2` | Target format: `v1` or `v2` |
 | `--format` / `-f` | `text` | Output format: `text` or `json` |

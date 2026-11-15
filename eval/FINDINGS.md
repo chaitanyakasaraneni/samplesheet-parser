@@ -3,7 +3,7 @@
 Summary of the Step-0 API inspection, where the real repo API changed the
 implementation versus the task spec, and what the smoke/full run shows.
 
-> **Note (later revision):** §§1–5 are a point-in-time record. They state that
+> **Note (later revision):** §§1-5 are a point-in-time record. They state that
 > "AVITI ≡ 4-channel" and that the tool matched both labelings perfectly. Both
 > were later refined: AVITI is now its own `Chemistry.AVIDITY` (more permissive
 > than Illumina 4-channel), `label_reference` now encodes published vendor rules,
@@ -25,7 +25,7 @@ implementation versus the task spec, and what the smoke/full run shows.
 
 ## 2. Where the real API changed the implementation vs. the spec
 
-**(a) AVITI is 4-channel, not 2-channel — this revises the paper's framing.**
+**(a) AVITI is 4-channel, not 2-channel - this revises the paper's framing.**
 The task context assumed pools "valid on 4-channel … fail on 2-channel **/ AVITI**,"
 i.e. that AVITI shares the 2-channel dark-base failure mode. **It does not.** This
 library models the Element AVITI as a four-channel avidity platform with **no dark
@@ -55,7 +55,7 @@ because every pool is parsed back through the factory for the round-trip check.
 **(d) Pre-write validation must be disabled to serialize defective pools.**
 `SampleSheetWriter.write()` validates by default and raises on errors (e.g.
 near-duplicate indexes). The corpus deliberately contains defective pools, so it
-is written with `validate=False` — we are testing the validator, not gating on it.
+is written with `validate=False` - we are testing the validator, not gating on it.
 
 **(e) Manifest granularity.** The spec listed a single `format` column; because
 the ground-truth object is the **logical pool** and labels are format-invariant,
@@ -66,7 +66,7 @@ rows while still covering all three serialized files in the round-trip check.
 
 ## 3. What the run shows (full corpus, seed 20260620, 52 pools × 3 chemistries)
 
-**Cross-format round-trip: 52/52 pools identical** across V1, V2, and AVITI —
+**Cross-format round-trip: 52/52 pools identical** across V1, V2, and AVITI -
 the corpus doubles as a passing cross-format correctness test.
 
 **Tool vs. ground truth: perfect agreement.** Precision/recall/F1 = **1.000**
@@ -82,7 +82,7 @@ color-balance implementation (no bug surfaced). Confusion counts:
 | AVITI | 9 | 0 | 43 | 0 |
 
 **AVITI ≡ 4-channel, ≠ 2-channel.** The AVITI and 4-channel columns are
-*identical* (9 fails each); 2-channel detects 28 — the extra 19 are exactly the
+*identical* (9 fails each); 2-channel detects 28 - the extra 19 are exactly the
 chemistry-specific failures.
 
 **Cross-vendor verdict flips: 19 pools** receive a different pass/fail verdict
@@ -97,7 +97,7 @@ depending on chemistry (the paper's key result), broken down as:
 
 Every flip is a 2-channel-only failure with 4-channel == AVITI, confirming the
 chemistry-specific nature of the failure mode. `monobase_collision` (all-`G`
-cycle) fails on **all** chemistries and so does *not* flip — a useful
+cycle) fails on **all** chemistries and so does *not* flip - a useful
 universal-bad control. The `edge_n2` flip is a genuine property, not noise:
 two-sample pools are inherently prone to a 2-channel channel dropping to zero.
 
@@ -113,7 +113,7 @@ The harness reports all three comparisons (tool-vs-definitional,
 tool-vs-reference, definitional-vs-reference) separately and lists every
 disagreement in `summary.md` and `disagreements.csv`.
 
-## 5. label_reference now encodes published vendor rules — where things diverge
+## 5. label_reference now encodes published vendor rules - where things diverge
 
 The earlier `label_reference` was a first-principles placeholder, so it agreed
 with `label_definitional` and the tool perfectly (P/R/F1 = 1.000 everywhere).
@@ -126,7 +126,7 @@ disagreements total, all `tool == definitional ≠ reference`):
 
 | # | Where | tool / def | vendor rule | count | My read |
 |---|---|---|---|---|---|
-| 1 | **2-channel**, single-channel-only cycle (e.g. only `G/T` → red absent) | `fail` | `pass` (weak) | 19 | **Conservative tool choice.** Illumina's published rule only requires "signal in at least one channel"; the tool/first-principles model requires *both*. Not a bug — a deliberately stricter policy. Worth stating in the paper as the tool being stricter than Illumina's stated minimum. |
+| 1 | **2-channel**, single-channel-only cycle (e.g. only `G/T` → red absent) | `fail` | `pass` (weak) | 19 | **Conservative tool choice.** Illumina's published rule only requires "signal in at least one channel"; the tool/first-principles model requires *both*. Not a bug - a deliberately stricter policy. Worth stating in the paper as the tool being stricter than Illumina's stated minimum. |
 | 2 | **4-channel**, diverse cycle missing one laser (e.g. only `G/T` → no red `{A,C}` laser) | `pass` | `fail` | 9 | **Genuine gap / under-detection in the tool.** The library's 4-channel model flags only zero-diversity cycles; Illumina's 4-channel guidance requires *both lasers* represented. A `{G,T}`-only cycle is diverse yet fails on a real MiSeq/HiSeq. This is the one divergence that looks like a tool limitation worth fixing (extend the 4-channel check to per-laser representation). |
 | 3 | **AVITI**, low-diversity / all-`G` cycle | `fail` | `pass` (advisory) | 9 | **Vendor-guidance divergence / over-strict tool.** The library applies 4-channel low-diversity flagging to AVITI, but Element markets the AVITI as low-diversity-tolerant, so its guidance makes this advisory-only. Defensible either way; the conservative paper framing is that the tool is stricter than Element recommends. |
 
@@ -160,26 +160,26 @@ by modelling AVITI as its own `Chemistry.AVIDITY`.
 | `conservative` | 28 |
 
 `vendor_faithful` now matches published vendor guidance exactly on every
-(pool, chemistry) — precision/recall/F1 = 1.000 (or n/a where a chemistry has no
+(pool, chemistry) - precision/recall/F1 = 1.000 (or n/a where a chemistry has no
 failures) across 2-channel, 4-channel, and avidity. `conservative` reproduces
 the prior stricter behavior as a documented, opt-in mode.
 
 **Per-divergence resolution:**
 
-1. **4-channel laser absence — genuine bug, now closed (both modes).** The
+1. **4-channel laser absence - genuine bug, now closed (both modes).** The
    four-channel check now fails a cycle when the green `{G,T}` or red `{A,C}`
    laser is entirely absent (e.g. all-`G`, or `G/T`-only). `definitional_vs_reference`
-   for 4-channel went from F1 0.667 (§5) to **1.000** — the gap is gone, in both
+   for 4-channel went from F1 0.667 (§5) to **1.000** - the gap is gone, in both
    modes. This was a correctness fix, not a strictness choice.
 
-2. **2-channel single-channel cycles — now a mode choice.** `vendor_faithful`
+2. **2-channel single-channel cycles - now a mode choice.** `vendor_faithful`
    follows Illumina's "signal in at least one channel" hard minimum: a
    single-channel cycle is a `COLOR_BALANCE_LOW` warning (pass). `conservative`
    keeps the stricter "both channels" rule (failure). The 19 prior 2-channel
    divergences are now intended `vendor_faithful` passes; they reappear only as
    `conservative`-vs-reference disagreements (documented).
 
-3. **AVITI low diversity — now a mode choice on a distinct chemistry.** AVITI
+3. **AVITI low diversity - now a mode choice on a distinct chemistry.** AVITI
    maps to `Chemistry.AVIDITY` (per-base dye, no laser-pair rule). In
    `vendor_faithful`, first-cycles low diversity is a `COLOR_BALANCE_ADVISORY`
    (never a failure); in `conservative` it is escalated to a failure. The 9
@@ -188,7 +188,7 @@ the prior stricter behavior as a documented, opt-in mode.
 **Residual divergence (expected, not a bug).** `definitional_vs_reference` still
 shows 19 (2-channel) + 9 (avidity) = 28 disagreements. This is the *inherent*
 strict-vs-permissive gap between the conservative first-principles model and the
-permissive published vendor minimum — exactly what `conservative` mode is for. It
+permissive published vendor minimum - exactly what `conservative` mode is for. It
 is surfaced in `disagreements.csv` (rows tagged `mode=conservative`), not hidden.
 The 4-channel column of `definitional_vs_reference` is now clean (0), confirming
-the bug — not a philosophy difference — is closed.
+the bug - not a philosophy difference - is closed.

@@ -2,7 +2,7 @@
 
 ## Auto-detect format (recommended)
 
-The simplest entry point. `SampleSheetFactory` detects the format automatically — Illumina V1, V2, or an Element AVITI run manifest — and returns the correct parser.
+The simplest entry point. `SampleSheetFactory` detects the format automatically - Illumina V1, V2, or an Element AVITI run manifest - and returns the correct parser.
 
 ```python
 from samplesheet_parser import SampleSheetFactory
@@ -26,7 +26,7 @@ sheet = SampleSheetFactory().create_parser("SampleSheet.csv", parse=True)
 result = SampleSheetValidator().validate(sheet)
 
 print(result.summary())
-# PASS — 0 error(s), 2 warning(s)
+# PASS - 0 error(s), 2 warning(s)
 
 for w in result.warnings:
     print(w)
@@ -43,7 +43,7 @@ from samplesheet_parser import SampleSheetConverter
 # V1 → V2
 SampleSheetConverter("SampleSheet_v1.csv").to_v2("SampleSheet_v2.csv")
 
-# V2 → V1  (lossy — V2-only fields are dropped with a warning)
+# V2 → V1  (lossy - V2-only fields are dropped with a warning)
 SampleSheetConverter("SampleSheet_v2.csv").to_v1("SampleSheet_v1.csv")
 ```
 

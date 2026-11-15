@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-demo_converter.py — SampleSheetConverter usage examples.
+demo_converter.py - SampleSheetConverter usage examples.
 
 Demonstrates bidirectional conversion between V1 (IEM / bcl2fastq) and
 V2 (BCLConvert) formats.
 
-    Scenario 1: V1 → V2  — classic dual-index sheet converted for NovaSeq X
-    Scenario 2: V2 → V1  — BCLConvert sheet converted back for bcl2fastq
-    Scenario 3: Roundtrip — V1 → V2 → V1 to inspect what is preserved / lost
+    Scenario 1: V1 → V2  - classic dual-index sheet converted for NovaSeq X
+    Scenario 2: V2 → V1  - BCLConvert sheet converted back for bcl2fastq
+    Scenario 3: Roundtrip - V1 → V2 → V1 to inspect what is preserved / lost
 
 Run from the repo root::
 
@@ -36,7 +36,7 @@ def _print_summary(label: str, path: Path) -> None:
     print(f"    Samples  : {len(samples)}")
     print(f"    Index    : {sheet.index_type()}")
     first = samples[0] if samples else {}
-    idx = first.get("index") or first.get("Index") or "—"
+    idx = first.get("index") or first.get("Index") or "-"
     print(f"    1st idx  : {idx}")
     print()
 
@@ -80,7 +80,7 @@ result_path = converter.to_v1(str(out_v1))
 
 print(f"  Input  : {src_v2.name}  ({converter.source_version.value})")
 print(f"  Output : {result_path.name}")
-print("  Note   : V2→V1 is lossy — OverrideCycles, UMI fields are dropped.")
+print("  Note   : V2→V1 is lossy - OverrideCycles, UMI fields are dropped.")
 print()
 _print_summary("before", src_v2)
 _print_summary("after", result_path)

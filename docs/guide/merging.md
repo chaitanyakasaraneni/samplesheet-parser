@@ -17,7 +17,7 @@ result = (
 )
 
 print(result.summary())
-# Merged 3 sheet(s) → SampleSheet_combined.csv (12 samples) — 0 conflict(s), 0 warning(s)
+# Merged 3 sheet(s) → SampleSheet_combined.csv (12 samples) - 0 conflict(s), 0 warning(s)
 ```
 
 ## Conflict detection
@@ -60,7 +60,7 @@ result = merger.merge("combined.csv", abort_on_conflicts=False)
 Mixed-format inputs are automatically converted to the target version:
 
 ```python
-# ProjectA is V1, ProjectB is V2 — both converted to V2 for output
+# ProjectA is V1, ProjectB is V2 - both converted to V2 for output
 merger = SampleSheetMerger(target_version=SampleSheetVersion.V2)
 merger.add("ProjectA_v1.csv").add("ProjectB_v2.csv")
 result = merger.merge("combined_v2.csv")
@@ -78,10 +78,10 @@ merger = SampleSheetMerger(target_version=SampleSheetVersion.V2, min_hamming_dis
 
 ```python
 result.has_conflicts        # bool
-result.sample_count         # int — samples in merged output
-result.output_path          # Path | None — None if write was aborted
-result.source_versions      # dict[str, str] — per-file detected version
+result.sample_count         # int - samples in merged output
+result.output_path          # Path | None - None if write was aborted
+result.source_versions      # dict[str, str] - per-file detected version
 result.conflicts            # list[MergeConflict]
 result.warnings             # list[MergeConflict]
-result.summary()            # str — one-line human-readable summary
+result.summary()            # str - one-line human-readable summary
 ```

@@ -2,14 +2,14 @@
 
 ## Format auto-detection
 
-`SampleSheetFactory` detects the format across vendors — no format hints required from the caller:
+`SampleSheetFactory` detects the format across vendors - no format hints required from the caller:
 
-1. **Vendor manifest check** — recognize a non-Illumina Element AVITI `RunManifest.csv` by its `[SAMPLES]` section combined with a `[RUNVALUES]` section or a `SampleName` column (→ `ELEMENT_AVITI`)
-2. **Header discriminator** — scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
-3. **Section name scan** — if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
-4. **Default** — fall back to V1 (broadest compatibility with legacy files)
+1. **Vendor manifest check** - recognize a non-Illumina Element AVITI `RunManifest.csv` by its `[SAMPLES]` section combined with a `[RUNVALUES]` section or a `SampleName` column (→ `ELEMENT_AVITI`)
+2. **Header discriminator** - scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
+3. **Section name scan** - if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
+4. **Default** - fall back to V1 (broadest compatibility with legacy files)
 
-The detector reads only as much of the file as needed — stopping after `[Header]` in the common case for Illumina sheets.
+The detector reads only as much of the file as needed - stopping after `[Header]` in the common case for Illumina sheets.
 
 ```python
 from samplesheet_parser import SampleSheetFactory
@@ -59,7 +59,7 @@ The V2 `OverrideCycles` field encodes read structure including UMI positions:
 
 | OverrideCycles | UMI length | UMI location |
 |---|---|---|
-| `Y151;I10;I10;Y151` | 0 | — |
+| `Y151;I10;I10;Y151` | 0 | - |
 | `Y151;I10U9;I10;Y151` | 9 | `index2` |
 | `U5Y146;I8;I8;U5Y146` | 5 | `read1` |
 
@@ -93,7 +93,7 @@ print("OverrideCycles" in sheet.custom_fields["data"])   # True
 
 Note this is distinct from the run-level `OverrideCycles` in
 `[BCLConvert_Settings]` used by `get_umi_length()` / `get_read_structure()`
-above — a per-sample column is carried through as data, not decoded for UMIs.
+above - a per-sample column is carried through as data, not decoded for UMIs.
 
 ## Shared interface
 
@@ -102,7 +102,7 @@ Both `SampleSheetV1` and `SampleSheetV2` satisfy the `SampleSheetParser` Protoco
 | Method / attribute | Returns | Description |
 |---|---|---|
 | `parse(do_clean=True)` | `None` | Parse all sections |
-| `clean()` | `str` | Return cleaned content as a string — source file is **never** modified |
+| `clean()` | `str` | Return cleaned content as a string - source file is **never** modified |
 | `samples()` | `list[dict]` | One record per unique `(sample_id, lane)` pair |
 | `index_type()` | `str` | `"dual"`, `"single"`, or `"none"` |
 | `parse_custom_section(name, *, required=False)` | `dict[str, str]` | Parse any non-standard section as key/value pairs |
@@ -111,7 +111,7 @@ Both `SampleSheetV1` and `SampleSheetV2` satisfy the `SampleSheetParser` Protoco
 
 ### In-memory cleaning
 
-`parse(do_clean=True)` (the default) cleans the file content in memory before parsing — stripping BOM, quotes, stray whitespace, and normalising V2 section names. **The source file on disk is never modified and no `.backup` files are created.**
+`parse(do_clean=True)` (the default) cleans the file content in memory before parsing - stripping BOM, quotes, stray whitespace, and normalising V2 section names. **The source file on disk is never modified and no `.backup` files are created.**
 
 ```python
 # Access the cleaned content directly

@@ -42,7 +42,7 @@ out = converter.to_v1("SampleSheet_v1.csv")
     A warning is logged for each dropped field.
 
     !!! info "Instrument is preserved"
-        `InstrumentPlatform` and `InstrumentType` are **not** dropped —
+        `InstrumentPlatform` and `InstrumentType` are **not** dropped -
         their value is written to the V1 `[Header]` as `Instrument Type`
         so the workflow signal survives a round trip. The original V2
         header key itself is not kept (V1 uses a different key name).
@@ -73,9 +73,9 @@ the source sheet declares an instrument; for ambiguous cases pass
 | **A** (i5 forward) | as written | MiSeq, HiSeq 2000, HiSeq 2500, NovaSeq 6000 (v1.0 chemistry) |
 | **B** (i5 RC'd on chip) | reverse-complemented | NovaSeq X / X Plus, NextSeq 500/550/1000/2000, iSeq 100, MiniSeq, HiSeq 3000/4000, NovaSeq 6000 (v1.5 chemistry) |
 
-- **Workflow A** — both demultiplexers expect i5 in the forward
+- **Workflow A** - both demultiplexers expect i5 in the forward
   orientation, so V1 ↔ V2 conversion leaves `Index2` unchanged.
-- **Workflow B** — `bcl2fastq` (V1) records i5 reverse-complemented as
+- **Workflow B** - `bcl2fastq` (V1) records i5 reverse-complemented as
   it was read; `BCLConvert` (V2) always expects the forward orientation.
   The converter reverse-complements `Index2` in both directions so the
   output is correct for the target demultiplexer.
@@ -129,6 +129,6 @@ record Index2 in opposite orientations. Pass workflow='a' or
 workflow='b' explicitly (CLI: --workflow {a,b}).
 ```
 
-This is intentional — silently passing i5 through would produce a V2
+This is intentional - silently passing i5 through would produce a V2
 sheet that runs but quietly misassigns reads. Single-index sheets and
 sheets whose `Index2` column is entirely empty are unaffected.

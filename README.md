@@ -2,7 +2,7 @@
 
 **Multi-vendor, format-agnostic parser for sequencing sample sheets.**
 
-Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) — plus non-Illumina **Element AVITI** run manifests — with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, **per-cycle color-balance validation** against the instrument's optical chemistry, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
+Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConvert V2 format (NovaSeq X series) - plus non-Illumina **Element AVITI** run manifests - with automatic format detection, bidirectional conversion, index validation, Hamming distance checking, **per-cycle color-balance validation** against the instrument's optical chemistry, diff comparison, multi-sheet merging, programmatic sheet creation, and a full-featured CLI.
 
 [![PyPI version](https://img.shields.io/pypi/v/samplesheet-parser.svg)](https://pypi.org/project/samplesheet-parser/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -18,15 +18,15 @@ Supports both the classic IEM V1 format (bcl2fastq era) and the modern BCLConver
 
 ![samplesheet-parser overview](https://raw.githubusercontent.com/chaitanyakasaraneni/samplesheet-parser/main/images/samplesheet_parser_arch_latest.png)
 
-*`SampleSheetFactory` auto-detects the format — Illumina V1/V2 or an Element AVITI run manifest — and routes to the correct parser. All formats share a common interface — `SampleSheetConverter` handles bidirectional conversion between the Illumina formats, `SampleSheetValidator` catches index, adapter, and color-balance issues, `SampleSheetDiff` compares two sheets across any combination of formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
+*`SampleSheetFactory` auto-detects the format - Illumina V1/V2 or an Element AVITI run manifest - and routes to the correct parser. All formats share a common interface - `SampleSheetConverter` handles bidirectional conversion between the Illumina formats, `SampleSheetValidator` catches index, adapter, and color-balance issues, `SampleSheetDiff` compares two sheets across any combination of formats, `SampleSheetMerger` combines multiple per-project sheets into one, and `SampleSheetWriter` builds or edits sheets programmatically. The `samplesheet` CLI exposes all of this from the shell.*
 
 ---
 
 ## The problem this solves
 
-Labs running mixed instrument fleets — older NovaSeq 6000 alongside newer NovaSeq X series, and increasingly non-Illumina platforms like the Element AVITI — produce several incompatible sample-sheet formats. BCLConvert V2 sheets use `[BCLConvert_Settings]` / `[BCLConvert_Data]` sections, `OverrideCycles` for UMI encoding, and `FileFormatVersion` in the header. IEM V1 sheets use `IEMFileVersion` and a flat `[Data]` section. Element AVITI ships a `RunManifest.csv` with an entirely different layout.
+Labs running mixed instrument fleets - older NovaSeq 6000 alongside newer NovaSeq X series, and increasingly non-Illumina platforms like the Element AVITI - produce several incompatible sample-sheet formats. BCLConvert V2 sheets use `[BCLConvert_Settings]` / `[BCLConvert_Data]` sections, `OverrideCycles` for UMI encoding, and `FileFormatVersion` in the header. IEM V1 sheets use `IEMFileVersion` and a flat `[Data]` section. Element AVITI ships a `RunManifest.csv` with an entirely different layout.
 
-Existing tools either hard-code one vendor's format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format across vendors, exposes a consistent interface for all of them, converts between the Illumina formats, validates index integrity (including Hamming distance and per-cycle color balance against each instrument's optical chemistry), diffs sheets to catch accidental changes before a run starts, and writes new sheets programmatically — so you never have to hand-edit a CSV again.
+Existing tools either hard-code one vendor's format or require the caller to know which format they have. `samplesheet-parser` auto-detects the format across vendors, exposes a consistent interface for all of them, converts between the Illumina formats, validates index integrity (including Hamming distance and per-cycle color balance against each instrument's optical chemistry), diffs sheets to catch accidental changes before a run starts, and writes new sheets programmatically - so you never have to hand-edit a CSV again.
 
 ---
 
@@ -101,7 +101,7 @@ from samplesheet_parser import SampleSheetConverter
 # V1 → V2
 SampleSheetConverter("SampleSheet_v1.csv").to_v2("SampleSheet_v2.csv")
 
-# V2 → V1  (lossy — V2-only fields are dropped with a warning)
+# V2 → V1  (lossy - V2-only fields are dropped with a warning)
 SampleSheetConverter("SampleSheet_v2.csv").to_v1("SampleSheet_v1.csv")
 ```
 
@@ -114,7 +114,7 @@ sheet = SampleSheetFactory().create_parser("SampleSheet.csv", parse=True)
 result = SampleSheetValidator().validate(sheet)
 
 print(result.summary())
-# PASS — 0 error(s), 2 warning(s)
+# PASS - 0 error(s), 2 warning(s)
 
 for w in result.warnings:
     print(w)
@@ -151,7 +151,7 @@ if result.has_changes:
         print(f"Added: {s['Sample_ID']}")
 ```
 
-Works across any combination of V1 and V2 — field names are normalised before
+Works across any combination of V1 and V2 - field names are normalised before
 comparison so V1-only columns (`I7_Index_ID`, `Sample_Name`, etc.) do not
 generate spurious diffs.
 
@@ -181,7 +181,7 @@ editor.update_sample("SAMPLE_002", index="GGGGGGGGGG")
 editor.write("SampleSheet_updated.csv")
 ```
 
-`write()` runs `SampleSheetValidator` before writing by default — pass
+`write()` runs `SampleSheetValidator` before writing by default - pass
 `validate=False` to skip. `from_sheet(sheet, version=SampleSheetVersion.V1)`
 converts format while editing.
 
@@ -207,7 +207,7 @@ result = (
 )
 
 print(result.summary())
-# Merged 3 sheet(s) → SampleSheet_combined.csv (12 samples) — 0 conflict(s), 0 warning(s)
+# Merged 3 sheet(s) → SampleSheet_combined.csv (12 samples) - 0 conflict(s), 0 warning(s)
 
 if result.has_conflicts:
     for c in result.conflicts:
@@ -237,7 +237,7 @@ pip install "samplesheet-parser[cli]"
 ### validate
 
 ```bash
-# Text output — exit 0 if clean, exit 1 if errors
+# Text output - exit 0 if clean, exit 1 if errors
 samplesheet validate SampleSheet.csv
 
 # JSON output for CI pipelines
@@ -264,7 +264,7 @@ samplesheet diff old/SampleSheet.csv new/SampleSheet.csv --format json
 ### merge
 
 ```bash
-# Clean merge — exit 0
+# Clean merge - exit 0
 samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv
 
 # Merge three sheets to V1 format
@@ -289,14 +289,14 @@ samplesheet merge ProjectA.csv ProjectB.csv --output combined.csv --format json
 
 ## Format detection logic
 
-The factory detects the format across vendors — no format hints required from the caller:
+The factory detects the format across vendors - no format hints required from the caller:
 
-1. **Vendor manifest check** — recognise a non-Illumina Element AVITI `RunManifest.csv` by its `[SAMPLES]` section combined with a `[RUNVALUES]` section or a `SampleName` column (→ `ELEMENT_AVITI`)
-2. **Header discriminator** — scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
-3. **Section name scan** — if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
-4. **Default** — fall back to V1 (broadest compatibility with legacy files)
+1. **Vendor manifest check** - recognise a non-Illumina Element AVITI `RunManifest.csv` by its `[SAMPLES]` section combined with a `[RUNVALUES]` section or a `SampleName` column (→ `ELEMENT_AVITI`)
+2. **Header discriminator** - scan `[Header]` for `FileFormatVersion` (→ V2) or `IEMFileVersion` (→ V1)
+3. **Section name scan** - if no header key found, look for `[BCLConvert_Settings]` / `[BCLConvert_Data]` in the full file (→ V2)
+4. **Default** - fall back to V1 (broadest compatibility with legacy files)
 
-For Illumina sheets the detector reads only as much of the file as needed — stopping after `[Header]` in the common case.
+For Illumina sheets the detector reads only as much of the file as needed - stopping after `[Header]` in the common case.
 
 ---
 
@@ -313,8 +313,8 @@ For Illumina sheets the detector reads only as much of the file as needed — st
 | `INDEX_DISTANCE_TOO_LOW` | warning | Two indexes in the same lane have Hamming distance < 3, risking demultiplexing bleed-through |
 | `NO_ADAPTERS` | warning | No adapter sequences configured |
 | `ADAPTER_MISMATCH` | warning | Adapter is non-standard |
-| `COLOR_BALANCE_NO_SIGNAL` | error | An index cycle has no signal in an optical channel (2-/1-channel chemistry) — the index read will fail. *Opt-in.* |
-| `COLOR_BALANCE_LOW` | warning | An index cycle has weak signal in a channel, or no base diversity (4-channel) — degraded base calls. *Opt-in.* |
+| `COLOR_BALANCE_NO_SIGNAL` | error | An index cycle has no signal in an optical channel (2-/1-channel chemistry) - the index read will fail. *Opt-in.* |
+| `COLOR_BALANCE_LOW` | warning | An index cycle has weak signal in a channel, or no base diversity (4-channel) - degraded base calls. *Opt-in.* |
 
 ### Index distance checking
 
@@ -350,7 +350,7 @@ On 2-channel instruments (NextSeq, NovaSeq, NovaSeq X) and 1-channel
 instruments (iSeq), bases are called from optical signal: `A` lights
 both channels, `C` only red, `T` only green, and **`G` is a dark base with no
 signal at all**. A cycle where the whole index pool reads `G` produces no
-signal, so the instrument cannot register the tile and the index read fails —
+signal, so the instrument cannot register the tile and the index read fails -
 a real, common cause of wrecked runs that a Hamming-distance check cannot see.
 
 Because the sample sheet already contains every sample's index, this can be
@@ -409,24 +409,24 @@ Color balance has two modes, selectable on the CLI via
 `validate(..., color_balance_mode=...)` / `analyze_color_balance(..., mode=...)`:
 
 - **`vendor_faithful`** (default) encodes each platform's *published* rule
-  exactly — Illumina's "signal in at least one channel" minimum for 2-channel,
+  exactly - Illumina's "signal in at least one channel" minimum for 2-channel,
   the both-lasers rule for 4-channel, and Element's permissive low-diversity
   stance for AVITI.
 - **`conservative`** is stricter than the published minimum: it also fails
   single-channel 2-channel cycles and AVITI low-diversity cycles. (This was the
-  behavior before modes existed — pass `color_balance_mode="conservative"` to
+  behavior before modes existed - pass `color_balance_mode="conservative"` to
   keep it.)
 
 | Chemistry | Instruments | Failure rule (both modes) | Stricter in `conservative` |
 |---|---|---|---|
-| 4-channel | MiSeq, HiSeq 2000/2500/3000/4000 | a green `{G,T}` or red `{A,C}` laser is entirely absent | — |
+| 4-channel | MiSeq, HiSeq 2000/2500/3000/4000 | a green `{G,T}` or red `{A,C}` laser is entirely absent | - |
 | 2-channel | NextSeq, NovaSeq 6000, NovaSeq X, MiniSeq | all-`G` cycle (no signal either channel) | single-channel cycle also fails |
 | 1-channel | iSeq 100 | all-`G` cycle | single-channel cycle also fails |
 | avidity | Element AVITI | (no dark/laser failure) | low-diversity cycle fails |
 
-Element AVITI uses avidity chemistry — each base has its own avidite dye
+Element AVITI uses avidity chemistry - each base has its own avidite dye
 ([Arslan et al., *Nat. Biotechnol.* 2023](https://www.nature.com/articles/s41587-023-01750-7))
-— so it has no dark base and no laser-pair constraint. In `vendor_faithful`
+- so it has no dark base and no laser-pair constraint. In `vendor_faithful`
 mode, AVITI low diversity in the first cycles is an advisory
 (`COLOR_BALANCE_ADVISORY`), never a failure.
 
@@ -436,7 +436,7 @@ mode, AVITI low diversity in the first cycles is an advisory
 
 The factory is not limited to Illumina. Any parser that implements the
 `SampleSheetParser` protocol can be auto-detected, and **Element Biosciences
-AVITI `RunManifest.csv`** files are supported out of the box — the same
+AVITI `RunManifest.csv`** files are supported out of the box - the same
 `SampleSheetFactory` recognises them and returns a parser with the identical
 interface:
 
@@ -478,7 +478,7 @@ across vendors without special-casing.
 
 ## Diff
 
-`SampleSheetDiff` compares two sheets — any combination of V1 and V2 — and
+`SampleSheetDiff` compares two sheets - any combination of V1 and V2 - and
 returns a structured `DiffResult` across four dimensions:
 
 | Dimension | What is compared |
@@ -517,7 +517,7 @@ The V2 `OverrideCycles` field encodes read structure including UMI positions:
 
 | OverrideCycles | UMI length | UMI location |
 |---|---|---|
-| `Y151;I10;I10;Y151` | 0 | — |
+| `Y151;I10;I10;Y151` | 0 | - |
 | `Y151;I10U9;I10;Y151` | 9 | `index2` |
 | `U5Y146;I8;I8;U5Y146` | 5 | `read1` |
 
@@ -594,13 +594,13 @@ Public helper for computing the Hamming distance between two index sequences. Se
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `SampleSheetWriter(version=)` | — | Instantiate for `SampleSheetVersion.V1` or `.V2` |
+| `SampleSheetWriter(version=)` | - | Instantiate for `SampleSheetVersion.V1` or `.V2` |
 | `from_sheet(sheet, version=)` | `SampleSheetWriter` | Load a parsed sheet for editing; optionally change output format |
 | `set_header(*, run_name, platform, ...)` | `self` | Set header fields (fluent) |
 | `set_reads(*, read1, read2, index1, index2)` | `self` | Set read cycle counts (fluent) |
 | `set_adapter(adapter_read1, adapter_read2)` | `self` | Set adapter sequences (fluent) |
-| `set_override_cycles(override)` | `self` | Set `OverrideCycles` string — V2 only (fluent) |
-| `set_software_version(version)` | `self` | Set `SoftwareVersion` — V2 only (fluent) |
+| `set_override_cycles(override)` | `self` | Set `OverrideCycles` string - V2 only (fluent) |
+| `set_software_version(version)` | `self` | Set `SoftwareVersion` - V2 only (fluent) |
 | `set_setting(key, value)` | `self` | Set an arbitrary settings key/value (fluent) |
 | `add_sample(sample_id, *, index, ...)` | `self` | Append a sample row (fluent) |
 | `remove_sample(sample_id, *, lane=)` | `self` | Remove sample(s) by ID, optionally scoped to a lane (fluent) |
@@ -639,7 +639,7 @@ Public helper for computing the Hamming distance between two index sequences. Se
 
 | Method / attribute | Returns | Description |
 |---|---|---|
-| `SampleSheetMerger(target_version=)` | — | Instantiate; default target is `SampleSheetVersion.V2` |
+| `SampleSheetMerger(target_version=)` | - | Instantiate; default target is `SampleSheetVersion.V2` |
 | `add(path)` | `self` | Register an input sheet path (fluent) |
 | `merge(output_path, *, validate=True, abort_on_conflicts=True)` | `MergeResult` | Run the merge and write output |
 
@@ -770,7 +770,7 @@ See [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
 
 ## License
 
-Apache 2.0 — see [LICENSE](LICENSE).
+Apache 2.0 - see [LICENSE](LICENSE).
 
 ---
 

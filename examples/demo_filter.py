@@ -1,12 +1,12 @@
 """
-demo_filter.py — SampleSheetFilter usage examples.
+demo_filter.py - SampleSheetFilter usage examples.
 
 Demonstrates four scenarios:
 
-    1. Filter by project   — keep only one project's samples.
-    2. Filter by lane      — keep only samples from a specific lane.
-    3. Filter by sample ID — exact match and glob pattern.
-    4. Combined criteria   — project + lane ANDed together.
+    1. Filter by project   - keep only one project's samples.
+    2. Filter by lane      - keep only samples from a specific lane.
+    3. Filter by sample ID - exact match and glob pattern.
+    4. Combined criteria   - project + lane ANDed together.
 
 Run from the repo root::
 
@@ -67,7 +67,7 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 3a: Filter by sample ID — exact match
+# Scenario 3a: Filter by sample ID - exact match
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
@@ -81,7 +81,7 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 3b: Filter by sample ID — glob pattern
+# Scenario 3b: Filter by sample ID - glob pattern
 # Keep all samples whose ID starts with "Alpha".
 # ---------------------------------------------------------------------------
 
@@ -96,7 +96,7 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 4: Combined criteria — project AND lane
+# Scenario 4: Combined criteria - project AND lane
 # Multiple criteria are ANDed: a sample must satisfy all of them.
 # ---------------------------------------------------------------------------
 

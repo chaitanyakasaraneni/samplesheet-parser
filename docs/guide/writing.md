@@ -75,8 +75,8 @@ print(writer.to_string())    # full CSV content as a string
 writer.write("out.csv", validate=False)
 ```
 
-If validation fails, a `ValueError` is raised with the full list of errors — the file is not written.
+If validation fails, a `ValueError` is raised with the full list of errors - the file is not written.
 
 ## CSV safety
 
-`SampleSheetWriter` rejects commas, newlines, and quotes in all free-text inputs (`sample_id`, `index`, `project`, adapter sequences, custom column keys/values) at input time with a clear error message — preventing malformed CSVs.
+`SampleSheetWriter` rejects commas, newlines, and quotes in all free-text inputs (`sample_id`, `index`, `project`, adapter sequences, custom column keys/values) at input time with a clear error message - preventing malformed CSVs.
