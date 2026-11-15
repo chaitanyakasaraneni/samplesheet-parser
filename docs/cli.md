@@ -78,8 +78,10 @@ Validate a sheet for index, adapter, and structural issues.
 ```bash
 samplesheet validate SampleSheet.csv
 samplesheet validate SampleSheet.csv --format json
+samplesheet validate SampleSheet.csv --strictness strict
+samplesheet validate SampleSheet.csv --strictness lenient
+samplesheet validate SampleSheet.csv --schema my_rules.json
 samplesheet validate SampleSheet.csv --min-hamming 4
-samplesheet validate SampleSheet.csv --color-balance
 samplesheet validate SampleSheet.csv --color-balance --instrument "NovaSeq X"
 samplesheet validate SampleSheet.csv --color-balance --color-balance-mode conservative
 ```
@@ -89,10 +91,15 @@ samplesheet validate SampleSheet.csv --color-balance --color-balance-mode conser
 | Option | Default | Description |
 |---|---|---|
 | `--format` / `-f` | `text` | Output format: `text` or `json` |
-| `--min-hamming` | `3` | Minimum Hamming distance between indexes |
-| `--color-balance` / `--no-color-balance` | off | Also run per-cycle color-balance checking against the instrument's optical chemistry (opt-in) |
-| `--color-balance-mode` | `vendor_faithful` | Strictness of the color-balance check: `vendor_faithful` (each platform's published rule) or `conservative` (also fails single-channel and low-diversity cycles the vendor minimum permits) |
+| `--strictness` | `standard` | Overall strictness dial: `lenient`, `standard`, or `strict`. `strict` tightens the index-distance threshold, turns on conservative color balance, and enforces Illumina v2 spec conformance plus the bundled JSON Schema. The options below override the level. |
+| `--schema` | none | Path to a JSON Schema (draft 2020-12) checked against the sheet alongside the built-in checks. May `$ref` the bundled Illumina v2 schema by URN (`urn:samplesheet-parser:illuminav2/v1` or the samshee alias `urn:samshee:illuminav2/v1`). Requires the `[schema]` extra (`pip install "samplesheet-parser[schema]"`). |
+| `--min-hamming` | from `--strictness` (3) | Minimum Hamming distance between indexes |
+| `--color-balance` / `--no-color-balance` | from `--strictness` (off) | Run per-cycle color-balance checking against the instrument's optical chemistry |
+| `--color-balance-mode` | from `--strictness` (`vendor_faithful`) | Strictness of the color-balance check: `vendor_faithful` (each platform's published rule) or `conservative` (also fails single-channel and low-diversity cycles the vendor minimum permits) |
 | `--instrument` | from header | Instrument name used to resolve chemistry for the color-balance check |
+
+When `--schema` is given without `jsonschema` installed, the command exits `2`
+with an install hint (rather than silently skipping the check).
 
 When `--color-balance` is requested but the instrument cannot be resolved, the
 check is not run and a `COLOR_BALANCE_SKIPPED` note is emitted (in both text and
