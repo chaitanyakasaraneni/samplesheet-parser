@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-demo_index_utils.py — normalize_index_lengths usage examples.
+demo_index_utils.py - normalize_index_lengths usage examples.
 
 Demonstrates normalizing mixed-length index sequences across a list of sample
 records before merging sheets from different library prep kits.
 
-    Scenario 1: Trim to shortest  — 10 bp + 8 bp kit → all trimmed to 8 bp
-    Scenario 2: Pad to longest    — 8 bp + 10 bp kit → shorter padded with 'N'
-    Scenario 3: Dual-index mixed  — both I7 and I5 lengths normalized together
-    Scenario 4: Real sheet usage  — load a sheet, normalize, inspect the result
+    Scenario 1: Trim to shortest  - 10 bp + 8 bp kit → all trimmed to 8 bp
+    Scenario 2: Pad to longest    - 8 bp + 10 bp kit → shorter padded with 'N'
+    Scenario 3: Dual-index mixed  - both I7 and I5 lengths normalized together
+    Scenario 4: Real sheet usage  - load a sheet, normalize, inspect the result
 
 Run from the repo root::
 
@@ -29,7 +29,7 @@ SHEETS = Path(__file__).parent / "sample_sheets"
 
 def _print_samples(samples: list[dict]) -> None:  # type: ignore[type-arg]
     for s in samples:
-        idx = s.get("index") or s.get("Index") or "—"
+        idx = s.get("index") or s.get("Index") or "-"
         idx2 = s.get("index2") or s.get("Index2") or ""
         idx2_str = f"  index2={idx2}" if idx2 else ""
         print(f"    {s.get('sample_id') or s.get('Sample_ID'):<12} index={idx}{idx2_str}")
@@ -41,7 +41,7 @@ def _print_samples(samples: list[dict]) -> None:  # type: ignore[type-arg]
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 1: Trim to shortest — mixed 10 bp / 8 bp I7")
+print("Scenario 1: Trim to shortest - mixed 10 bp / 8 bp I7")
 print("=" * 60)
 
 samples_mixed = [
@@ -63,7 +63,7 @@ _print_samples(normalized)
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 2: Pad to longest — 8 bp padded to 10 bp")
+print("Scenario 2: Pad to longest - 8 bp padded to 10 bp")
 print("=" * 60)
 
 print("  Before:")
@@ -74,11 +74,11 @@ print("  After (strategy='pad' → 10 bp, short indexes get 'N' suffix):")
 _print_samples(normalized)
 
 # ---------------------------------------------------------------------------
-# Scenario 3: Dual-index — normalize both I7 and I5 together
+# Scenario 3: Dual-index - normalize both I7 and I5 together
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 3: Dual-index — normalize I7 and I5 independently")
+print("Scenario 3: Dual-index - normalize I7 and I5 independently")
 print("=" * 60)
 
 dual_mixed = [
@@ -91,15 +91,15 @@ print("  Before:")
 _print_samples(dual_mixed)
 
 normalized = normalize_index_lengths(dual_mixed, strategy="trim")
-print("  After (strategy='trim' — I7→8bp, I5→7bp):")
+print("  After (strategy='trim' - I7→8bp, I5→7bp):")
 _print_samples(normalized)
 
 # ---------------------------------------------------------------------------
-# Scenario 4: Real sheet — load, normalize, inspect
+# Scenario 4: Real sheet - load, normalize, inspect
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 4: Real sheet — load V1, normalize, inspect")
+print("Scenario 4: Real sheet - load V1, normalize, inspect")
 print("=" * 60)
 
 factory = SampleSheetFactory()

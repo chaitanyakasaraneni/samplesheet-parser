@@ -1,11 +1,11 @@
 """
-demo_splitter.py — SampleSheetSplitter usage examples.
+demo_splitter.py - SampleSheetSplitter usage examples.
 
 Demonstrates three scenarios:
 
-    1. Split by project  — combined V2 sheet → one file per Sample_Project.
-    2. Split by lane     — same sheet → one file per lane.
-    3. Target version    — split a V2 combined sheet into V1 per-project files.
+    1. Split by project  - combined V2 sheet → one file per Sample_Project.
+    2. Split by lane     - same sheet → one file per lane.
+    3. Target version    - split a V2 combined sheet into V1 per-project files.
 
 Run from the repo root::
 
@@ -40,7 +40,7 @@ def print_result(result: SplitResult) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Scenario 1: Split by project — combined V2 → one file per Sample_Project
+# Scenario 1: Split by project - combined V2 → one file per Sample_Project
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
@@ -54,7 +54,7 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 2: Split by lane — V1 multi-lane sheet → one file per lane
+# Scenario 2: Split by lane - V1 multi-lane sheet → one file per lane
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
@@ -68,7 +68,7 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 3: Target version override — split V2 input into V1 output files
+# Scenario 3: Target version override - split V2 input into V1 output files
 # Useful when downstream tools (bcl2fastq) require V1 format but your
 # combined sheet is V2.
 # ---------------------------------------------------------------------------

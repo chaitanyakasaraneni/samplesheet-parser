@@ -1,6 +1,6 @@
 # Diffing
 
-`SampleSheetDiff` compares two sheets — any combination of V1 and V2 — and returns a structured `DiffResult`.
+`SampleSheetDiff` compares two sheets - any combination of V1 and V2 - and returns a structured `DiffResult`.
 
 ## Basic usage
 
@@ -53,7 +53,7 @@ for sc in result.sample_changes:
 V1-only metadata columns (`I7_Index_ID`, `I5_Index_ID`, `Sample_Name`, `Description`) are suppressed when comparing V1 against V2 so that format differences do not generate noise.
 
 ```python
-# V1 vs its own V2 conversion — should show zero meaningful changes
+# V1 vs its own V2 conversion - should show zero meaningful changes
 result = SampleSheetDiff("SampleSheet_v1.csv", "SampleSheet_v2.csv").compare()
 print(result.has_changes)   # False (or only adapter field name differences)
 ```

@@ -39,7 +39,7 @@ input:
           - edam: "http://edamontology.org/format_3752"
   - - target_version:
         type: string
-        description: Target format — either 'v1' or 'v2'
+        description: Target format - either 'v1' or 'v2'
 output:
   samplesheet:
     - - meta:

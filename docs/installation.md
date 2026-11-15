@@ -8,7 +8,7 @@
 ## pip (recommended)
 
 ```bash
-# Core library — parsing, validation, conversion, diff, merge, writer
+# Core library - parsing, validation, conversion, diff, merge, writer
 pip install samplesheet-parser
 
 # With the CLI (adds typer as a dependency)

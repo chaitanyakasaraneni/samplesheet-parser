@@ -1,7 +1,7 @@
 name: samplesheetparser_filter
 description: |
   Extract a subset of samples from an Illumina SampleSheet.csv by project,
-  lane, or sample ID. Multiple criteria are ANDed — a sample must match all
+  lane, or sample ID. Multiple criteria are ANDed - a sample must match all
   provided criteria. Sample ID supports glob patterns (e.g. 'CTRL_*').
   Exits 0 if at least one sample matched, 1 if no samples matched.
   Filter criteria are passed via task.ext.args (e.g. '--project ProjectA').

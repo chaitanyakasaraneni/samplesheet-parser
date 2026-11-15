@@ -224,21 +224,21 @@ _No unreleased changes._
 
 ### Added
 
-- **`SampleSheetParser` Protocol** (`samplesheet_parser.protocol`) — a
+- **`SampleSheetParser` Protocol** (`samplesheet_parser.protocol`) - a
   `runtime_checkable` structural protocol satisfied by both `SampleSheetV1`
   and `SampleSheetV2`. Third-party parsers that implement the same interface
   can be registered with the factory without inheriting from any base class.
   `isinstance(sheet, SampleSheetParser)` works at runtime.
-- **`SampleSheetFactory.register(detector, parser_class, version)`** — class
+- **`SampleSheetFactory.register(detector, parser_class, version)`** - class
   method that registers a custom format detector. Registered detectors are
   tried before the built-in V1/V2 detection in LIFO order. Useful for
   supporting hypothetical V3 formats or vendor-specific variants.
-- **`SampleSheetFactory.clear_registry()`** — removes all custom registrations.
+- **`SampleSheetFactory.clear_registry()`** - removes all custom registrations.
   Intended for use in tests to prevent cross-test contamination.
-- **`detect_workflow()` accepts `extra_a` / `extra_b` keyword arguments** —
+- **`detect_workflow()` accepts `extra_a` / `extra_b` keyword arguments** -
   caller-supplied `frozenset[str]` of instrument names checked before the
   built-in tables. Allows narrowing workflow classification without subclassing.
-- **`hamming_distance` is now a public export** — available as
+- **`hamming_distance` is now a public export** - available as
   `from samplesheet_parser import hamming_distance` and documented in the API
   reference.
 
@@ -267,15 +267,15 @@ _No unreleased changes._
 
 ### Added
 
-- **`samplesheet_parser.instruments`** — public module exposing
+- **`samplesheet_parser.instruments`** - public module exposing
   `Workflow` (StrEnum: `A` / `B`), `WORKFLOW_A_INSTRUMENTS` /
   `WORKFLOW_B_INSTRUMENTS` / `AMBIGUOUS_INSTRUMENTS` tables,
   `detect_workflow()`, `parse_workflow()`, and `reverse_complement()`.
-- **`SampleSheetConverter(path, *, workflow=...)`** — explicit workflow
+- **`SampleSheetConverter(path, *, workflow=...)`** - explicit workflow
   override accepting `"a"`, `"b"`, or a `Workflow` enum value. Required for
   ambiguous instruments such as `NovaSeq 6000` (workflow depends on v1.0
   vs v1.5 chemistry).
-- **`samplesheet convert --workflow {a,b}` / `-w`** — CLI override that
+- **`samplesheet convert --workflow {a,b}` / `-w`** - CLI override that
   takes precedence over auto-detection.
 
 [#30]: https://github.com/chaitanyakasaraneni/samplesheet-parser/issues/30
@@ -291,7 +291,7 @@ _No unreleased changes._
 
 ### Added
 
-- **`SampleSheetSplitter` and `SplitResult`** — splits a combined sheet into
+- **`SampleSheetSplitter` and `SplitResult`** - splits a combined sheet into
   one file per project or per lane (the inverse of `SampleSheetMerger`).
   - `SampleSheetSplitter(path, *, by="project"|"lane", target_version=None, unassigned_label="unassigned")`
   - `split(output_dir, *, prefix="", suffix="_SampleSheet.csv", validate=True) → SplitResult`
@@ -303,11 +303,11 @@ _No unreleased changes._
   - `SampleSheetSplitter` and `SplitResult` are exported from the top-level
     package.
 
-- **`SampleSheetFilter` and `FilterResult`** — extracts a subset of samples
+- **`SampleSheetFilter` and `FilterResult`** - extracts a subset of samples
   from a sheet by project, lane, or sample ID (with glob support).
   - `SampleSheetFilter(path, *, target_version=None)`
   - `filter(output_path, *, project=None, lane=None, sample_id=None, validate=True) → FilterResult`
-  - Multiple criteria are ANDed — a sample must match all provided criteria.
+  - Multiple criteria are ANDed - a sample must match all provided criteria.
   - `sample_id` supports glob patterns (e.g. `"CTRL_*"`, `"SAMPLE_00[1-3]"`)
     via `fnmatch.fnmatchcase` for consistent case-sensitive behavior across
     platforms.
@@ -316,65 +316,65 @@ _No unreleased changes._
   - `SampleSheetFilter` and `FilterResult` are exported from the top-level
     package.
 
-- **`samplesheet split` CLI command** — splits a combined sheet into per-group
+- **`samplesheet split` CLI command** - splits a combined sheet into per-group
   files. Accepts `--by project|lane`, `--output-dir / -d`, `--to v1|v2`,
   `--format json|text`, and `--prefix`. Exits 0 on clean split, 1 if warnings
   were produced, 2 on bad arguments or unreadable files.
 
-- **`samplesheet filter` CLI command** — filters samples by `--project / -p`,
+- **`samplesheet filter` CLI command** - filters samples by `--project / -p`,
   `--lane / -l`, and `--sample-id / -s` (glob patterns supported). Accepts
   `--output / -o`, `--to v1|v2`, and `--format json|text`. Exits 0 when
   samples match, 1 when no samples match, 2 on bad arguments.
 
-- **`SampleSheetWriter.clear_samples()`** — public method to remove all samples
+- **`SampleSheetWriter.clear_samples()`** - public method to remove all samples
   from a writer while preserving header, reads, and settings. Enables the
   copy-metadata-then-repopulate pattern without accessing the private
   `_samples` attribute.
 
-- **`--format json` for `samplesheet convert`** — the convert command now accepts
+- **`--format json` for `samplesheet convert`** - the convert command now accepts
   `--format json` and emits a structured JSON object with `input`, `output`,
   `source_version`, and `target_version` keys. All seven CLI subcommands now
   support `--format json` uniformly.
 
-- **Bioconda recipe (`recipes/meta.yaml`)** — a `noarch: python` conda recipe
+- **Bioconda recipe (`recipes/meta.yaml`)** - a `noarch: python` conda recipe
   with `loguru` as the only runtime dependency. Python version is not pinned
   (noarch packages rely on the conda solver for compatibility). The CLI extra
   (`typer`) is intentionally omitted from the base recipe so the conda package
   stays lightweight; users who need the `samplesheet` CLI can
   `conda install typer` alongside.
 
-- **nf-core compatible Nextflow modules** — three modules following
+- **nf-core compatible Nextflow modules** - three modules following
   nf-core/modules conventions, each with `main.nf`, `meta.yml`,
   `environment.yml`, nf-test tests, and `tags.yml`:
-  - `SAMPLESHEETPARSER_VALIDATE` — validates V1/V2 sheets and emits a
+  - `SAMPLESHEETPARSER_VALIDATE` - validates V1/V2 sheets and emits a
     structured JSON report; exits 1 on errors so pipelines fail before
     demultiplexing.
-  - `SAMPLESHEETPARSER_CONVERT` — bidirectional V1↔V2 conversion with target
+  - `SAMPLESHEETPARSER_CONVERT` - bidirectional V1↔V2 conversion with target
     version passed as a channel value.
-  - `SAMPLESHEETPARSER_INFO` — emits a JSON metadata summary (format, sample
+  - `SAMPLESHEETPARSER_INFO` - emits a JSON metadata summary (format, sample
     count, lanes, index type, read lengths, adapters) for run logging and
     conditional pipeline branching.
 
-- **Example scripts** — `examples/demo_splitter.py` and
+- **Example scripts** - `examples/demo_splitter.py` and
   `examples/demo_filter.py` demonstrating the new split and filter APIs with
   three and four runnable scenarios respectively.
 
 ### Tests
 
-- **`tests/test_splitter.py`** — 46 tests covering: split by project and lane,
+- **`tests/test_splitter.py`** - 46 tests covering: split by project and lane,
   header/reads/settings preservation, unassigned samples (custom label),
   incomplete records (missing `Sample_ID` or `Index`, all-incomplete group),
   empty input, target version override, custom prefix/suffix, output directory
   creation, `SplitResult` summary and `source_version`, and error conditions
   (`FileNotFoundError`, `ValueError` on invalid `--by`).
 
-- **`tests/test_filter.py`** — 46 tests covering: filter by project, lane
+- **`tests/test_filter.py`** - 46 tests covering: filter by project, lane
   (string and int), and sample ID (exact and glob); multiple ANDed criteria;
   no-match behaviour (no file written, `matched_count == 0`); header/settings
   preservation; target version override; `FilterResult` attributes; incomplete
   records; and error conditions (`ValueError`, `FileNotFoundError`).
 
-- **`TestCLISplit` and `TestCLIFilter`** in `tests/test_cli.py` — 13 tests each
+- **`TestCLISplit` and `TestCLIFilter`** in `tests/test_cli.py` - 13 tests each
   covering happy paths, JSON output, warning exit codes, error exit codes,
   exception paths (via `monkeypatch`), and text output formatting.
 
@@ -388,24 +388,24 @@ _No unreleased changes._
 
 ### Added
 
-- **`--version` / `-V` CLI flag** — prints the installed package version
+- **`--version` / `-V` CLI flag** - prints the installed package version
   and exits. Reads the version via `importlib.metadata` so the full package
   is not loaded just to print a version string.
 
-- **`demo_converter.py`** — runnable example covering V1→V2 conversion,
+- **`demo_converter.py`** - runnable example covering V1→V2 conversion,
   V2→V1 (lossy) conversion, and a full V1→V2→V1 roundtrip with sample
   identity verification.
 
-- **`demo_diff.py`** — runnable example covering five diff scenarios:
+- **`demo_diff.py`** - runnable example covering five diff scenarios:
   identical sheets, header change, sample added, index correction, and
   cross-format (V1 vs its V2 conversion) diff.
 
-- **`demo_writer.py`** — runnable example covering the fluent
+- **`demo_writer.py`** - runnable example covering the fluent
   `SampleSheetWriter` API: building V1 and V2 sheets from scratch,
   correcting a sample index on an existing sheet, and removing a sample
   before submission.
 
-- **`demo_index_utils.py`** — runnable example covering
+- **`demo_index_utils.py`** - runnable example covering
   `normalize_index_lengths` with trim and pad strategies, dual-index
   normalization, and a real-sheet walkthrough.
 
@@ -418,12 +418,12 @@ _No unreleased changes._
 
 - `cli.py` fallback type aliases (`_FormatOption`, `_OutputOption`,
   `_VersionOption`) reduced from `type: ignore[assignment,misc]` to
-  `type: ignore[misc]` — the `assignment` suppression was unused under
+  `type: ignore[misc]` - the `assignment` suppression was unused under
   current mypy.
 
 ### Tests
 
-- `TestCLIVersion` — four new tests covering `--version` exit code, `-V`
+- `TestCLIVersion` - four new tests covering `--version` exit code, `-V`
   short flag, package name in output, version string in output, and
   `PackageNotFoundError` fallback to `"unknown"`.
 
@@ -436,15 +436,15 @@ _No unreleased changes._
 
 ### Added
 
-- **`py.typed` marker** — package now ships inline type information per
+- **`py.typed` marker** - package now ships inline type information per
   PEP 561, enabling mypy and pyright to type-check downstream code without
   extra configuration.
 
-- **`InstrumentPlatform` and `UMILocation` enums exported** — both were
+- **`InstrumentPlatform` and `UMILocation` enums exported** - both were
   already defined in `enums.py` but not part of the public API. They are now
   importable directly from the top-level package and listed in `__all__`.
 
-- **`.pre-commit-config.yaml`** — pre-commit hook configuration included in
+- **`.pre-commit-config.yaml`** - pre-commit hook configuration included in
   the repository (black, ruff with `--fix`, mypy, and standard file hygiene
   hooks) so contributors get the same checks locally that CI enforces.
 
@@ -470,7 +470,7 @@ _No unreleased changes._
   `samplesheet_parser/__init__.py`, where the version-detection block
   intentionally precedes the package re-exports.
 
-- **Stability guarantee** — `1.0.0` marks the first stable release.
+- **Stability guarantee** - `1.0.0` marks the first stable release.
   The public API (all names in `__init__.__all__`) is now subject to
   semantic versioning: breaking changes will not be made without a major
   version bump.
@@ -481,12 +481,12 @@ _No unreleased changes._
 
 ### Added
 
-- **`samplesheet info` CLI command** — prints a concise summary of any V1 or
+- **`samplesheet info` CLI command** - prints a concise summary of any V1 or
   V2 sample sheet (format, sample count, lanes, index type, read lengths,
   adapters, experiment name, instrument). Supports `--format json` for
   machine-readable output; exits 0 on success, 2 on unreadable files.
 
-- **Configurable Hamming distance threshold** — `SampleSheetValidator.validate()`
+- **Configurable Hamming distance threshold** - `SampleSheetValidator.validate()`
   now accepts a `min_hamming_distance` keyword argument (default: 3) so labs
   using longer indexes can enforce stricter thresholds without changing the
   module-level constant.
@@ -497,17 +497,17 @@ _No unreleased changes._
     invalid input). The JSON output includes `min_hamming_distance` for
     auditability.
 
-- **`normalize_index_lengths()` utility** — normalizes index sequence lengths
+- **`normalize_index_lengths()` utility** - normalizes index sequence lengths
   across a list of sample dicts (output of `sheet.samples()`) to a consistent
   length before merging sheets with mixed-length indexes.
-  - `strategy="trim"` — trims all indexes to the shortest sequence length.
-  - `strategy="pad"` — pads shorter indexes to the longest length using `"N"`
+  - `strategy="trim"` - trims all indexes to the shortest sequence length.
+  - `strategy="pad"` - pads shorter indexes to the longest length using `"N"`
     wildcard characters (supported by BCLConvert ≥ 3.9 and bcl2fastq ≥ 2.20).
   - Auto-detects V1-style (`index`/`index2`) and V2-style (`Index`/`Index2`)
     field names; explicit `index1_key`/`index2_key` overrides supported.
   - Exported from the top-level package as `normalize_index_lengths`.
 
-- **CI / pre-commit integration guide** in README — GitHub Actions workflow
+- **CI / pre-commit integration guide** in README - GitHub Actions workflow
   and pre-commit hook configuration for automatic sample sheet validation on
   every commit or pull request that touches a `SampleSheet.csv`.
 
@@ -543,59 +543,59 @@ _No unreleased changes._
 
 ### Fixed
 
-- **`SampleSheetMerger`** — `INDEX_DISTANCE_TOO_LOW` and `DUPLICATE_INDEX`
+- **`SampleSheetMerger`** - `INDEX_DISTANCE_TOO_LOW` and `DUPLICATE_INDEX`
   were reported twice in `--force` merges (once by the pre-merge cross-sheet
   check, once by the post-merge validator). Duplicate codes are now suppressed
-  in `_validate_merged` — the more descriptive pre-merge message is always
+  in `_validate_merged` - the more descriptive pre-merge message is always
   preferred.
 
 ## [0.3.0] - 2026-03-10
 
 ### Added
 
-- **`SampleSheetMerger`** — combines multiple per-project sample sheets into a
+- **`SampleSheetMerger`** - combines multiple per-project sample sheets into a
   single sheet for a flow cell run.
-  - `add(path)` — register an input sheet (V1 or V2); mixed formats are
+  - `add(path)` - register an input sheet (V1 or V2); mixed formats are
     auto-converted to the target version before merging.
-  - `merge(output_path, validate=True, abort_on_conflicts=True)` — merges all
+  - `merge(output_path, validate=True, abort_on_conflicts=True)` - merges all
     registered sheets, writes the combined output, and returns a `MergeResult`.
-  - **Index collision detection** — raises a conflict when two samples share
+  - **Index collision detection** - raises a conflict when two samples share
     the same lane and index sequence across project boundaries.
-  - **Hamming distance check** — warns when the combined I7+I5 distance between
+  - **Hamming distance check** - warns when the combined I7+I5 distance between
     any two samples across sheets falls below 3.
-  - **Read-length conflict detection** — raises a conflict when registered
+  - **Read-length conflict detection** - raises a conflict when registered
     sheets specify incompatible `Read1Cycles`/`Read2Cycles` (V2) or `[Reads]`
     lengths (V1).
-  - **Adapter conflict detection** — warns when adapter sequences differ across
+  - **Adapter conflict detection** - warns when adapter sequences differ across
     sheets.
-  - **Mixed-format warning** — emits a warning when V1 and V2 sheets are
+  - **Mixed-format warning** - emits a warning when V1 and V2 sheets are
     combined, with the auto-conversion strategy logged.
-  - `MergeResult` dataclass — exposes `conflicts`, `warnings`, `sample_count`,
+  - `MergeResult` dataclass - exposes `conflicts`, `warnings`, `sample_count`,
     `source_versions`, `output_path`, `has_conflicts`, and `summary()`;
     consistent with `ValidationResult` and `DiffResult`.
-  - `abort_on_conflicts=True` (default) — skips writing the output file when
+  - `abort_on_conflicts=True` (default) - skips writing the output file when
     any conflict is present; set `False` (via `--force` in the CLI) to write
     despite conflicts.
   - `SampleSheetMerger` and `MergeResult` are exported from the top-level
     package.
 
-- **`samplesheet` CLI** — command-line interface exposing the four core
+- **`samplesheet` CLI** - command-line interface exposing the four core
   operations, available as an optional extra (`pip install
   "samplesheet-parser[cli]"`; adds `typer` as a dependency).
-  - `samplesheet validate <file>` — exits 0 if clean, 1 if errors, 2 on
+  - `samplesheet validate <file>` - exits 0 if clean, 1 if errors, 2 on
     usage/parse errors. Supports `--format json` for machine-readable output.
-  - `samplesheet convert <file> --to <v1|v2> --output <path>` — converts
+  - `samplesheet convert <file> --to <v1|v2> --output <path>` - converts
     between formats; exits 0 on success, 1 on conversion error, 2 on bad
     arguments.
-  - `samplesheet diff <old> <new>` — exits 0 if identical, 1 if differences
+  - `samplesheet diff <old> <new>` - exits 0 if identical, 1 if differences
     detected (useful in CI pre-run checks). Supports `--format json`.
-  - `samplesheet merge <files...> --output <path>` — merges two or more sheets;
+  - `samplesheet merge <files...> --output <path>` - merges two or more sheets;
     exits 0 on clean merge, 1 on conflicts or warnings, 2 on bad arguments.
     Supports `--force`, `--to <v1|v2>`, and `--format json`.
   - All commands print errors to stderr and structured data to stdout.
   - Entry point configured in `pyproject.toml`:
     `samplesheet = "samplesheet_parser.cli:main"`.
-  - Module imports cleanly without `typer` installed — missing-extra error is
+  - Module imports cleanly without `typer` installed - missing-extra error is
     surfaced only at invocation time.
 
 ### Changed
@@ -611,19 +611,19 @@ _No unreleased changes._
 
 ### Added
 
-- **`SampleSheetWriter`** — programmatic creation and editing of IEM V1 and
+- **`SampleSheetWriter`** - programmatic creation and editing of IEM V1 and
   BCLConvert V2 sample sheets.
   - Build sheets from scratch with a fluent API: `set_header()`, `set_reads()`,
     `set_adapter()`, `set_override_cycles()`, `set_software_version()`,
     `set_setting()`, `add_sample()`.
-  - `from_sheet(sheet, version=)` class method — load any parsed V1/V2 sheet,
+  - `from_sheet(sheet, version=)` class method - load any parsed V1/V2 sheet,
     edit in place, and write back; pass a different `version` to convert format
     while editing.
   - `remove_sample(sample_id, lane=)` and `update_sample(sample_id, **fields)`
     for surgical edits to existing sheets.
-  - `write(path, validate=True)` — runs `SampleSheetValidator` before writing
+  - `write(path, validate=True)` - runs `SampleSheetValidator` before writing
     by default; raises `ValueError` with the full error list if validation fails.
-  - `to_string()` — serialise to a string without writing to disk (useful for
+  - `to_string()` - serialise to a string without writing to disk (useful for
     testing and inspection).
   - CSV safety: `_validate_field` rejects commas, newlines, and quotes in all
     free-text inputs (`sample_id`, `index`, `project`, `run_name`, adapter
@@ -631,7 +631,7 @@ _No unreleased changes._
     error message.
   - `SampleSheetWriter` is now exported from the top-level package.
 
-- **`SampleSheetDiff`** — structured comparison of two sample sheets across
+- **`SampleSheetDiff`** - structured comparison of two sample sheets across
   any combination of V1 and V2 formats.
   - Compares header, reads, settings, and samples in a single `compare()` call.
   - Returns a `DiffResult` dataclass with `header_changes`, `samples_added`,
@@ -641,23 +641,23 @@ _No unreleased changes._
     format-noise diffs.
   - `DiffResult.summary()` and `DiffResult.has_changes` for quick inspection.
 
-- **`INDEX_DISTANCE_TOO_LOW` validation check** — `SampleSheetValidator` now
+- **`INDEX_DISTANCE_TOO_LOW` validation check** - `SampleSheetValidator` now
   computes the Hamming distance between every pair of index sequences within
   each lane and warns when the distance falls below the recommended minimum
   of 3. For dual-index sheets the combined I7+I5 sequence is used so that
   pairs well-separated on I5 are not incorrectly flagged.
 
-- **`_hamming_distance` helper** — module-level pure function, independently
+- **`_hamming_distance` helper** - module-level pure function, independently
   testable, handles sequences of unequal length by comparing up to the shorter
   sequence length.
 
-- **`scripts/demo_writer.py`** — smoke-test script demonstrating V1/V2
+- **`scripts/demo_writer.py`** - smoke-test script demonstrating V1/V2
   from-scratch creation and round-trip editing.
 
-- **`scripts/demo_diff.py`** — smoke-test script demonstrating identical,
+- **`scripts/demo_diff.py`** - smoke-test script demonstrating identical,
   modified, and cross-format diff scenarios.
 
-- **`.github/copilot-instructions.md`** — Copilot review instructions scoping
+- **`.github/copilot-instructions.md`** - Copilot review instructions scoping
   suggestions to logic bugs, test coverage gaps, and type errors.
 
 ### Changed
@@ -671,27 +671,27 @@ _No unreleased changes._
 
 ### Added
 
-- **`SampleSheetConverter`** — bidirectional V1 ↔ V2 format conversion.
-  - `to_v2(output_path)` — converts IEM V1 to BCLConvert V2.
-  - `to_v1(output_path)` — converts BCLConvert V2 to IEM V1 (lossy; V2-only
+- **`SampleSheetConverter`** - bidirectional V1 ↔ V2 format conversion.
+  - `to_v2(output_path)` - converts IEM V1 to BCLConvert V2.
+  - `to_v1(output_path)` - converts BCLConvert V2 to IEM V1 (lossy; V2-only
     fields dropped with a warning).
   - Auto-detects source format via `SampleSheetFactory`.
 
-- **`scripts/demo_converter.py`** — smoke-test script for converter scenarios
+- **`scripts/demo_converter.py`** - smoke-test script for converter scenarios
   including V1→V2→V1 and V2→V1→V2 round-trips.
 
-- **`CONTRIBUTING.md`** — local development setup, test instructions, and
+- **`CONTRIBUTING.md`** - local development setup, test instructions, and
   PR checklist.
 
 ---
 
-## [0.1.1] – [0.1.4] - 2026-02-22 / 2026-02-23
+## [0.1.1] - [0.1.4] - 2026-02-22 / 2026-02-23
 
 ### Fixed
 
-- CI workflow not triggering on tag push — added `tags` trigger to
+- CI workflow not triggering on tag push - added `tags` trigger to
   `ci.yml` (was gated on tags but never configured to *run* on them).
-- PyPI README image not rendering — switched from `badge.fury.io` to
+- PyPI README image not rendering - switched from `badge.fury.io` to
   `shields.io` dynamic badge; bumped versions to force PyPI to re-render
   the README on each new release.
 - Minor ruff and mypy fixes surfaced during initial CI runs.
@@ -705,21 +705,21 @@ _No unreleased changes._
 
 ### Added
 
-- **`SampleSheetV1`** — parser for IEM V1 (bcl2fastq-era) sample sheets.
+- **`SampleSheetV1`** - parser for IEM V1 (bcl2fastq-era) sample sheets.
   Parses `[Header]`, `[Reads]`, `[Settings]`, `[Manifests]`, and `[Data]`
   sections. Exposes `samples()`, `index_type()`, `adapters`, `read_lengths`,
   and all standard header fields.
 
-- **`SampleSheetV2`** — parser for BCLConvert V2 (NovaSeq X series) sample
+- **`SampleSheetV2`** - parser for BCLConvert V2 (NovaSeq X series) sample
   sheets. Parses `[Header]`, `[Reads]`, `[BCLConvert_Settings]`,
   `[BCLConvert_Data]`, and optional `[Cloud_Data]` sections. Adds
   `get_umi_length()` and `get_read_structure()` for `OverrideCycles` decoding.
 
-- **`SampleSheetFactory`** — auto-detects V1 vs V2 format using a three-step
+- **`SampleSheetFactory`** - auto-detects V1 vs V2 format using a three-step
   strategy (header key scan → section name scan → V1 fallback) and returns
   the appropriate parser.
 
-- **`SampleSheetValidator`** — validates parsed sheets for `EMPTY_SAMPLES`,
+- **`SampleSheetValidator`** - validates parsed sheets for `EMPTY_SAMPLES`,
   `INVALID_INDEX_CHARS`, `INDEX_TOO_SHORT`, `INDEX_TOO_LONG`,
   `DUPLICATE_INDEX`, `MISSING_INDEX2`, `DUPLICATE_SAMPLE_ID`, `NO_ADAPTERS`,
   and `ADAPTER_MISMATCH`. Returns a structured `ValidationResult`.

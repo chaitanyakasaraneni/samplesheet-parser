@@ -1,11 +1,11 @@
 """
-demo_merger.py — SampleSheetMerger usage examples.
+demo_merger.py - SampleSheetMerger usage examples.
 
 Demonstrates three scenarios:
 
-    1. Clean merge     — two V1 sheets, no conflicts, output written.
-    2. Mixed formats   — V1 + V1 + V2, auto-converted to a target version.
-    3. Conflict handling — index collision detected; abort vs. force write.
+    1. Clean merge     - two V1 sheets, no conflicts, output written.
+    2. Mixed formats   - V1 + V1 + V2, auto-converted to a target version.
+    3. Conflict handling - index collision detected; abort vs. force write.
 
 Run from the repo root::
 
@@ -40,7 +40,7 @@ def print_result(result: MergeResult) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Scenario 1: Clean merge — two V1 sheets → combined V2
+# Scenario 1: Clean merge - two V1 sheets → combined V2
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
@@ -61,7 +61,7 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 2: Mixed formats — V1 + V1 + V2 → combined V2
+# Scenario 2: Mixed formats - V1 + V1 + V2 → combined V2
 # ProjectGamma supplies a V2 sheet; merger auto-converts all inputs to V2.
 # Mixed-format inputs produce a warning but are not a conflict.
 # ---------------------------------------------------------------------------
@@ -85,13 +85,13 @@ print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 3a: Index collision — abort_on_conflicts=True (default)
+# Scenario 3a: Index collision - abort_on_conflicts=True (default)
 # ProjectDelta reuses an index from ProjectAlpha on the same lane.
 # The output file is NOT written; result.output_path is None.
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 3a: Index collision — abort (default)")
+print("Scenario 3a: Index collision - abort (default)")
 print("=" * 60)
 
 merger = SampleSheetMerger(target_version=SampleSheetVersion.V2)
@@ -101,20 +101,20 @@ merger.add(SHEETS / "ProjectDelta_SampleSheet_collision.csv")
 result = merger.merge(
     SHEETS / "combined_collision_aborted.csv",
     validate=True,
-    abort_on_conflicts=True,   # default — file not written on conflict
+    abort_on_conflicts=True,  # default - file not written on conflict
 )
 
 print_result(result)
 print()
 
 # ---------------------------------------------------------------------------
-# Scenario 3b: Index collision — abort_on_conflicts=False (force write)
+# Scenario 3b: Index collision - abort_on_conflicts=False (force write)
 # Same collision as above, but the file is written anyway.
 # Equivalent to passing --force on the CLI.
 # ---------------------------------------------------------------------------
 
 print("=" * 60)
-print("Scenario 3b: Index collision — force write")
+print("Scenario 3b: Index collision - force write")
 print("=" * 60)
 
 merger = SampleSheetMerger(target_version=SampleSheetVersion.V2)
@@ -124,7 +124,7 @@ merger.add(SHEETS / "ProjectDelta_SampleSheet_collision.csv")
 result = merger.merge(
     SHEETS / "combined_collision_forced.csv",
     validate=True,
-    abort_on_conflicts=False,   # write despite conflicts
+    abort_on_conflicts=False,  # write despite conflicts
 )
 
 print_result(result)

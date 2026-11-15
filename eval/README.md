@@ -12,7 +12,7 @@ ground-truth labelings under 4-channel, 2-channel, and AVITI chemistries.
 ## Central claim under test
 
 A vendor-agnostic, chemistry-aware color-balance validator catches index-pool
-failure modes that **differ across sequencing chemistries** — in particular,
+failure modes that **differ across sequencing chemistries** - in particular,
 pools that pass on 4-channel chemistry but fail on 2-channel.
 
 > **Important nuance (see [FINDINGS.md](FINDINGS.md)):** this library models the
@@ -67,8 +67,8 @@ Outputs in `eval/results/`:
 
 The tool is scored in **both modes** (`vendor_faithful` default, `conservative`).
 The three comparisons are: `tool_vendor_faithful_vs_reference` (agreement with
-published vendor guidance — should be ~perfect), `tool_conservative_vs_definitional`
-(the conservative tool matches the strict first-principles model — implementation
+published vendor guidance - should be ~perfect), `tool_conservative_vs_definitional`
+(the conservative tool matches the strict first-principles model - implementation
 correctness), and `definitional_vs_reference` (the inherent strict-vs-permissive
 gap). `summary.md` reports tool-vs-reference disagreement counts per mode.
 
@@ -88,16 +88,16 @@ gap). `summary.md` reports tool-vs-reference disagreement counts per mode.
 
 Both are computed **in the generator** (never by calling the library under test):
 
-- **`label_definitional`** — the strict first-principles optical-channel model
+- **`label_definitional`** - the strict first-principles optical-channel model
   (the conservative view: 4-channel needs both lasers, 2-channel needs both
   channels, avidity fails only on collapsed diversity). The library's
   `conservative` mode implements exactly this, so they agree by construction.
-- **`label_reference`** — the actual **published vendor rules**, implemented in
+- **`label_reference`** - the actual **published vendor rules**, implemented in
   [`reference_rules.py`](reference_rules.py) with source citations (Illumina
   Index Adapters Pooling Guide #1000000041074 and the NextSeq/MiniSeq/NovaSeq
   color-balancing knowledge articles; Element AVITI metrics & low-diversity
   docs). Dispatched by **vendor/platform key** (`2channel`/`4channel`/`aviti`),
-  *not* by physical channel count — the AVITI is physically four-channel but
+  *not* by physical channel count - the AVITI is physically four-channel but
   Element's guidance is more permissive than Illumina's four-channel guidance.
   Illumina's qualitative rules ("signal in at least one channel") are encoded as
   rules, not invented numeric thresholds. Anything not vendor-specified (e.g. the
@@ -105,7 +105,7 @@ Both are computed **in the generator** (never by calling the library under test)
   `# heuristic, not vendor-specified`.
 
 The harness scores the tool in both modes and reports all three comparisons
-separately, so disagreement is surfaced and quantified, not hidden — keeping the
+separately, so disagreement is surfaced and quantified, not hidden - keeping the
 paper's claim falsifiable. After the mode change and the 4-channel fix,
 `vendor_faithful` matches published vendor guidance exactly (0 disagreements,
 down from 37) while `conservative` reproduces the prior stricter behavior; see
