@@ -60,12 +60,15 @@ v.validate(sheet, strictness=Strictness.STRICT)     # tighter distance + conserv
                                                     # colour balance + spec conformance
 ```
 
-`Strictness.STRICT` additionally runs the built-in `illumina_v2_conformance`
-validator, which enforces a subset of the Illumina v2 Settings spec (e.g. index
-length must match the declared `Index1Cycles` / `Index2Cycles`, `RunName`
-present). This is the strict counterpart to the lenient-by-default structure
-described in [No fixed column schema](#no-fixed-column-schema): tolerant parsing
-stays the default, and spec conformance is opt-in.
+`Strictness.STRICT` additionally runs two built-in validators:
+`illumina_v2_conformance` (procedural cross-field checks, e.g. index length must
+match the declared `Index1Cycles` / `Index2Cycles`) and
+`illumina_v2_schema_validator()` (the bundled Illumina v2 JSON Schema: required
+sections and fields, value types, index character set). Together they enforce
+the Illumina v2 Settings spec. This is the strict counterpart to the
+lenient-by-default structure described in
+[No fixed column schema](#no-fixed-column-schema): tolerant parsing stays the
+default, and spec conformance is opt-in.
 
 The dial only sets defaults. Any explicit keyword still wins, so you can mix a
 level with an override:
@@ -97,20 +100,41 @@ result = SampleSheetValidator().validate(sheet, extra_validators=[require_projec
 
 ### JSON Schema
 
-Pass a JSON Schema (draft 2020-12) as `schema`; it is checked against a dict
-view of the sheet (`sheet_to_dict()` - `header`, `reads`, `settings`,
-`samples`). A schema may `$ref` an external document, including a samshee
-`urn:samshee:illuminav2/v1` reference, so an existing schema carries over.
+Pass a JSON Schema (draft 2020-12) as `schema`; it is checked against the
+*sectioned* view of the sheet (`sheet_to_sections()`), which keeps the sheet's
+real section and column names as top-level keys (`Header`, `Reads`,
+`BCLConvert_Settings`, `BCLConvert_Data` as an array of row objects). This
+mirrors how samshee represents a sheet, so a samshee-authored schema applies
+directly.
 
 ```python
 schema = {"type": "object",
-          "properties": {"header": {"type": "object", "required": ["RunName"]}}}
+          "properties": {"Header": {"type": "object", "required": ["RunName"]}}}
 result = SampleSheetValidator().validate(sheet, schema=schema)
 ```
 
-`jsonschema` is a **soft** dependency, kept out of the stdlib-only core. Without
-it the check degrades to a `SCHEMA_SKIPPED` note instead of failing; install it
-with `pip install "samplesheet-parser[schema]"` to enable the check.
+**Bundled schema and `$ref` by URN.** A schema may `$ref` the bundled Illumina
+v2 document by URN, and it resolves offline (no network, no extra files):
+
+- `urn:samplesheet-parser:illuminav2/v1` - this project's URN.
+- `urn:samshee:illuminav2/v1` - a compatibility alias resolving to the same
+  bundled schema, so a schema written for samshee keeps working. The bundled
+  schema is equivalent to samshee's intent, not byte-identical to it.
+
+```python
+# Validate against the bundled Illumina v2 schema, by reference:
+result = SampleSheetValidator().validate(sheet, schema={"$ref": "urn:samshee:illuminav2/v1"})
+```
+
+The same bundled schema runs automatically at `Strictness.STRICT` (as
+`illumina_v2_schema_validator()`), so you only need an explicit `schema=` for
+your own rules.
+
+`jsonschema` is a **soft** dependency (it brings `referencing`, used for the
+registry), kept out of the stdlib-only core. Without it the check degrades to a
+`SCHEMA_SKIPPED` note instead of failing; install it with
+`pip install "samplesheet-parser[schema]"` to enable the check. An unresolvable
+`$ref` is reported as a `SCHEMA_REF_UNRESOLVED` error rather than raising.
 
 ## Index distance checking
 

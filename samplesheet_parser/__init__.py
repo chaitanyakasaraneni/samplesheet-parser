@@ -51,6 +51,13 @@ from samplesheet_parser.parsers.element import ElementRunManifest
 from samplesheet_parser.parsers.v1 import SampleSheetV1
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 from samplesheet_parser.protocol import SampleSheetParser
+from samplesheet_parser.schema import (
+    ILLUMINA_V2_SCHEMA,
+    ILLUMINA_V2_URN,
+    SAMSHEE_V2_URN,
+    build_registry,
+    sheet_to_sections,
+)
 from samplesheet_parser.splitter import SampleSheetSplitter, SplitResult
 from samplesheet_parser.validators import (
     SampleSheetValidator,
@@ -61,6 +68,7 @@ from samplesheet_parser.validators import (
     ValidatorError,
     hamming_distance,
     illumina_v2_conformance,
+    illumina_v2_schema_validator,
     index_collision_distance,
     json_schema_validator,
     sheet_to_dict,
@@ -84,8 +92,14 @@ __all__ = [
     "Validator",
     "ValidatorError",
     "illumina_v2_conformance",
+    "illumina_v2_schema_validator",
     "json_schema_validator",
     "sheet_to_dict",
+    "sheet_to_sections",
+    "build_registry",
+    "ILLUMINA_V2_SCHEMA",
+    "ILLUMINA_V2_URN",
+    "SAMSHEE_V2_URN",
     "hamming_distance",
     "index_collision_distance",
     "Chemistry",

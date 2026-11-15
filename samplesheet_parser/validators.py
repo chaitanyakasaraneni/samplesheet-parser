@@ -33,6 +33,7 @@ from samplesheet_parser.chemistry import (
     chemistry_for_instrument,
 )
 from samplesheet_parser.protocol import SampleSheetParser
+from samplesheet_parser.schema import ILLUMINA_V2_SCHEMA, build_registry, sheet_to_sections
 
 logger = logging.getLogger(__name__)
 
@@ -321,12 +322,13 @@ def _run_validator(
 
 
 def sheet_to_dict(sheet: SampleSheetParser) -> dict[str, Any]:
-    """Return a minimal JSON-friendly view of a parsed sheet.
+    """Return a minimal, flat JSON-friendly view of a parsed sheet.
 
-    This is the document a JSON Schema is checked against (see
-    :func:`json_schema_validator`). It is intentionally small - header, reads,
-    settings, and the per-sample records - and is the natural seed for a fuller
-    ``to_json()`` on the parsers.
+    A convenience view with lowercase keys - ``header``, ``reads``,
+    ``settings``, ``samples`` - and the natural seed for a fuller ``to_json()``
+    on the parsers. Note JSON Schema validation uses the *sectioned* view
+    (:func:`~samplesheet_parser.schema.sheet_to_sections`) instead, which keeps
+    the sheet's real section and column names; see :func:`json_schema_validator`.
     """
     return {
         "header": dict(getattr(sheet, "header", None) or {}),
@@ -436,46 +438,121 @@ def illumina_v2_conformance(sheet: SampleSheetParser) -> list[ValidationIssue]:
     return issues
 
 
-def json_schema_validator(schema: Mapping[str, Any]) -> Validator:
-    """Build a validator that checks :func:`sheet_to_dict` against ``schema``.
+def _validate_against_schema(
+    schema: Mapping[str, Any],
+    sheet: SampleSheetParser,
+    *,
+    error_code: str,
+) -> list[ValidationIssue]:
+    """Validate the sectioned view of ``sheet`` against a JSON Schema.
 
-    Accepts any JSON Schema (draft 2020-12), including a schema that ``$ref``\\ s
-    an external document such as a samshee ``urn:samshee:illuminav2/v1``
-    reference, so an existing schema can be carried over.
+    Resolves ``$ref`` against the bundled registry (so a reference to
+    :data:`~samplesheet_parser.schema.ILLUMINA_V2_URN` or
+    :data:`~samplesheet_parser.schema.SAMSHEE_V2_URN` works offline), and
+    degrades to a ``SCHEMA_SKIPPED`` note when ``jsonschema`` is absent.
+    """
+    try:
+        import jsonschema
+    except ImportError:
+        return [
+            ValidationIssue(
+                "note",
+                "SCHEMA_SKIPPED",
+                "jsonschema is not installed; the JSON Schema check was skipped. "
+                "Install `jsonschema` (or the `samplesheet-parser[schema]` extra) "
+                "to enable schema validation.",
+            )
+        ]
+
+    # Validate the schema itself first: the validator constructor does not
+    # reliably reject a malformed schema, so without this check a bad schema
+    # would instead surface later as a reference error with the wrong code.
+    try:
+        jsonschema.Draft202012Validator.check_schema(dict(schema))
+    except jsonschema.exceptions.SchemaError as exc:
+        return [ValidationIssue("error", "SCHEMA_INVALID", f"Invalid JSON Schema: {exc}")]
+
+    document = sheet_to_sections(sheet)
+    registry = build_registry()
+    if registry is not None:
+        validator = jsonschema.Draft202012Validator(dict(schema), registry=registry)
+    else:
+        validator = jsonschema.Draft202012Validator(dict(schema))
+
+    try:
+        errors = list(validator.iter_errors(document))
+    except Exception as exc:  # unresolvable $ref
+        return [
+            ValidationIssue(
+                "error",
+                "SCHEMA_REF_UNRESOLVED",
+                f"Could not resolve a schema reference: {exc}",
+            )
+        ]
+
+    issues: list[ValidationIssue] = []
+    for error in sorted(errors, key=lambda e: list(e.absolute_path)):
+        issues.append(
+            ValidationIssue(
+                "error",
+                error_code,
+                str(error.message),
+                {"path": "/".join(str(p) for p in error.absolute_path)},
+            )
+        )
+    return issues
+
+
+def json_schema_validator(schema: Mapping[str, Any]) -> Validator:
+    """Build a validator that checks the sheet against a JSON Schema.
+
+    The schema is checked against :func:`~samplesheet_parser.schema.sheet_to_sections`
+    (section names as top-level keys, Data sections as arrays of row objects),
+    which mirrors how samshee represents a sheet, so a samshee-authored schema
+    applies directly. A schema may ``$ref`` the bundled Illumina v2 document by
+    URN - ``urn:samplesheet-parser:illuminav2/v1`` or the samshee compatibility
+    alias ``urn:samshee:illuminav2/v1`` - and it resolves offline via the
+    bundled registry.
 
     ``jsonschema`` is a **soft** dependency: when it is not installed the check
-    degrades to a ``SCHEMA_SKIPPED`` note instead of failing, keeping the
-    core dependency-free. Install it with ``pip install jsonschema`` (or the
+    degrades to a ``SCHEMA_SKIPPED`` note instead of failing, keeping the core
+    dependency-free. Install it with ``pip install jsonschema`` (or the
     ``samplesheet-parser[schema]`` extra) to enable the check.
     """
 
     def _validate(sheet: SampleSheetParser) -> list[ValidationIssue]:
-        try:
-            import jsonschema
-        except ImportError:
+        return _validate_against_schema(schema, sheet, error_code="SCHEMA_VIOLATION")
+
+    return _validate
+
+
+def illumina_v2_schema_validator() -> Validator:
+    """Build a validator that checks a sheet against the bundled Illumina v2 schema.
+
+    This is the schema-based counterpart to the procedural
+    :func:`illumina_v2_conformance`: it enforces the structural v2 spec
+    (required sections and fields, value types, index character set) from
+    :data:`~samplesheet_parser.schema.ILLUMINA_V2_SCHEMA`, while conformance adds
+    the cross-field checks a JSON Schema cannot express (e.g. index length vs
+    declared cycles). Both run at :attr:`Strictness.STRICT`.
+
+    Skips non-v2 sheets (no ``FileFormatVersion`` in ``[Header]``) with a
+    ``SPEC_NOT_APPLICABLE`` note, so V1 / AVITI sheets are not failed.
+    """
+
+    def _validate(sheet: SampleSheetParser) -> list[ValidationIssue]:
+        header = getattr(sheet, "header", None) or {}
+        if "FileFormatVersion" not in header:
             return [
                 ValidationIssue(
                     "note",
-                    "SCHEMA_SKIPPED",
-                    "jsonschema is not installed; the JSON Schema check was skipped. "
-                    "Install `jsonschema` (or the `samplesheet-parser[schema]` extra) "
-                    "to enable schema validation.",
+                    "SPEC_NOT_APPLICABLE",
+                    "Illumina v2 schema check skipped " "(no FileFormatVersion in [Header]).",
                 )
             ]
-
-        document = sheet_to_dict(sheet)
-        validator = jsonschema.Draft202012Validator(dict(schema))
-        issues: list[ValidationIssue] = []
-        for error in sorted(validator.iter_errors(document), key=lambda e: list(e.absolute_path)):
-            issues.append(
-                ValidationIssue(
-                    "error",
-                    "SCHEMA_VIOLATION",
-                    str(error.message),
-                    {"path": "/".join(str(p) for p in error.absolute_path)},
-                )
-            )
-        return issues
+        return _validate_against_schema(
+            ILLUMINA_V2_SCHEMA, sheet, error_code="SPEC_SCHEMA_VIOLATION"
+        )
 
     return _validate
 
@@ -614,29 +691,33 @@ class SampleSheetValidator:
         samples = sheet.samples()
 
         self._check_empty(samples, result)
-        if not samples:
-            return result  # no point continuing
 
-        self._check_index_sequences(samples, result)
-        self._check_duplicate_indices(samples, result)
-        self._check_index_distances(samples, result, min_distance=resolved_min_distance)
-        self._check_duplicate_sample_ids(samples, result)
-        self._check_adapters(sheet, result)
-        if resolved_check_cb:
-            self._check_color_balance(
-                sheet,
-                samples,
-                result,
-                instrument=instrument,
-                mode=resolved_cb_mode,
-                min_signal_fraction=min_signal_fraction,
-            )
+        # Sample-dependent core checks only run when there are samples; the
+        # pluggable and schema validators below still run on an empty sheet, so
+        # a strict schema (e.g. BCLConvert_Data minItems) or a user-supplied
+        # validator is not silently skipped.
+        if samples:
+            self._check_index_sequences(samples, result)
+            self._check_duplicate_indices(samples, result)
+            self._check_index_distances(samples, result, min_distance=resolved_min_distance)
+            self._check_duplicate_sample_ids(samples, result)
+            self._check_adapters(sheet, result)
+            if resolved_check_cb:
+                self._check_color_balance(
+                    sheet,
+                    samples,
+                    result,
+                    instrument=instrument,
+                    mode=resolved_cb_mode,
+                    min_signal_fraction=min_signal_fraction,
+                )
 
         # Pluggable validators: strict spec conformance (at STRICT), then any
         # user-supplied validators, then an optional JSON Schema.
         chain: list[Validator] = []
         if level is Strictness.STRICT:
             chain.append(illumina_v2_conformance)
+            chain.append(illumina_v2_schema_validator())
         chain.extend(extra_validators)
         if schema is not None:
             chain.append(json_schema_validator(schema))

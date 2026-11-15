@@ -2,13 +2,17 @@
 validators, strict Illumina v2 conformance, and optional JSON Schema."""
 
 from samplesheet_parser import (
+    ILLUMINA_V2_URN,
+    SAMSHEE_V2_URN,
     SampleSheetValidator,
     Strictness,
     ValidationIssue,
     ValidatorError,
     illumina_v2_conformance,
+    illumina_v2_schema_validator,
     json_schema_validator,
     sheet_to_dict,
+    sheet_to_sections,
 )
 from samplesheet_parser.parsers.v2 import SampleSheetV2
 
@@ -186,11 +190,12 @@ class TestJsonSchema:
         assert len(doc["samples"]) == 2
 
     def test_schema_required_field(self, tmp_path):
-        # Schema requires header.RunName; the nonconformant sheet lacks it.
+        # Schema validates the sectioned view (Header section); the nonconformant
+        # sheet has no RunName.
         sheet = _parse_v2(tmp_path / "s.csv", _NONCONFORMANT_V2)
         schema = {
             "type": "object",
-            "properties": {"header": {"type": "object", "required": ["RunName"]}},
+            "properties": {"Header": {"type": "object", "required": ["RunName"]}},
         }
         result = SampleSheetValidator().validate(sheet, schema=schema)
         if HAS_JSONSCHEMA:
@@ -205,7 +210,7 @@ class TestJsonSchema:
         sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
         schema = {
             "type": "object",
-            "properties": {"header": {"type": "object", "required": ["RunName"]}},
+            "properties": {"Header": {"type": "object", "required": ["RunName"]}},
         }
         result = SampleSheetValidator().validate(sheet, schema=schema)
         # Conformant sheet satisfies the schema (or the check is skipped).
@@ -299,3 +304,218 @@ class TestPluggableMerge:
         sheet.parse()
         result = SampleSheetValidator().validate(sheet, strictness=Strictness.STRICT)
         assert any(n.code == "SPEC_NOT_APPLICABLE" for n in result.notes)
+
+
+# Parses fine, but violates the v2 schema: FileFormatVersion is 3, and the
+# schema's Header.FileFormatVersion enum requires "2". Index lengths match the
+# declared cycles, so this isolates a schema-only structural failure.
+_SCHEMA_INVALID_V2 = """\
+[Header]
+FileFormatVersion,3
+RunName,SchemaInvalid
+InstrumentPlatform,NovaSeqXSeries
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2
+1,Sample1,ATTACTCGAT,TATAGCCTGT
+1,Sample2,TCCGGAGACC,ATAGAGGCAC
+"""
+
+
+class TestSheetToSections:
+    def test_sections_shape(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        sec = sheet_to_sections(sheet)
+        assert "Header" in sec and "Reads" in sec and "BCLConvert_Data" in sec
+        assert sec["Header"]["RunName"] == "ConformantRun"
+        # Reads values are integers in the sectioned view.
+        assert sec["Reads"]["Read1Cycles"] == 151
+        # Data rows keep their original column names.
+        assert sec["BCLConvert_Data"][0]["Sample_ID"] == "Sample1"
+
+
+class TestIlluminaV2SchemaValidator:
+    def test_conformant_sheet_passes_schema(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        issues = illumina_v2_schema_validator()(sheet)
+        assert not any(i.code == "SPEC_SCHEMA_VIOLATION" for i in issues)
+
+    def test_bad_format_version_fails_schema(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _SCHEMA_INVALID_V2)
+        issues = illumina_v2_schema_validator()(sheet)
+        if HAS_JSONSCHEMA:
+            assert any(i.code == "SPEC_SCHEMA_VIOLATION" for i in issues)
+        else:
+            assert any(i.code == "SCHEMA_SKIPPED" for i in issues)
+
+    def test_skips_non_v2(self, v1_minimal):
+        from samplesheet_parser.parsers.v1 import SampleSheetV1
+
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        issues = illumina_v2_schema_validator()(sheet)
+        assert any(i.code == "SPEC_NOT_APPLICABLE" for i in issues)
+
+    def test_strict_runs_schema_check(self, tmp_path):
+        # STRICT appends the schema validator; a missing Index column fails it.
+        sheet = _parse_v2(tmp_path / "s.csv", _SCHEMA_INVALID_V2)
+        result = SampleSheetValidator().validate(sheet, strictness=Strictness.STRICT)
+        if HAS_JSONSCHEMA:
+            assert not result.is_valid
+            assert any(e.code == "SPEC_SCHEMA_VIOLATION" for e in result.errors)
+
+
+class TestSchemaRegistry:
+    def test_ref_to_project_urn_resolves(self, tmp_path):
+        # A user schema that $refs the bundled URN must resolve offline and pass
+        # a conformant sheet.
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        result = SampleSheetValidator().validate(sheet, schema={"$ref": ILLUMINA_V2_URN})
+        assert result.is_valid
+        assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+
+    def test_ref_to_samshee_urn_alias_resolves(self, tmp_path):
+        # The samshee compatibility alias resolves to the bundled schema, so a
+        # samshee-authored $ref keeps working and flags a bad sheet.
+        sheet = _parse_v2(tmp_path / "s.csv", _SCHEMA_INVALID_V2)
+        result = SampleSheetValidator().validate(sheet, schema={"$ref": SAMSHEE_V2_URN})
+        if HAS_JSONSCHEMA:
+            assert not result.is_valid
+            assert any(e.code == "SCHEMA_VIOLATION" for e in result.errors)
+            assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        else:
+            assert any(n.code == "SCHEMA_SKIPPED" for n in result.notes)
+
+    def test_unresolvable_ref_is_reported_not_raised(self, tmp_path):
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        result = SampleSheetValidator().validate(
+            sheet, schema={"$ref": "urn:nope:does-not-exist/v1"}
+        )
+        if HAS_JSONSCHEMA:
+            assert not result.is_valid
+            assert any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        else:
+            assert any(n.code == "SCHEMA_SKIPPED" for n in result.notes)
+
+
+class _SectionStub:
+    """Stub exposing just the attributes sheet_to_sections reads, for branch
+    coverage of its v2/non-v2 (Data) and Cloud_Data paths."""
+
+    def __init__(self, *, header=None, records=None, cloud_data=None, samples=None):
+        if header is not None:
+            self.header = header
+        if records is not None:
+            self.records = records
+        if cloud_data is not None:
+            self.cloud_data = cloud_data
+        self._samples = samples or []
+
+    def samples(self):
+        return self._samples
+
+
+class TestSheetToSectionsBranches:
+    def test_falls_back_to_data_without_records(self):
+        # No `records` attribute: rows come from samples() under a generic Data key.
+        stub = _SectionStub(samples=[{"sample_id": "A", "index": "ACGT"}])
+        sec = sheet_to_sections(stub)
+        assert sec["Data"] == [{"sample_id": "A", "index": "ACGT"}]
+
+    def test_includes_cloud_data(self):
+        stub = _SectionStub(
+            header={"FileFormatVersion": "2"},
+            records=[{"Sample_ID": "A", "Index": "ACGTACGTAC"}],
+            cloud_data=[{"Sample_ID": "A", "ProjectName": "P"}],
+        )
+        sec = sheet_to_sections(stub)
+        assert "BCLConvert_Data" in sec
+        assert sec["Cloud_Data"] == [{"Sample_ID": "A", "ProjectName": "P"}]
+
+    def test_v1_records_use_generic_data_key(self, v1_minimal):
+        # V1 exposes `records` too, but it is not a v2 BCLConvert_Data section.
+        from samplesheet_parser.parsers.v1 import SampleSheetV1
+
+        sheet = SampleSheetV1(v1_minimal)
+        sheet.parse()
+        sec = sheet_to_sections(sheet)
+        assert "BCLConvert_Data" not in sec
+        assert "Data" in sec
+
+    def test_empty_v2_data_still_projected(self):
+        # An empty [BCLConvert_Data] on a v2 sheet projects an empty array, not a
+        # missing section, so a schema can distinguish empty from absent.
+        stub = _SectionStub(header={"FileFormatVersion": "2"}, records=[])
+        sec = sheet_to_sections(stub)
+        assert sec["BCLConvert_Data"] == []
+
+
+class TestRegistryAndSchemaEdgeCases:
+    def test_build_registry_none_without_referencing(self, monkeypatch):
+        # When `referencing` cannot be imported, build_registry degrades to None.
+        import builtins
+
+        from samplesheet_parser import build_registry
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "referencing":
+                raise ImportError("forced absent for test")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        assert build_registry() is None
+
+    def test_validation_without_registry_uses_plain_validator(self, tmp_path, monkeypatch):
+        # Force build_registry() -> None so the no-registry validator path runs.
+        if not HAS_JSONSCHEMA:
+            return
+        import samplesheet_parser.validators as validators_mod
+
+        monkeypatch.setattr(validators_mod, "build_registry", lambda: None)
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        schema = {
+            "type": "object",
+            "properties": {"Header": {"type": "object", "required": ["RunName"]}},
+        }
+        result = SampleSheetValidator().validate(sheet, schema=schema)
+        # Conformant sheet; the point is the plain-validator branch ran cleanly.
+        assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        assert not any(e.code == "SCHEMA_INVALID" for e in result.errors)
+
+    def test_malformed_schema_reports_schema_invalid(self, tmp_path):
+        # A genuinely malformed schema (`type` must be a string/array) is caught
+        # by check_schema and reported as SCHEMA_INVALID, not SCHEMA_REF_UNRESOLVED.
+        sheet = _parse_v2(tmp_path / "s.csv", _CONFORMANT_V2)
+        result = SampleSheetValidator().validate(sheet, schema={"type": 123})
+        if HAS_JSONSCHEMA:
+            assert any(e.code == "SCHEMA_INVALID" for e in result.errors)
+            assert not any(e.code == "SCHEMA_REF_UNRESOLVED" for e in result.errors)
+        else:
+            assert any(n.code == "SCHEMA_SKIPPED" for n in result.notes)
+
+
+class TestEmptySheetRunsValidators:
+    def test_pluggable_chain_runs_on_empty_sheet(self):
+        # An empty sheet still reports EMPTY_SAMPLES, but the pluggable chain
+        # (here a custom validator) must not be silently skipped.
+        class _EmptySheet:
+            def samples(self):
+                return []
+
+        def marker(_sheet):
+            return [ValidationIssue("warning", "RAN_ANYWAY", "ran on empty sheet")]
+
+        result = SampleSheetValidator().validate(_EmptySheet(), extra_validators=[marker])
+        assert any(e.code == "EMPTY_SAMPLES" for e in result.errors)
+        assert any(w.code == "RAN_ANYWAY" for w in result.warnings)
