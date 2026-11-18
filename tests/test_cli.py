@@ -731,6 +731,37 @@ class TestCLIValidate:
         assert result.exit_code == 2
         assert "could not read JSON schema" in result.output
 
+    def test_schema_with_non_ascii_reads(self, tmp_path: Path) -> None:
+        # A valid UTF-8 schema with non-ASCII content must read regardless of
+        # locale (the file is read with explicit encoding="utf-8").
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("jsonschema not installed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = tmp_path / "schema.json"
+        schema.write_bytes('{"type": "object", "description": "café"}'.encode())
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code != 2
+        assert "could not read JSON schema" not in result.output
+
+    def test_strict_without_jsonschema_shows_skip_note(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Strict mode degrades gracefully: without jsonschema the bundled schema
+        # is skipped with a visible SCHEMA_SKIPPED note, not silently.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "jsonschema":
+                raise ImportError("forced absent for test")
+            return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--strictness", "strict"])
+        assert "SCHEMA_SKIPPED" in result.output
+
     def test_schema_violation_fails(self, tmp_path: Path) -> None:
         if not _HAS_JSONSCHEMA:
             pytest.skip("jsonschema not installed")

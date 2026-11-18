@@ -262,9 +262,11 @@ if _TYPER_AVAILABLE:
                 help=(
                     "Overall strictness. 'standard' is the default behaviour; "
                     "'lenient' loosens the index-distance threshold and skips "
-                    "colour balance; 'strict' tightens them and also enforces "
-                    "Illumina v2 spec conformance plus the bundled JSON Schema. "
-                    "Explicit options below override the level."
+                    "colour balance; 'strict' tightens them and enforces Illumina "
+                    "v2 spec conformance, and also runs the bundled JSON Schema "
+                    "when the [schema] extra is installed (otherwise a "
+                    "SCHEMA_SKIPPED note is emitted). Explicit options below "
+                    "override the level."
                 ),
             ),
         ] = Strictness.STANDARD,
@@ -350,6 +352,10 @@ if _TYPER_AVAILABLE:
             if not schema.exists():
                 typer.echo(f"Error: schema file not found: {schema}", err=True)
                 raise typer.Exit(code=2)
+            # An explicit --schema is a hard requirement: if jsonschema is
+            # missing we fail rather than silently skip the user's own schema.
+            # (Strict mode's *bundled* schema degrades to a note instead, since
+            # its other checks still run; see the --strictness help.)
             try:
                 import jsonschema  # noqa: F401
             except ImportError as exc:
@@ -360,7 +366,7 @@ if _TYPER_AVAILABLE:
                 )
                 raise typer.Exit(code=2) from exc
             try:
-                loaded = json.loads(schema.read_text())
+                loaded = json.loads(schema.read_text(encoding="utf-8"))
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
                 typer.echo(f"Error: could not read JSON schema {schema}: {exc}", err=True)
                 raise typer.Exit(code=2) from exc
