@@ -45,7 +45,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.parsers.element import ElementRunManifest
@@ -81,7 +81,7 @@ class SampleSheetFactory:
     # SampleSheetFactory instance in the process, and registration is not
     # synchronised, so register custom parsers at import or startup rather than
     # concurrently from worker threads. Call clear_registry() to reset it.
-    _registry: list[tuple[Callable[[Path], bool], type[Any], SampleSheetVersion]] = []
+    _registry: ClassVar[list[tuple[Callable[[Path], bool], type[Any], SampleSheetVersion]]] = []
 
     def __init__(self) -> None:
         self.version: SampleSheetVersion | None = None
