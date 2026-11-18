@@ -721,6 +721,16 @@ class TestCLIValidate:
         assert result.exit_code == 2
         assert "must be a JSON object" in result.output
 
+    def test_schema_invalid_utf8_exits_2(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("without jsonschema the import guard fires before the file is read")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = tmp_path / "schema.json"
+        schema.write_bytes(b"\xff\xfe not valid utf-8")
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 2
+        assert "could not read JSON schema" in result.output
+
     def test_schema_violation_fails(self, tmp_path: Path) -> None:
         if not _HAS_JSONSCHEMA:
             pytest.skip("jsonschema not installed")
