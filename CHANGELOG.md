@@ -10,6 +10,49 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 _No unreleased changes._
 
+## [2.6.0] - 2026-11-18
+
+### Added
+
+- **Configurable validation strictness.** `SampleSheetValidator.validate()` now
+  accepts a `strictness` argument (`Strictness.LENIENT`, `.STANDARD`, or
+  `.STRICT`). `STANDARD` is the default and reproduces the previous behavior
+  exactly, so existing callers are unaffected. `LENIENT` relaxes the index and
+  color-balance thresholds; `STRICT` tightens them and additionally runs the
+  bundled Illumina v2 conformance and JSON Schema checks. The three overlapping
+  knobs (`min_hamming_distance`, `check_color_balance`, `color_balance_mode`)
+  default to the preset and can still be overridden per call.
+- **Pluggable validators.** `validate()` accepts an `extra_validators` list of
+  callables, letting callers add project-specific checks to the chain without
+  subclassing. A `ValidatorError` type and the `Validator` protocol are exported
+  for building custom validators.
+- **Bundled Illumina v2 JSON Schema and resolvable registry.** A full Draft
+  2020-12 schema for BCLConvert v2 sheets ships in `samplesheet_parser.schema`
+  (`ILLUMINA_V2_SCHEMA`), together with `build_registry()` and the
+  `ILLUMINA_V2_URN` / `SAMSHEE_V2_URN` identifiers. The registry resolves the
+  `urn:samshee:illuminav2/v1` reference used by samshee, so schemas written for
+  samshee resolve against this package too. The `illumina_v2_conformance`,
+  `illumina_v2_schema_validator`, `json_schema_validator`, `sheet_to_dict`, and
+  `sheet_to_sections` helpers are exported.
+- **CLI `--strictness` and `--schema` on `samplesheet validate`.**
+  `--strictness {lenient,standard,strict}` selects the preset; `--schema PATH`
+  validates the sheet against a caller-supplied JSON Schema. Text output now
+  prints the resolved mode and the effective index-distance and color-balance
+  settings; JSON output reports the strictness level and schema source. Exit
+  codes are unchanged.
+- **Optional `jsonschema` dependency via the `[schema]` extra.** JSON Schema
+  validation requires `jsonschema>=4.18`, installed with
+  `pip install "samplesheet-parser[schema]"`. When it is absent, schema checks
+  degrade gracefully to a `SCHEMA_SKIPPED` note rather than failing, so the core
+  library stays dependency-free.
+
+### Documentation
+
+- Expanded the validation guide and CLI reference to cover strictness levels,
+  JSON Schema validation, the samshee-compatible URN, and the `[schema]` extra.
+- Refreshed the architecture diagram and added dark-mode variants of the README
+  and documentation homepage images.
+
 ## [2.5.2] - 2026-08-26
 
 ### Changed (behavioral)
