@@ -34,6 +34,13 @@ from typer.testing import CliRunner
 
 from samplesheet_parser.cli import app
 
+try:
+    import jsonschema  # noqa: F401
+
+    _HAS_JSONSCHEMA = True
+except ImportError:
+    _HAS_JSONSCHEMA = False
+
 runner = CliRunner()
 
 # ---------------------------------------------------------------------------
@@ -600,6 +607,191 @@ class TestCLIValidate:
         )
         data = json.loads(result.output)
         assert any(n["code"] == "COLOR_BALANCE_SKIPPED" for n in data["notes"])
+
+    # -- strictness dial --------------------------------------------------
+
+    def test_strictness_lenient_valid_sheet_exits_0(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--strictness", "lenient"])
+        assert result.exit_code == 0
+        assert "Mode:" in result.output
+        assert "lenient" in result.output
+
+    def test_text_output_shows_resolved_checks(self, tmp_path: Path) -> None:
+        # strict resolves to min distance 4 + conservative colour balance; these
+        # must be visible in text output so the user can audit what ran.
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--strictness", "strict"])
+        assert "min index distance 4" in result.output
+        assert "conservative" in result.output
+
+    def test_text_output_colour_balance_off_at_standard(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert "min index distance 3" in result.output
+        assert "colour balance off" in result.output
+
+    def test_strictness_in_json(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(
+            app, ["validate", str(p), "--format", "json", "--strictness", "lenient"]
+        )
+        data = json.loads(result.output)
+        assert data["strictness"] == "lenient"
+        # lenient preset loosens the index-distance threshold to 2
+        assert data["min_hamming_distance"] == 2
+
+    def test_strictness_strict_resolves_preset_in_json(self, tmp_path: Path) -> None:
+        # The JSON reports the resolved strict preset regardless of pass/fail.
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(
+            app, ["validate", str(p), "--format", "json", "--strictness", "strict"]
+        )
+        data = json.loads(result.output)
+        assert data["strictness"] == "strict"
+        assert data["min_hamming_distance"] == 4
+        assert data["color_balance_checked"] is True
+        assert data["color_balance_mode"] == "conservative"
+
+    def test_explicit_min_hamming_overrides_strictness(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(
+            app,
+            [
+                "validate",
+                str(p),
+                "--format",
+                "json",
+                "--strictness",
+                "lenient",
+                "--min-hamming",
+                "4",
+            ],
+        )
+        data = json.loads(result.output)
+        assert data["min_hamming_distance"] == 4  # explicit wins over lenient's 2
+
+    def test_invalid_strictness_exits_2(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--strictness", "bogus"])
+        assert result.exit_code == 2
+
+    # -- custom JSON Schema -----------------------------------------------
+
+    def test_schema_missing_file_exits_2(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(tmp_path / "nope.json")])
+        assert result.exit_code == 2
+
+    def test_schema_requires_jsonschema_extra(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Force the jsonschema import to fail even when it is installed (as in
+        # CI), so the missing-extra exit path is always exercised.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "jsonschema":
+                raise ImportError("forced absent for test")
+            return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = _write(tmp_path, "schema.json", '{"type": "object"}')
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 2
+        assert "jsonschema" in result.output
+
+    def test_schema_invalid_json_exits_2(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("without jsonschema the import guard fires before JSON is parsed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = _write(tmp_path, "schema.json", "{not valid json")
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 2
+
+    def test_schema_non_object_exits_2(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("without jsonschema the import guard fires before JSON is parsed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = _write(tmp_path, "schema.json", "[1, 2, 3]")
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 2
+        assert "must be a JSON object" in result.output
+
+    def test_schema_invalid_utf8_exits_2(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("without jsonschema the import guard fires before the file is read")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = tmp_path / "schema.json"
+        schema.write_bytes(b"\xff\xfe not valid utf-8")
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 2
+        assert "could not read JSON schema" in result.output
+
+    def test_schema_with_non_ascii_reads(self, tmp_path: Path) -> None:
+        # A valid UTF-8 schema with non-ASCII content must read regardless of
+        # locale (the file is read with explicit encoding="utf-8").
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("jsonschema not installed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = tmp_path / "schema.json"
+        schema.write_bytes('{"type": "object", "description": "café"}'.encode())
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code != 2
+        assert "could not read JSON schema" not in result.output
+
+    def test_strict_without_jsonschema_shows_skip_note(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Strict mode degrades gracefully: without jsonschema the bundled schema
+        # is skipped with a visible SCHEMA_SKIPPED note, not silently.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name: str, *args: object, **kwargs: object) -> object:
+            if name == "jsonschema":
+                raise ImportError("forced absent for test")
+            return real_import(name, *args, **kwargs)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(builtins, "__import__", fake_import)
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--strictness", "strict"])
+        assert "SCHEMA_SKIPPED" in result.output
+
+    def test_schema_violation_fails(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("jsonschema not installed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = _write(
+            tmp_path,
+            "schema.json",
+            '{"type": "object", "properties": {"Header": '
+            '{"type": "object", "required": ["Nonexistent"]}}}',
+        )
+        result = runner.invoke(app, ["validate", str(p), "--schema", str(schema)])
+        assert result.exit_code == 1
+        assert "SCHEMA_VIOLATION" in result.output
+
+    def test_schema_satisfied_passes(self, tmp_path: Path) -> None:
+        if not _HAS_JSONSCHEMA:
+            pytest.skip("jsonschema not installed")
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        schema = _write(
+            tmp_path,
+            "schema.json",
+            '{"type": "object", "properties": {"Header": '
+            '{"type": "object", "required": ["RunName"]}}}',
+        )
+        result = runner.invoke(
+            app, ["validate", str(p), "--format", "json", "--schema", str(schema)]
+        )
+        data = json.loads(result.output)
+        assert not any(e["code"] == "SCHEMA_VIOLATION" for e in data["errors"])
+        assert data["schema"] == str(schema)
 
 
 # ---------------------------------------------------------------------------

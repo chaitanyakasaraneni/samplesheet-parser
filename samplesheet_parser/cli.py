@@ -70,6 +70,7 @@ except ImportError:  # pragma: no cover
 from samplesheet_parser.chemistry import ColorBalanceMode
 from samplesheet_parser.enums import SampleSheetVersion
 from samplesheet_parser.validators import MIN_HAMMING_DISTANCE as _MIN_HAMMING_DEFAULT
+from samplesheet_parser.validators import Strictness
 
 if _TYPER_AVAILABLE:
     from importlib.metadata import PackageNotFoundError
@@ -254,40 +255,69 @@ if _TYPER_AVAILABLE:
     def validate(
         path: Annotated[Path, typer.Argument(help="Path to SampleSheet.csv.", metavar="FILE")],
         fmt: _FormatOption = "text",
+        strictness: Annotated[
+            Strictness,
+            typer.Option(
+                "--strictness",
+                help=(
+                    "Overall strictness. 'standard' is the default behaviour; "
+                    "'lenient' loosens the index-distance threshold and skips "
+                    "colour balance; 'strict' tightens them and enforces Illumina "
+                    "v2 spec conformance, and also runs the bundled JSON Schema "
+                    "when the [schema] extra is installed (otherwise a "
+                    "SCHEMA_SKIPPED note is emitted). Explicit options below "
+                    "override the level."
+                ),
+            ),
+        ] = Strictness.STANDARD,
+        schema: Annotated[
+            Path | None,
+            typer.Option(
+                "--schema",
+                help=(
+                    "Path to a JSON Schema (draft 2020-12) to check the sheet "
+                    "against, alongside the built-in checks. May $ref the bundled "
+                    "Illumina v2 schema by URN. Requires the [schema] extra."
+                ),
+                metavar="FILE",
+            ),
+        ] = None,
         min_hamming: Annotated[
-            int,
+            int | None,
             typer.Option(
                 "--min-hamming",
                 help=(
-                    f"Minimum Hamming distance between indexes "
-                    f"(default: {_MIN_HAMMING_DEFAULT}, must be >= 1)."
+                    "Minimum Hamming distance between indexes (must be >= 1). "
+                    f"Defaults to the --strictness level ({_MIN_HAMMING_DEFAULT} "
+                    "at standard)."
                 ),
                 metavar="N",
             ),
-        ] = _MIN_HAMMING_DEFAULT,
+        ] = None,
         color_balance: Annotated[
-            bool,
+            bool | None,
             typer.Option(
                 "--color-balance/--no-color-balance",
                 help=(
-                    "Also check per-cycle index colour balance against the "
-                    "instrument's optical chemistry (flags dark/no-signal "
-                    "cycles on 2-/1-channel instruments). Off by default."
+                    "Check per-cycle index colour balance against the "
+                    "instrument's optical chemistry (flags dark/no-signal cycles "
+                    "on 2-/1-channel instruments). Defaults to the --strictness "
+                    "level (off except at strict)."
                 ),
             ),
-        ] = False,
+        ] = None,
         color_balance_mode: Annotated[
-            ColorBalanceMode,
+            ColorBalanceMode | None,
             typer.Option(
                 "--color-balance-mode",
                 help=(
-                    "Strictness of the colour-balance check (only with "
-                    "--color-balance). 'vendor_faithful' encodes each platform's "
-                    "published rule; 'conservative' also fails single-channel and "
-                    "low-diversity cycles the vendor minimum permits."
+                    "Strictness of the colour-balance check. 'vendor_faithful' "
+                    "encodes each platform's published rule; 'conservative' also "
+                    "fails single-channel and low-diversity cycles the vendor "
+                    "minimum permits. Defaults to the --strictness level."
                 ),
             ),
-        ] = ColorBalanceMode.VENDOR_FAITHFUL,
+        ] = None,
         instrument: Annotated[
             str | None,
             typer.Option(
@@ -307,15 +337,47 @@ if _TYPER_AVAILABLE:
         Exits 2 on usage errors or unreadable files.
         """
         from samplesheet_parser.factory import SampleSheetFactory
-        from samplesheet_parser.validators import SampleSheetValidator
+        from samplesheet_parser.validators import _STRICTNESS_PRESETS, SampleSheetValidator
 
         _validate_fmt(fmt)
-        if min_hamming < 1:
+        if min_hamming is not None and min_hamming < 1:
             typer.echo(f"Error: --min-hamming must be >= 1, got {min_hamming}.", err=True)
             raise typer.Exit(code=2)
         if not path.exists():
             typer.echo(f"Error: file not found: {path}", err=True)
             raise typer.Exit(code=2)
+
+        schema_doc: dict[str, object] | None = None
+        if schema is not None:
+            if not schema.exists():
+                typer.echo(f"Error: schema file not found: {schema}", err=True)
+                raise typer.Exit(code=2)
+            # An explicit --schema is a hard requirement: if jsonschema is
+            # missing we fail rather than silently skip the user's own schema.
+            # (Strict mode's *bundled* schema degrades to a note instead, since
+            # its other checks still run; see the --strictness help.)
+            try:
+                import jsonschema  # noqa: F401
+            except ImportError as exc:
+                typer.echo(
+                    "Error: --schema requires jsonschema. Install it with "
+                    "'pip install samplesheet-parser[schema]'.",
+                    err=True,
+                )
+                raise typer.Exit(code=2) from exc
+            try:
+                loaded = json.loads(schema.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                typer.echo(f"Error: could not read JSON schema {schema}: {exc}", err=True)
+                raise typer.Exit(code=2) from exc
+            if not isinstance(loaded, dict):
+                typer.echo(
+                    f"Error: schema {schema} must be a JSON object, "
+                    f"got {type(loaded).__name__}.",
+                    err=True,
+                )
+                raise typer.Exit(code=2)
+            schema_doc = loaded
 
         try:
             factory = SampleSheetFactory()
@@ -330,10 +392,21 @@ if _TYPER_AVAILABLE:
 
         result = SampleSheetValidator().validate(
             sheet,
+            strictness=strictness,
+            schema=schema_doc,
             min_hamming_distance=min_hamming,
             check_color_balance=color_balance,
             color_balance_mode=color_balance_mode,
             instrument=instrument,
+        )
+
+        # Resolve the effective settings (the preset the validator applied) for
+        # reporting, so output reflects what actually ran under --strictness.
+        preset = _STRICTNESS_PRESETS[strictness]
+        eff_min_hamming = preset["min_hamming_distance"] if min_hamming is None else min_hamming
+        eff_cb = preset["check_color_balance"] if color_balance is None else color_balance
+        eff_cb_mode = (
+            preset["color_balance_mode"] if color_balance_mode is None else color_balance_mode
         )
 
         if fmt == "json":
@@ -342,9 +415,11 @@ if _TYPER_AVAILABLE:
                     "file": str(path),
                     "version": version.value,
                     "is_valid": result.is_valid,
-                    "min_hamming_distance": min_hamming,
-                    "color_balance_checked": color_balance,
-                    "color_balance_mode": color_balance_mode.value if color_balance else None,
+                    "strictness": strictness.value,
+                    "schema": str(schema) if schema is not None else None,
+                    "min_hamming_distance": eff_min_hamming,
+                    "color_balance_checked": eff_cb,
+                    "color_balance_mode": eff_cb_mode.value if eff_cb else None,
                     "errors": [
                         {"code": e.code, "message": e.message, "context": e.context}
                         for e in result.errors
@@ -361,8 +436,13 @@ if _TYPER_AVAILABLE:
                 }
             )
         else:
+            cb_desc = eff_cb_mode.value if eff_cb else "off"
             typer.echo(f"File:    {path}")
             typer.echo(f"Format:  {version.value}")
+            typer.echo(f"Mode:    {strictness.value}")
+            typer.echo(f"Checks:  min index distance {eff_min_hamming}, colour balance {cb_desc}")
+            if schema is not None:
+                typer.echo(f"Schema:  {schema}")
             typer.echo(f"Result:  {result.summary()}")
 
             if result.notes:
