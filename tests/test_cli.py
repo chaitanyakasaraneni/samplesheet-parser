@@ -617,6 +617,20 @@ class TestCLIValidate:
         assert "Mode:" in result.output
         assert "lenient" in result.output
 
+    def test_text_output_shows_resolved_checks(self, tmp_path: Path) -> None:
+        # strict resolves to min distance 4 + conservative colour balance; these
+        # must be visible in text output so the user can audit what ran.
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p), "--strictness", "strict"])
+        assert "min index distance 4" in result.output
+        assert "conservative" in result.output
+
+    def test_text_output_colour_balance_off_at_standard(self, tmp_path: Path) -> None:
+        p = _write(tmp_path, "sheet.csv", _V2_C)
+        result = runner.invoke(app, ["validate", str(p)])
+        assert "min index distance 3" in result.output
+        assert "colour balance off" in result.output
+
     def test_strictness_in_json(self, tmp_path: Path) -> None:
         p = _write(tmp_path, "sheet.csv", _V2_C)
         result = runner.invoke(

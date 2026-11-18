@@ -430,9 +430,11 @@ if _TYPER_AVAILABLE:
                 }
             )
         else:
+            cb_desc = eff_cb_mode.value if eff_cb else "off"
             typer.echo(f"File:    {path}")
             typer.echo(f"Format:  {version.value}")
             typer.echo(f"Mode:    {strictness.value}")
+            typer.echo(f"Checks:  min index distance {eff_min_hamming}, colour balance {cb_desc}")
             if schema is not None:
                 typer.echo(f"Schema:  {schema}")
             typer.echo(f"Result:  {result.summary()}")
