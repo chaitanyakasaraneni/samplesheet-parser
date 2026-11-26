@@ -19,6 +19,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `[Header]`, `[Reads]`, `[Settings]` and custom key-value sections before
   parsing; interior fields and data sections are untouched. Reported against
   nf-core/demultiplex by @apeltzer.
+- **Comma-padded data headers no longer yield phantom empty columns.** A
+  uniformly padded `[Data]` / `[BCLConvert_Data]` / `[Cloud_Data]` / `[SAMPLES]`
+  section (header and rows padded to the same width) left empty column names in
+  the parsed output: V1 and Element records carried an empty-string key, V2
+  reported `""` as a `custom_fields["data"]` entry, and all parsers listed `""`
+  in `columns`. Empty column names are now dropped from the reported columns and
+  records across the V1, V2 and Element parsers, while row/column alignment is
+  preserved (no rows are dropped). A JSON schema with `additionalProperties:
+  false` no longer fails on the phantom column.
+
+### Changed
+
+- **Dropped data rows are now reported loudly.** When a `[Data]` /
+  `[BCLConvert_Data]` row has the wrong column count (a stray or missing comma,
+  or an unsupported quoted-comma field), it was skipped with a single easy-to-miss
+  `warning`. Each dropped row now logs a `warning` naming the sample and stating
+  it will be MISSING from the output, and the parser emits an `error`-level
+  summary (`N row(s) dropped ...`) so a lost sample cannot pass unnoticed.
+  `[Cloud_Data]` gets the same per-row and summary warnings.
 
 ## [2.6.0] - 2026-11-18
 

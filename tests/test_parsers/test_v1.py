@@ -55,6 +55,10 @@ class TestSampleSheetV1Parsing:
         assert sheet.experiment_name == "My Run"
         assert sheet.read_lengths == [36]
         assert sheet.adapters == ["CTGTCTCTTATACACATCT"]
+        # Trailing empty columns from the padded [Data] header must not leak
+        # into the reported columns or as empty-string keys in the records.
+        assert sheet.columns == ["Sample_ID", "Sample_Name", "index"]
+        assert sheet.records == [{"Sample_ID": "S1", "Sample_Name": "S1", "index": "ACGTACGTAC"}]
 
     def test_parse_adapters_iem_two_key(self, v1_minimal):
         """IEM spec format: Adapter (Read1) + AdapterRead2 parsed as separate keys."""
@@ -157,7 +161,9 @@ class TestSampleSheetV1Parsing:
         sheet.parse()
         assert len(sheet.records) == 2
 
-    def test_parse_data_skips_malformed_lines(self, tmp_path):
+    def test_parse_data_skips_malformed_lines(self, tmp_path, caplog):
+        import logging
+
         p = tmp_path / "bad_data.csv"
         p.write_text(
             "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
@@ -166,8 +172,17 @@ class TestSampleSheetV1Parsing:
             "1,S2\n"
         )
         sheet = SampleSheetV1(str(p))
-        sheet.parse()
+        with caplog.at_level(logging.WARNING):
+            sheet.parse()
         assert len(sheet.records) == 1
+        # A dropped sample must be loud: a per-row WARNING plus an ERROR summary.
+        assert any(
+            r.levelno == logging.WARNING and "MISSING" in r.getMessage() for r in caplog.records
+        )
+        summary = [
+            r for r in caplog.records if r.levelno == logging.ERROR and "dropped" in r.getMessage()
+        ]
+        assert summary and "1 [Data] row(s)" in summary[0].getMessage()
 
     def test_parse_no_reads_section(self, v1_no_reads):
         # Should not raise - [Reads] is optional

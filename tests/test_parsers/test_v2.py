@@ -43,6 +43,11 @@ class TestSampleSheetV2Parsing:
         sheet.parse()
         assert sheet.reads["Read1Cycles"] == 151
         assert sheet.reads["Index1Cycles"] == 10
+        # Trailing empty columns from the padded [BCLConvert_Data] header must
+        # not leak into reported columns, records, or the custom-fields set.
+        assert sheet.columns == ["Sample_ID", "Index"]
+        assert sheet.records == [{"Sample_ID": "S1", "Index": "ATTACTCG"}]
+        assert "" not in sheet.custom_fields["data"]
 
     def test_parse_settings(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
@@ -297,6 +302,19 @@ class TestSampleSheetV2CloudData:
         assert len(sheet.cloud_data) == 1
         assert sheet.cloud_data[0]["Sample_ID"] == "S1"
 
+    def test_parse_cloud_data_comma_padded(self, tmp_path):
+        """Trailing empty columns from a padded [Cloud_Data] header must not
+        appear as empty-string keys in the cloud records."""
+        p = tmp_path / "cloud_padded.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n\n"
+            "[Cloud_Data],,\nSample_ID,ProjectName,,\nS1,Project1,,\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert sheet.cloud_data == [{"Sample_ID": "S1", "ProjectName": "Project1"}]
+
 
 class TestSampleSheetV2Equality:
     def test_equal_sheets(self, v2_minimal, tmp_path):
@@ -408,8 +426,10 @@ class TestSampleSheetV2EdgeCases:
         with pytest.raises(ValueError, match=r"BCLConvert_Data"):
             sheet.parse()
 
-    def test_malformed_data_line_is_skipped(self, tmp_path):
-        """Lines 551-552: BCLConvert_Data line with wrong column count is skipped."""
+    def test_malformed_data_line_is_skipped(self, tmp_path, caplog):
+        """A BCLConvert_Data line with the wrong column count is dropped, loudly."""
+        import logging
+
         p = tmp_path / "v2.csv"
         p.write_text(
             "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
@@ -418,9 +438,18 @@ class TestSampleSheetV2EdgeCases:
             "S2,TCCGGAGA,EXTRA_COL\n"  # wrong column count
         )
         sheet = SampleSheetV2(str(p))
-        sheet.parse()
+        with caplog.at_level(logging.WARNING):
+            sheet.parse()
         assert len(sheet.records) == 1
         assert sheet.records[0]["Sample_ID"] == "S1"
+        # Dropping a sample must surface a per-row WARNING and an ERROR summary.
+        assert any(
+            r.levelno == logging.WARNING and "MISSING" in r.getMessage() for r in caplog.records
+        )
+        assert any(
+            r.levelno == logging.ERROR and "1 [BCLConvert_Data] row(s)" in r.getMessage()
+            for r in caplog.records
+        )
 
     def test_override_cycles_with_n_code(self, tmp_path):
         """Lines 724-725: 'N' (masked) code in OverrideCycles parsed correctly."""
