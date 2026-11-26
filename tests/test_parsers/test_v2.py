@@ -31,6 +31,19 @@ class TestSampleSheetV2Parsing:
         assert "Read1Cycles" not in sheet.reads
         assert sheet.reads["Index1Cycles"] == 10
 
+    def test_parse_reads_comma_padded(self, tmp_path):
+        """Spreadsheet exports pad rows with trailing commas; cycles must still parse."""
+        p = tmp_path / "padded_reads.csv"
+        p.write_text(
+            "[Header],,,\nFileFormatVersion,2,,,\nRunName,Test,,,\n\n"
+            "[Reads],,,\nRead1Cycles,151,,,\nIndex1Cycles,10,,,\n\n"
+            "[BCLConvert_Data],,,\nSample_ID,Index,,\nS1,ATTACTCG,,\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert sheet.reads["Read1Cycles"] == 151
+        assert sheet.reads["Index1Cycles"] == 10
+
     def test_parse_settings(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
         sheet.parse()

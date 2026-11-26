@@ -39,6 +39,23 @@ class TestSampleSheetV1Parsing:
         sheet.parse()
         assert sheet.read_lengths == [151]
 
+    def test_parse_comma_padded_sheet(self, tmp_path):
+        """Excel-exported sheets pad every row with trailing commas; header and
+        adapter values must not keep that padding."""
+        p = tmp_path / "padded_v1.csv"
+        p.write_text(
+            "[Header],,,\nIEMFileVersion,4,,,\nExperiment Name,My Run,,,\n\n"
+            "[Reads],,,\n36,,,\n\n"
+            "[Settings],,,\nAdapter,CTGTCTCTTATACACATCT,,,\n\n"
+            "[Data],,,\nSample_ID,Sample_Name,index,,\nS1,S1,ACGTACGTAC,,\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        assert sheet.iem_version == "4"
+        assert sheet.experiment_name == "My Run"
+        assert sheet.read_lengths == [36]
+        assert sheet.adapters == ["CTGTCTCTTATACACATCT"]
+
     def test_parse_adapters_iem_two_key(self, v1_minimal):
         """IEM spec format: Adapter (Read1) + AdapterRead2 parsed as separate keys."""
         sheet = SampleSheetV1(v1_minimal)

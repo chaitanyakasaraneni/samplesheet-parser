@@ -8,7 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-_No unreleased changes._
+### Fixed
+
+- **Comma-padded sheets no longer break parsing.** Spreadsheet exports (Excel,
+  Numbers, Google Sheets) pad every row to the width of the widest row, so a
+  `Read1Cycles,28` pair is written as `Read1Cycles,28,,,`. The key-value section
+  parsers folded that trailing padding into the value, so `Read1Cycles` failed to
+  parse (surfacing as `SPEC_MISSING_READ1` at `strict`) and V1 adapters were read
+  as `CTGTCTCTTATACACATCT,,,,`. Trailing empty fields are now stripped from
+  `[Header]`, `[Reads]`, `[Settings]` and custom key-value sections before
+  parsing; interior fields and data sections are untouched. Reported against
+  nf-core/demultiplex by @apeltzer.
 
 ## [2.6.0] - 2026-11-18
 

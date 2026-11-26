@@ -51,6 +51,8 @@ from collections import namedtuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from samplesheet_parser.parsers._common import strip_trailing_empty_fields
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -547,6 +549,7 @@ class SampleSheetV2:
         """Parse the ``[Reads]`` section (key,value pairs in V2 format)."""
         reads: dict[str, int] = {}
         for line in self.raw.reads:
+            line = strip_trailing_empty_fields(line)
             parts = line.split(",", 1)
             if len(parts) == 2:
                 key = parts[0].strip()

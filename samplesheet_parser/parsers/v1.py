@@ -47,6 +47,8 @@ import re
 from collections import namedtuple
 from pathlib import Path
 
+from samplesheet_parser.parsers._common import strip_trailing_empty_fields
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -329,6 +331,7 @@ class SampleSheetV1:
 
         result: dict[str, str] = {}
         for line in self._section_dict[key]:
+            line = strip_trailing_empty_fields(line)
             parts = line.split(",", 1)
             if len(parts) < 2 or not parts[0].strip():
                 logger.warning(f"Skipping malformed line in [{section_name}]: {line!r}")
@@ -521,6 +524,7 @@ class SampleSheetV1:
         """Parse the ``[Header]`` section into ``self.header``."""
         header: dict[str, str] = {}
         for line in self.raw.header:
+            line = strip_trailing_empty_fields(line)
             parts = line.split(",", 1)
             if len(parts) == 2:
                 key, value = parts[0].strip(), parts[1].strip()
@@ -566,6 +570,7 @@ class SampleSheetV1:
         """
         settings: dict[str, str] = {}
         for line in self.raw.settings:
+            line = strip_trailing_empty_fields(line)
             parts = line.split(",", 1)
             if len(parts) == 2:
                 settings[parts[0].strip()] = parts[1].strip()
