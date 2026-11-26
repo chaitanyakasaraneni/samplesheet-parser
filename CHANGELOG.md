@@ -28,8 +28,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   records across the V1, V2 and Element parsers, while row/column alignment is
   preserved (no rows are dropped). A JSON schema with `additionalProperties:
   false` no longer fails on the phantom column.
+- **Splitter no longer silently overwrites colliding output files.**
+  `SampleSheetSplitter` named each output file after the group key with
+  filesystem-unsafe characters replaced by `_`, so two distinct groups whose
+  names differ only in those characters (e.g. `Proj/A` and `Proj A`, both
+  `Proj_A`) wrote to the same path and one silently overwrote the other, losing
+  samples while the result still reported both as written. Colliding filenames
+  are now disambiguated with a numeric suffix (`Proj_A_2`), and a warning records
+  the rename.
 
 ### Changed
+
+- **The filter now warns on records it drops.** `SampleSheetFilter` silently
+  skipped a record that matched the filter criteria but was missing `Sample_ID`
+  or `Index`; it now logs a warning naming the missing field(s), matching
+  `SampleSheetSplitter`.
 
 - **Dropped data rows are now reported loudly.** When a `[Data]` /
   `[BCLConvert_Data]` row has the wrong column count (a stray or missing comma,

@@ -212,6 +212,17 @@ class SampleSheetFilter:
 
             idx = record.get("index") or record.get("Index") or ""
             if not rec_sid or not idx:
+                missing = []
+                if not rec_sid:
+                    missing.append("Sample_ID")
+                if not idx:
+                    missing.append("Index")
+                logger.warning(
+                    "Skipping a record that matched the filter but is missing "
+                    "required field(s) %s; it will NOT appear in the output: %r",
+                    missing,
+                    dict(record),
+                )
                 continue
 
             writer.add_sample(
