@@ -426,8 +426,10 @@ class TestSampleSheetV2EdgeCases:
         with pytest.raises(ValueError, match=r"BCLConvert_Data"):
             sheet.parse()
 
-    def test_malformed_data_line_is_skipped(self, tmp_path):
-        """Lines 551-552: BCLConvert_Data line with wrong column count is skipped."""
+    def test_malformed_data_line_is_skipped(self, tmp_path, caplog):
+        """A BCLConvert_Data line with the wrong column count is dropped, loudly."""
+        import logging
+
         p = tmp_path / "v2.csv"
         p.write_text(
             "[Header]\nFileFormatVersion,2\nRunName,T\n\n"
@@ -436,9 +438,18 @@ class TestSampleSheetV2EdgeCases:
             "S2,TCCGGAGA,EXTRA_COL\n"  # wrong column count
         )
         sheet = SampleSheetV2(str(p))
-        sheet.parse()
+        with caplog.at_level(logging.WARNING):
+            sheet.parse()
         assert len(sheet.records) == 1
         assert sheet.records[0]["Sample_ID"] == "S1"
+        # Dropping a sample must surface a per-row WARNING and an ERROR summary.
+        assert any(
+            r.levelno == logging.WARNING and "MISSING" in r.getMessage() for r in caplog.records
+        )
+        assert any(
+            r.levelno == logging.ERROR and "1 [BCLConvert_Data] row(s)" in r.getMessage()
+            for r in caplog.records
+        )
 
     def test_override_cycles_with_n_code(self, tmp_path):
         """Lines 724-725: 'N' (masked) code in OverrideCycles parsed correctly."""

@@ -599,13 +599,29 @@ class SampleSheetV2:
             raise ValueError(f"Missing required [BCLConvert_Data] columns: {missing}")
 
         records: list[dict[str, str]] = []
+        dropped = 0
         for line in lines[1:]:
             values = line.split(",")
             if len(values) != len(columns):
-                logger.warning(f"Skipping malformed BCLConvert_Data line: {line!r}")
+                dropped += 1
+                logger.warning(
+                    "Dropping malformed [BCLConvert_Data] row (%d fields, header has "
+                    "%d); this sample will be MISSING from the output: %r",
+                    len(values),
+                    len(columns),
+                    line,
+                )
                 continue
             record = {k: v.strip() for k, v in zip(columns, values, strict=False) if k}
             records.append(record)
+
+        if dropped:
+            logger.error(
+                "%d [BCLConvert_Data] row(s) dropped due to a column-count mismatch; "
+                "that many sample(s) will be MISSING from demultiplexing. Check the "
+                "sheet for stray or missing commas.",
+                dropped,
+            )
 
         # Drop empty column names produced by comma-padded (Excel-export) headers;
         # the full ``columns`` list above keeps row/column alignment for the zip.
@@ -621,12 +637,27 @@ class SampleSheetV2:
         headers = [c.strip() for c in self.raw.cloud_data[0].split(",")]
         records: list[dict[str, str]] = []
 
+        dropped = 0
         for line in self.raw.cloud_data[1:]:
             values = line.split(",")
             if len(values) != len(headers):
-                logger.warning(f"Skipping malformed Cloud_Data line: {line!r}")
+                dropped += 1
+                logger.warning(
+                    "Dropping malformed [Cloud_Data] row (%d fields, header has %d); "
+                    "this row will be MISSING from the cloud metadata: %r",
+                    len(values),
+                    len(headers),
+                    line,
+                )
                 continue
             records.append({h: v.strip() for h, v in zip(headers, values, strict=False) if h})
+
+        if dropped:
+            logger.warning(
+                "%d [Cloud_Data] row(s) dropped due to a column-count mismatch; that "
+                "cloud metadata will be missing. Check the sheet for stray commas.",
+                dropped,
+            )
 
         self.cloud_data = records
 

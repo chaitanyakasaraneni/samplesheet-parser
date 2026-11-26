@@ -606,13 +606,29 @@ class SampleSheetV1:
         columns = [c.strip() for c in lines[0].split(",")]
         records: list[dict[str, str]] = []
 
+        dropped = 0
         for line in lines[1:]:
             values = line.split(",")
             if len(values) != len(columns):
-                logger.warning(f"Skipping malformed Data line: {line!r}")
+                dropped += 1
+                logger.warning(
+                    "Dropping malformed [Data] row (%d fields, header has %d); this "
+                    "sample will be MISSING from the output: %r",
+                    len(values),
+                    len(columns),
+                    line,
+                )
                 continue
             record = {k: v.strip() for k, v in zip(columns, values, strict=False) if k}
             records.append(record)
+
+        if dropped:
+            logger.error(
+                "%d [Data] row(s) dropped due to a column-count mismatch; that many "
+                "sample(s) will be MISSING from demultiplexing. Check the sheet for "
+                "stray or missing commas.",
+                dropped,
+            )
 
         # Drop empty column names produced by comma-padded (Excel-export) headers;
         # the full ``columns`` list above keeps row/column alignment for the zip.

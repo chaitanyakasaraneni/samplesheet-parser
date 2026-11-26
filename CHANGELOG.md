@@ -29,6 +29,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   preserved (no rows are dropped). A JSON schema with `additionalProperties:
   false` no longer fails on the phantom column.
 
+### Changed
+
+- **Dropped data rows are now reported loudly.** When a `[Data]` /
+  `[BCLConvert_Data]` row has the wrong column count (a stray or missing comma,
+  or an unsupported quoted-comma field), it was skipped with a single easy-to-miss
+  `warning`. Each dropped row now logs a `warning` naming the sample and stating
+  it will be MISSING from the output, and the parser emits an `error`-level
+  summary (`N row(s) dropped ...`) so a lost sample cannot pass unnoticed.
+  `[Cloud_Data]` gets the same per-row and summary warnings.
+
 ## [2.6.0] - 2026-11-18
 
 ### Added

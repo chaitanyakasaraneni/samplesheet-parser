@@ -161,7 +161,9 @@ class TestSampleSheetV1Parsing:
         sheet.parse()
         assert len(sheet.records) == 2
 
-    def test_parse_data_skips_malformed_lines(self, tmp_path):
+    def test_parse_data_skips_malformed_lines(self, tmp_path, caplog):
+        import logging
+
         p = tmp_path / "bad_data.csv"
         p.write_text(
             "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
@@ -170,8 +172,17 @@ class TestSampleSheetV1Parsing:
             "1,S2\n"
         )
         sheet = SampleSheetV1(str(p))
-        sheet.parse()
+        with caplog.at_level(logging.WARNING):
+            sheet.parse()
         assert len(sheet.records) == 1
+        # A dropped sample must be loud: a per-row WARNING plus an ERROR summary.
+        assert any(
+            r.levelno == logging.WARNING and "MISSING" in r.getMessage() for r in caplog.records
+        )
+        summary = [
+            r for r in caplog.records if r.levelno == logging.ERROR and "dropped" in r.getMessage()
+        ]
+        assert summary and "1 [Data] row(s)" in summary[0].getMessage()
 
     def test_parse_no_reads_section(self, v1_no_reads):
         # Should not raise - [Reads] is optional
