@@ -8,6 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-26
+
 ### Fixed
 
 - **`samples()` no longer silently drops rows.** `SampleSheetV1.samples()` and
