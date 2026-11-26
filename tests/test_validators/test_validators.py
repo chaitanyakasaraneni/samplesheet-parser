@@ -317,37 +317,51 @@ class TestDuplicateIndex:
 
 
 class TestDuplicateSampleId:
-    def test_duplicate_sample_id_error(self, tmp_path):
+    def test_duplicate_sample_id_different_index_warns_but_valid(self, tmp_path):
+        # Same Sample_ID in a lane with DIFFERENT indexes is the valid
+        # one-sample/multi-barcode pattern: a warning, not a validity failure.
         p = tmp_path / "dup_sid.csv"
         p.write_text(
             "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
             "[Data]\nLane,Sample_ID,index\n"
             "1,S1,ATTACTCG\n"
-            "1,S1,TCCGGAGA\n"  # duplicate Sample_ID, same lane
+            "1,S1,TCCGGAGA\n"  # duplicate Sample_ID, same lane, different index
         )
         sheet = SampleSheetV1(str(p))
         sheet.parse()
         result = SampleSheetValidator().validate(sheet)
-        # samples() returns one record per row (no de-duplication), so a
-        # duplicate Sample_ID in the same lane is flagged at validation time.
-        assert any(e.code == "DUPLICATE_SAMPLE_ID" for e in result.errors)
-        assert not result.is_valid
+        assert any(w.code == "DUPLICATE_SAMPLE_ID" for w in result.warnings)
+        assert not any(e.code == "DUPLICATE_SAMPLE_ID" for e in result.errors)
+        assert result.is_valid
 
-    def test_duplicate_sample_id_in_same_lane_raises_error(self):
-        """Line 402: duplicate Sample_ID in same lane produces DUPLICATE_SAMPLE_ID error."""
+    def test_duplicate_sample_id_same_index_is_error_via_duplicate_index(self, tmp_path):
+        # An exact duplicate row (same Sample_ID AND same index) is still a hard
+        # error - caught as DUPLICATE_INDEX, independent of the sample-id warning.
+        p = tmp_path / "dup_row.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,5\nExperiment Name,Test\n\n"
+            "[Data]\nLane,Sample_ID,index\n"
+            "1,S1,ATTACTCG\n"
+            "1,S1,ATTACTCG\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        result = SampleSheetValidator().validate(sheet)
+        assert not result.is_valid
+        assert any(e.code == "DUPLICATE_INDEX" for e in result.errors)
+
+    def test_duplicate_sample_id_in_same_lane_warns(self):
         from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
 
         validator = SampleSheetValidator()
         result = ValidationResult()
-        # Provide samples with duplicate (lane, sample_id) - samples() always deduplicates
-        # so we call the private method directly with crafted input
         samples = [
             {"lane": "1", "sample_id": "S1"},
             {"lane": "1", "sample_id": "S1"},  # duplicate in same lane
         ]
         validator._check_duplicate_sample_ids(samples, result)
-        codes = [e.code for e in result.errors]
-        assert "DUPLICATE_SAMPLE_ID" in codes
+        assert any(w.code == "DUPLICATE_SAMPLE_ID" for w in result.warnings)
+        assert not any(e.code == "DUPLICATE_SAMPLE_ID" for e in result.errors)
 
 
 class TestReadCycles:

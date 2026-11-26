@@ -8,17 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-11-26
+
 ### Fixed
 
-- **`DUPLICATE_SAMPLE_ID` validation now works.** `SampleSheetV1.samples()` and
+- **`samples()` no longer silently drops rows.** `SampleSheetV1.samples()` and
   `SampleSheetV2.samples()` de-duplicated rows by `(Sample_ID, Lane)` before
-  returning them, so the validator never saw a duplicate and the
-  `DUPLICATE_SAMPLE_ID` check could not fire on a real parsed sheet (and the
-  duplicate row's index escaped every index check). Both now return one record
-  per data row, matching the `SampleSheetParser` protocol and the Element
-  parser. Valid sheets (no repeated `(Sample_ID, Lane)`) are unaffected; a sheet
-  with a genuine duplicate - which `bcl-convert` also rejects - now fails
-  validation as it should.
+  returning them, so a repeated pair collapsed to one entry and the dropped
+  row's index escaped every index check (character set, length, collision,
+  colour balance). Both now return one record per data row, matching the
+  `SampleSheetParser` protocol and the Element parser. Valid sheets (no repeated
+  `(Sample_ID, Lane)`) are unaffected; every index is now validated.
 - **Duplicate data-column headers are reported.** A data section with a repeated
   column name (e.g. `Sample_ID,Index,Index`) silently kept only the last
   column's value and discarded the earlier one, so a sample could be
@@ -34,6 +34,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **`DUPLICATE_SAMPLE_ID` validation warning.** A `Sample_ID` that repeats
+  within a lane is now flagged as a warning. It is a warning, not an error,
+  because a repeated `Sample_ID` with *different* indexes is the valid
+  "one sample, multiple barcodes" pattern that bcl-convert / bcl2fastq combine
+  into one output sample; a genuinely duplicated row (same `Sample_ID` *and*
+  index) is still a hard `DUPLICATE_INDEX` error. (Previously this check was
+  unreachable because `samples()` de-duplicated before it ran.)
 - **`INVALID_READ_CYCLES` validation warning.** A negative read or index cycle
   count (e.g. `Read1Cycles,-5`) is now flagged as a warning at every strictness.
   It is a warning, not an error, so it never flips a previously-valid sheet; the
