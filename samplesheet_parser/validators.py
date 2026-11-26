@@ -691,6 +691,7 @@ class SampleSheetValidator:
         samples = sheet.samples()
 
         self._check_empty(samples, result)
+        self._check_read_cycles(sheet, result)
 
         # Sample-dependent core checks only run when there are samples; the
         # pluggable and schema validators below still run on an empty sheet, so
@@ -740,6 +741,38 @@ class SampleSheetValidator:
                 "EMPTY_SAMPLES",
                 "No samples found in the [Data] / [BCLConvert_Data] section.",
             )
+
+    def _check_read_cycles(
+        self,
+        sheet: SampleSheetParser,
+        result: ValidationResult,
+    ) -> None:
+        """Warn on negative read/index cycle counts.
+
+        A cycle count cannot be negative; such a value is always a data error.
+        This is a warning (not an error) at every strictness so it never flips a
+        previously-valid sheet; the strict JSON Schema enforces the positive
+        ``Read1Cycles`` / non-negative index-cycle bounds as hard errors.
+        """
+        pairs: list[tuple[str, Any]] = []
+        reads = getattr(sheet, "reads", None)
+        if isinstance(reads, dict):
+            pairs.extend(reads.items())
+        read_lengths = getattr(sheet, "read_lengths", None)
+        if isinstance(read_lengths, list):
+            pairs.extend((f"Read{i + 1}Cycles", v) for i, v in enumerate(read_lengths))
+
+        for name, value in pairs:
+            try:
+                ivalue = int(value)
+            except (TypeError, ValueError):
+                continue
+            if ivalue < 0:
+                result.add_warning(
+                    "INVALID_READ_CYCLES",
+                    f"{name} is negative ({value}); cycle counts cannot be negative.",
+                    field=name,
+                )
 
     def _check_index_sequences(
         self,

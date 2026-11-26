@@ -49,6 +49,35 @@ class TestSampleSheetV2Parsing:
         assert sheet.records == [{"Sample_ID": "S1", "Index": "ATTACTCG"}]
         assert "" not in sheet.custom_fields["data"]
 
+    def test_parse_data_duplicate_column_warns(self, tmp_path, caplog):
+        import logging
+
+        p = tmp_path / "dupcol.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\n\n[Reads]\nRead1Cycles,151\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index,Index\nS1,ACGTACGT,TTTTGGGG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        with caplog.at_level(logging.WARNING):
+            sheet.parse()
+        assert sheet.records == [{"Sample_ID": "S1", "Index": "TTTTGGGG"}]
+        assert any(
+            "duplicate column" in r.getMessage().lower() and "Index" in r.getMessage()
+            for r in caplog.records
+        )
+
+    def test_samples_not_deduplicated(self, tmp_path):
+        p = tmp_path / "dup.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\n\n[Reads]\nRead1Cycles,151\n\n"
+            "[BCLConvert_Data]\nLane,Sample_ID,Index\n1,DUP,ACGTACGT\n1,DUP,TTTTGGGG\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        samples = sheet.samples()
+        assert len(samples) == 2
+        assert [s["index"] for s in samples] == ["ACGTACGT", "TTTTGGGG"]
+
     def test_parse_settings(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
         sheet.parse()

@@ -10,6 +10,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **`DUPLICATE_SAMPLE_ID` validation now works.** `SampleSheetV1.samples()` and
+  `SampleSheetV2.samples()` de-duplicated rows by `(Sample_ID, Lane)` before
+  returning them, so the validator never saw a duplicate and the
+  `DUPLICATE_SAMPLE_ID` check could not fire on a real parsed sheet (and the
+  duplicate row's index escaped every index check). Both now return one record
+  per data row, matching the `SampleSheetParser` protocol and the Element
+  parser. Valid sheets (no repeated `(Sample_ID, Lane)`) are unaffected; a sheet
+  with a genuine duplicate - which `bcl-convert` also rejects - now fails
+  validation as it should.
+- **Duplicate data-column headers are reported.** A data section with a repeated
+  column name (e.g. `Sample_ID,Index,Index`) silently kept only the last
+  column's value and discarded the earlier one, so a sample could be
+  demultiplexed on the wrong index with no indication. The V1, V2 and Element
+  parsers now log a warning naming the duplicated column(s); parsing still
+  succeeds (last value wins) so no previously-working sheet breaks.
+
+### Added
+
+- **`INVALID_READ_CYCLES` validation warning.** A negative read or index cycle
+  count (e.g. `Read1Cycles,-5`) is now flagged as a warning at every strictness.
+  It is a warning, not an error, so it never flips a previously-valid sheet; the
+  strict JSON Schema continues to enforce the positive/non-negative cycle bounds
+  as hard errors.
+
 - **Comma-padded sheets no longer break parsing.** Spreadsheet exports (Excel,
   Numbers, Google Sheets) pad every row to the width of the widest row, so a
   `Read1Cycles,28` pair is written as `Read1Cycles,28,,,`. The key-value section

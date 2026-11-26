@@ -98,6 +98,20 @@ class TestParsing:
         assert samples[0]["sample_id"] == "S1"
         assert samples[0]["index"] == "ACGTACGTAC"
 
+    def test_duplicate_samples_column_warns(self, tmp_path, caplog):
+        import logging
+
+        manifest = (
+            "[RUNVALUES]\nKeyName,Value\nrun_name,AVITI_Run\n\n"
+            "[SAMPLES]\nSampleName,Index1,Index1\nS1,ACGTACGTAC,TGCATGCATG\n"
+        )
+        with caplog.at_level(logging.WARNING):
+            ElementRunManifest(str(_write(tmp_path, manifest)), parse=True)
+        assert any(
+            "duplicate column" in r.getMessage().lower() and "Index1" in r.getMessage()
+            for r in caplog.records
+        )
+
     def test_index_type_dual(self, tmp_path):
         sheet = ElementRunManifest(str(_write(tmp_path, MANIFEST)), parse=True)
         assert sheet.index_type() == "dual"

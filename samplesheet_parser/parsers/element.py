@@ -54,6 +54,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from samplesheet_parser.parsers._common import duplicate_columns
+
 logger = logging.getLogger(__name__)
 
 # Section names, lowercased.
@@ -228,6 +230,14 @@ class ElementRunManifest:
         # exports) for positional row/column alignment; drop the empty names
         # from the reported columns and records below.
         all_columns = [c.strip() for c in rows[0]]
+        dupes = duplicate_columns(all_columns)
+        if dupes:
+            logger.warning(
+                "[SAMPLES] section has duplicate column name(s) %s; only the last "
+                "value of each is kept and earlier values are DISCARDED. Check the "
+                "manifest header.",
+                dupes,
+            )
         records: list[dict[str, str]] = []
         for row in rows[1:]:
             if not any(cell.strip() for cell in row):

@@ -60,6 +60,39 @@ class TestSampleSheetV1Parsing:
         assert sheet.columns == ["Sample_ID", "Sample_Name", "index"]
         assert sheet.records == [{"Sample_ID": "S1", "Sample_Name": "S1", "index": "ACGTACGTAC"}]
 
+    def test_parse_data_duplicate_column_warns(self, tmp_path, caplog):
+        import logging
+
+        p = tmp_path / "dupcol.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,4\n\n[Reads]\n36\n\n"
+            "[Data]\nLane,Sample_ID,index,index\n1,S1,ACGTACGT,TTTTGGGG\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        with caplog.at_level(logging.WARNING):
+            sheet.parse()
+        # Duplicate header column -> last value wins (documented data loss), and
+        # the parser must warn loudly rather than drop a value silently.
+        assert sheet.records == [{"Lane": "1", "Sample_ID": "S1", "index": "TTTTGGGG"}]
+        assert any(
+            "duplicate column" in r.getMessage().lower() and "index" in r.getMessage()
+            for r in caplog.records
+        )
+
+    def test_samples_not_deduplicated(self, tmp_path):
+        # Two rows with the same (Sample_ID, Lane) must both be returned so the
+        # validator can flag the duplicate (no silent de-duplication).
+        p = tmp_path / "dup.csv"
+        p.write_text(
+            "[Header]\nIEMFileVersion,4\n\n[Reads]\n36\n\n"
+            "[Data]\nLane,Sample_ID,index\n1,DUP,ACGTACGT\n1,DUP,TTTTGGGG\n"
+        )
+        sheet = SampleSheetV1(str(p))
+        sheet.parse()
+        samples = sheet.samples()
+        assert len(samples) == 2
+        assert [s["index"] for s in samples] == ["ACGTACGT", "TTTTGGGG"]
+
     def test_parse_adapters_iem_two_key(self, v1_minimal):
         """IEM spec format: Adapter (Read1) + AdapterRead2 parsed as separate keys."""
         sheet = SampleSheetV1(v1_minimal)
