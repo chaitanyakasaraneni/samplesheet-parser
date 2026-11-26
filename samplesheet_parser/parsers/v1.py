@@ -611,10 +611,12 @@ class SampleSheetV1:
             if len(values) != len(columns):
                 logger.warning(f"Skipping malformed Data line: {line!r}")
                 continue
-            record = {k: v.strip() for k, v in zip(columns, values, strict=False)}
+            record = {k: v.strip() for k, v in zip(columns, values, strict=False) if k}
             records.append(record)
 
-        self.columns = columns
+        # Drop empty column names produced by comma-padded (Excel-export) headers;
+        # the full ``columns`` list above keeps row/column alignment for the zip.
+        self.columns = [c for c in columns if c]
         self.records = records
 
     # ------------------------------------------------------------------

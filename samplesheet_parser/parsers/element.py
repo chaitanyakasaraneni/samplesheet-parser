@@ -224,16 +224,21 @@ class ElementRunManifest:
             self.columns = []
             self.records = []
             return
-        self.columns = [c.strip() for c in rows[0]]
+        # Keep the full header (with any empty names from comma-padded Excel
+        # exports) for positional row/column alignment; drop the empty names
+        # from the reported columns and records below.
+        all_columns = [c.strip() for c in rows[0]]
         records: list[dict[str, str]] = []
         for row in rows[1:]:
             if not any(cell.strip() for cell in row):
                 continue
             record = {
-                self.columns[i]: (row[i].strip() if i < len(row) else "")
-                for i in range(len(self.columns))
+                col: (row[i].strip() if i < len(row) else "")
+                for i, col in enumerate(all_columns)
+                if col
             }
             records.append(record)
+        self.columns = [c for c in all_columns if c]
         self.records = records
 
     # ------------------------------------------------------------------

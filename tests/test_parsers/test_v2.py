@@ -43,6 +43,11 @@ class TestSampleSheetV2Parsing:
         sheet.parse()
         assert sheet.reads["Read1Cycles"] == 151
         assert sheet.reads["Index1Cycles"] == 10
+        # Trailing empty columns from the padded [BCLConvert_Data] header must
+        # not leak into reported columns, records, or the custom-fields set.
+        assert sheet.columns == ["Sample_ID", "Index"]
+        assert sheet.records == [{"Sample_ID": "S1", "Index": "ATTACTCG"}]
+        assert "" not in sheet.custom_fields["data"]
 
     def test_parse_settings(self, v2_minimal):
         sheet = SampleSheetV2(v2_minimal)
@@ -296,6 +301,19 @@ class TestSampleSheetV2CloudData:
         sheet.parse()
         assert len(sheet.cloud_data) == 1
         assert sheet.cloud_data[0]["Sample_ID"] == "S1"
+
+    def test_parse_cloud_data_comma_padded(self, tmp_path):
+        """Trailing empty columns from a padded [Cloud_Data] header must not
+        appear as empty-string keys in the cloud records."""
+        p = tmp_path / "cloud_padded.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\nRunName,Test\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ATTACTCG\n\n"
+            "[Cloud_Data],,\nSample_ID,ProjectName,,\nS1,Project1,,\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        assert sheet.cloud_data == [{"Sample_ID": "S1", "ProjectName": "Project1"}]
 
 
 class TestSampleSheetV2Equality:

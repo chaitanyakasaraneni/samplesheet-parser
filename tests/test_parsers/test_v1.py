@@ -55,6 +55,10 @@ class TestSampleSheetV1Parsing:
         assert sheet.experiment_name == "My Run"
         assert sheet.read_lengths == [36]
         assert sheet.adapters == ["CTGTCTCTTATACACATCT"]
+        # Trailing empty columns from the padded [Data] header must not leak
+        # into the reported columns or as empty-string keys in the records.
+        assert sheet.columns == ["Sample_ID", "Sample_Name", "index"]
+        assert sheet.records == [{"Sample_ID": "S1", "Sample_Name": "S1", "index": "ACGTACGTAC"}]
 
     def test_parse_adapters_iem_two_key(self, v1_minimal):
         """IEM spec format: Adapter (Read1) + AdapterRead2 parsed as separate keys."""

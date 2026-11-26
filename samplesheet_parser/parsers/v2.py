@@ -590,7 +590,9 @@ class SampleSheetV2:
             raise ValueError("Empty [BCLConvert_Data] section.")
 
         columns = [c.strip() for c in lines[0].split(",")]
-        custom = {c for c in columns if c.startswith("Custom_") or c not in STANDARD_DATA_COLUMNS}
+        custom = {
+            c for c in columns if c and (c.startswith("Custom_") or c not in STANDARD_DATA_COLUMNS)
+        }
 
         missing = REQUIRED_DATA_COLUMNS - set(columns)
         if missing:
@@ -605,7 +607,9 @@ class SampleSheetV2:
             record = {k: v.strip() for k, v in zip(columns, values, strict=False) if k}
             records.append(record)
 
-        self.columns = columns
+        # Drop empty column names produced by comma-padded (Excel-export) headers;
+        # the full ``columns`` list above keeps row/column alignment for the zip.
+        self.columns = [c for c in columns if c]
         self.records = records
         self.custom_fields["data"] = custom
 
@@ -622,7 +626,7 @@ class SampleSheetV2:
             if len(values) != len(headers):
                 logger.warning(f"Skipping malformed Cloud_Data line: {line!r}")
                 continue
-            records.append({h: v.strip() for h, v in zip(headers, values, strict=False)})
+            records.append({h: v.strip() for h, v in zip(headers, values, strict=False) if h})
 
         self.cloud_data = records
 

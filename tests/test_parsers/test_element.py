@@ -40,6 +40,19 @@ SampleName,Index1,Lane
 S1,ACGTACGTAC,1
 """
 
+# Comma-padded [SAMPLES] header/rows, as produced by a spreadsheet export.
+PADDED_MANIFEST = """\
+[RUNVALUES]
+KeyName,Value,,
+run_name,AVITI_Run,,
+instrument,AVITI,,
+
+[SAMPLES]
+SampleName,Index1,Index2,Lane,Project,,
+S1,ACGTACGTAC,TGCATGCATG,1,ProjA,,
+S2,GGTTCCAAGG,CCAAGGTTCC,1,ProjA,,
+"""
+
 
 def _write(tmp_path, content, name="RunManifest.csv"):
     p = tmp_path / name
@@ -67,6 +80,23 @@ class TestParsing:
         assert sheet.header["run_name"] == "AVITI_Run"
         assert sheet.instrument == "AVITI"
         assert sheet.adapters == ["CTGTCTCTTATACACATCT"]
+
+    def test_parse_comma_padded_samples(self, tmp_path):
+        # Trailing empty columns from a spreadsheet export must not leak into
+        # the reported columns or the per-sample records as empty-string keys.
+        sheet = ElementRunManifest(str(_write(tmp_path, PADDED_MANIFEST)), parse=True)
+        assert sheet.columns == ["SampleName", "Index1", "Index2", "Lane", "Project"]
+        assert "" not in sheet.records[0]
+        assert sheet.records[0] == {
+            "SampleName": "S1",
+            "Index1": "ACGTACGTAC",
+            "Index2": "TGCATGCATG",
+            "Lane": "1",
+            "Project": "ProjA",
+        }
+        samples = sheet.samples()
+        assert samples[0]["sample_id"] == "S1"
+        assert samples[0]["index"] == "ACGTACGTAC"
 
     def test_index_type_dual(self, tmp_path):
         sheet = ElementRunManifest(str(_write(tmp_path, MANIFEST)), parse=True)
