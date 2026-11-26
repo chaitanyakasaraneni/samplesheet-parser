@@ -342,6 +342,7 @@ AdapterRead1,CTGTCTCTTATACACATCT
 Lane,Sample_ID,Index,Sample_Project
 1,SampleA1,ATTACTCGAT,ProjectA
 1,,TCCGGAGAGA,ProjectA
+1,SampleA3,,ProjectA
 """
 
 
@@ -354,14 +355,12 @@ def test_filter_incomplete_record_matching_project_skipped(tmp_path: Path, caplo
         result = SampleSheetFilter(src).filter(out, project="ProjectA")
 
     assert result.matched_count == 1
-    # A record that matches the filter but is missing a required field must be
-    # skipped loudly, not silently (parity with SampleSheetSplitter).
-    assert any(
-        r.levelno == logging.WARNING
-        and "missing" in r.getMessage()
-        and "Sample_ID" in r.getMessage()
-        for r in caplog.records
-    )
+    # Records that match the filter but are missing a required field must be
+    # skipped loudly, not silently (parity with SampleSheetSplitter). Both the
+    # missing-Sample_ID and the missing-Index rows must warn.
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("missing" in m and "Sample_ID" in m for m in warnings)
+    assert any("missing" in m and "Index" in m for m in warnings)
 
 
 # ---------------------------------------------------------------------------
