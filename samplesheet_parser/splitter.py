@@ -249,6 +249,11 @@ class SampleSheetSplitter:
         # ── Write one file per group ──────────────────────────────────────
         from samplesheet_parser.writer import SampleSheetWriter
 
+        # Track output filenames so two distinct group keys that sanitise to
+        # the same filename (e.g. "Proj/A" and "Proj A" -> "Proj_A") do not
+        # silently overwrite each other's file. Maps filename -> group key.
+        used_filenames: dict[str, str] = {}
+
         for group_key, group_records in sorted(groups.items()):
             writer = SampleSheetWriter.from_sheet(sheet, version=target_version)
             # from_sheet loads all samples from the source; clear them so we
@@ -292,7 +297,23 @@ class SampleSheetSplitter:
                 result.warnings.append(f"Group '{group_key}' produced no valid samples - skipping.")
                 continue
 
-            filename = f"{prefix}{_safe_filename(group_key)}{suffix}"
+            stem = f"{prefix}{_safe_filename(group_key)}"
+            filename = f"{stem}{suffix}"
+            if filename in used_filenames:
+                # Two distinct group keys sanitised to the same filename;
+                # disambiguate with a counter so neither file is overwritten.
+                collided_with = used_filenames[filename]
+                n = 2
+                while filename in used_filenames:
+                    filename = f"{stem}_{n}{suffix}"
+                    n += 1
+                result.warnings.append(
+                    f"Group '{group_key}' maps to the same filename as "
+                    f"'{collided_with}'; writing to '{filename}' instead to avoid "
+                    f"overwriting it."
+                )
+            used_filenames[filename] = group_key
+
             out_path = out_dir / filename
             written = writer.write(out_path, validate=validate)
             result.output_files[group_key] = written

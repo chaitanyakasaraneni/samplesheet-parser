@@ -345,12 +345,23 @@ Lane,Sample_ID,Index,Sample_Project
 """
 
 
-def test_filter_incomplete_record_matching_project_skipped(tmp_path: Path) -> None:
+def test_filter_incomplete_record_matching_project_skipped(tmp_path: Path, caplog) -> None:
+    import logging
+
     src = _write(tmp_path, "combined.csv", _V2_INCOMPLETE_MATCH)
     out = tmp_path / "filtered.csv"
-    result = SampleSheetFilter(src).filter(out, project="ProjectA")
+    with caplog.at_level(logging.WARNING):
+        result = SampleSheetFilter(src).filter(out, project="ProjectA")
 
     assert result.matched_count == 1
+    # A record that matches the filter but is missing a required field must be
+    # skipped loudly, not silently (parity with SampleSheetSplitter).
+    assert any(
+        r.levelno == logging.WARNING
+        and "missing" in r.getMessage()
+        and "Sample_ID" in r.getMessage()
+        for r in caplog.records
+    )
 
 
 # ---------------------------------------------------------------------------

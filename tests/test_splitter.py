@@ -350,6 +350,46 @@ def test_split_group_all_incomplete_skipped(tmp_path: Path) -> None:
     assert any("no valid samples" in w for w in result.warnings)
 
 
+_V2_COLLIDING_PROJECTS = """\
+[Header]
+FileFormatVersion,2
+RunName,CombinedRun
+
+[Reads]
+Read1Cycles,151
+Read2Cycles,151
+Index1Cycles,10
+Index2Cycles,10
+
+[BCLConvert_Settings]
+AdapterRead1,CTGTCTCTTATACACATCT
+
+[BCLConvert_Data]
+Lane,Sample_ID,Index,Index2,Sample_Project
+1,S1,ATTACTCGAT,TATAGCCTGT,Proj/A
+1,S2,TCCGGAGAGA,ATAGAGGCGT,Proj A
+"""
+
+
+def test_split_project_names_sanitising_to_same_filename_do_not_overwrite(
+    tmp_path: Path,
+) -> None:
+    # "Proj/A" and "Proj A" both sanitise to "Proj_A"; neither file must be
+    # silently overwritten by the other.
+    src = _write(tmp_path, "combined.csv", _V2_COLLIDING_PROJECTS)
+    out_dir = tmp_path / "split"
+    result = SampleSheetSplitter(src).split(out_dir, validate=False)
+
+    # Both groups are reported and both land in distinct files on disk.
+    assert set(result.output_files) == {"Proj/A", "Proj A"}
+    paths = {p.name for p in result.output_files.values()}
+    assert len(paths) == 2, paths
+    written = sorted(p.name for p in out_dir.glob("*.csv"))
+    assert len(written) == 2, written
+    assert result.sample_counts == {"Proj/A": 1, "Proj A": 1}
+    assert any("same filename" in w for w in result.warnings)
+
+
 # ---------------------------------------------------------------------------
 # Tests - empty input
 # ---------------------------------------------------------------------------
