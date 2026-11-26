@@ -576,7 +576,10 @@ class SampleSheetValidator:
                                  index (or index pair for dual-index sheets).
     * **MISSING_INDEX2**       - Sheet has an ``Index2`` / ``index2`` column but
                                  one or more samples have it empty.
-    * **DUPLICATE_SAMPLE_ID**  - ``Sample_ID`` appears more than once per lane.
+    * **DUPLICATE_SAMPLE_ID**  - ``Sample_ID`` appears more than once in a lane
+                                 (warning only; valid for one-sample/multi-barcode
+                                 rows, which carry different indexes - an exact
+                                 duplicate row is caught by ``DUPLICATE_INDEX``).
     * **INDEX_DISTANCE_TOO_LOW** - Two samples in the same lane have a combined
                                  index distance (I7 plus I5 mismatches, with N
                                  treated as a wildcard) below
@@ -947,7 +950,17 @@ class SampleSheetValidator:
         samples: list[dict[str, Any]],
         result: ValidationResult,
     ) -> None:
-        """Detect duplicate Sample_IDs within the same lane."""
+        """Flag a ``Sample_ID`` that repeats within a lane.
+
+        This is a *warning*, not an error: a ``Sample_ID`` that appears on more
+        than one row of a lane with *different* index sequences is the valid
+        "one sample, multiple barcodes" pattern that bcl-convert / bcl2fastq
+        combine into a single output sample, so rejecting it would be a false
+        positive. A genuinely duplicated row (same ``Sample_ID`` *and* the same
+        index pair) is already reported as a ``DUPLICATE_INDEX`` error by
+        :meth:`_check_duplicate_indices`, so this warning only adds the
+        "intended multi-barcode, or a copy-paste slip?" signal.
+        """
         lane_id_map: dict[str | None, set[str]] = {}
 
         for sample in samples:
@@ -955,9 +968,11 @@ class SampleSheetValidator:
             sid = sample.get("sample_id", "")
             bucket = lane_id_map.setdefault(lane, set())
             if sid in bucket:
-                result.add_error(
+                result.add_warning(
                     "DUPLICATE_SAMPLE_ID",
-                    f"Sample_ID '{sid}' appears more than once in lane {lane!r}.",
+                    f"Sample_ID '{sid}' appears more than once in lane {lane!r}. "
+                    "This is valid when the rows carry different indexes (one sample, "
+                    "multiple barcodes); verify it is intentional.",
                     lane=lane,
                     sample_id=sid,
                 )
