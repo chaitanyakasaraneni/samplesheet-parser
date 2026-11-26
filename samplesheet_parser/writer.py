@@ -151,8 +151,12 @@ class SampleSheetWriter:
     >>> writer.write("SampleSheet.csv")
     """
 
-    def __init__(self, version: SampleSheetVersion = SampleSheetVersion.V2) -> None:
-        self.version = version
+    def __init__(self, version: SampleSheetVersion | str = SampleSheetVersion.V2) -> None:
+        # Coerce a bare string ("V1" / "V2") to the enum so a natural mistake -
+        # SampleSheetVersion is a str-enum, so ``"V2" == SampleSheetVersion.V2`` -
+        # fails fast here with a clear error instead of crashing later in write()
+        # with a cryptic ``'str' object has no attribute 'value'``.
+        self.version = SampleSheetVersion(version)
 
         # Header fields
         self._run_name: str = ""

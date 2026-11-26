@@ -70,6 +70,30 @@ def _writer_v1() -> SampleSheetWriter:
 
 
 # ---------------------------------------------------------------------------
+# Version argument
+# ---------------------------------------------------------------------------
+
+
+class TestVersionCoercion:
+    def test_string_version_is_coerced_to_enum(self, tmp_path):
+        # SampleSheetVersion is a str-enum, so passing "V2" is a natural mistake;
+        # it must be coerced to the enum and still write, not crash later.
+        w = SampleSheetWriter(version="V2")
+        assert w.version is SampleSheetVersion.V2
+        w.set_reads(read1=151)
+        w.add_sample("S1", index="ACGTACGT")
+        out = w.write(tmp_path / "out.csv", validate=False)
+        assert out.exists()
+
+    def test_enum_version_still_accepted(self):
+        assert SampleSheetWriter(version=SampleSheetVersion.V1).version is SampleSheetVersion.V1
+
+    def test_invalid_version_string_raises_at_construction(self):
+        with pytest.raises(ValueError):
+            SampleSheetWriter(version="V3")
+
+
+# ---------------------------------------------------------------------------
 # V2 - from scratch
 # ---------------------------------------------------------------------------
 

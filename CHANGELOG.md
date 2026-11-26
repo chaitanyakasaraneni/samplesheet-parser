@@ -25,6 +25,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   demultiplexed on the wrong index with no indication. The V1, V2 and Element
   parsers now log a warning naming the duplicated column(s); parsing still
   succeeds (last value wins) so no previously-working sheet breaks.
+- **`SampleSheetWriter` accepts a string version.** Passing the bare string
+  `"V1"` / `"V2"` (a natural mistake, since `SampleSheetVersion` is a str-enum)
+  was silently accepted and then crashed later in `write()` with a cryptic
+  `'str' object has no attribute 'value'`. The version is now coerced to the
+  enum at construction, so a valid string works and an invalid one fails fast
+  with a clear `ValueError`.
 
 ### Added
 
