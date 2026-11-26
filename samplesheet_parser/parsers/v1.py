@@ -47,9 +47,22 @@ import re
 from collections import namedtuple
 from pathlib import Path
 
-from samplesheet_parser.parsers._common import strip_trailing_empty_fields
+from samplesheet_parser.parsers._common import duplicate_columns, strip_trailing_empty_fields
 
 logger = logging.getLogger(__name__)
+
+
+def _warn_duplicate_columns(section: str, columns: list[str]) -> None:
+    """Warn if *columns* repeats a name; the repeat silently overwrites data."""
+    dupes = duplicate_columns(columns)
+    if dupes:
+        logger.warning(
+            "%s section has duplicate column name(s) %s; only the last value of "
+            "each is kept and earlier values are DISCARDED. Check the sheet header.",
+            section,
+            dupes,
+        )
+
 
 # ---------------------------------------------------------------------------
 # Standard IEM V1 column definitions (from Illumina's public documentation)
@@ -341,7 +354,13 @@ class SampleSheetV1:
         return result
 
     def samples(self) -> list[dict[str, str | None]]:
-        """Return one record per unique ``Sample_ID``.
+        """Return one record per ``[Data]`` row.
+
+        One dict is returned for every data row, with no de-duplication, so a
+        sheet that repeats a ``(Sample_ID, Lane)`` pair yields one entry per
+        row and the validator can flag it as ``DUPLICATE_SAMPLE_ID`` (and check
+        every index). This matches the :class:`SampleSheetParser` protocol
+        ("one record per sample row").
 
         Returns
         -------
@@ -359,16 +378,10 @@ class SampleSheetV1:
         if self.records is None:
             raise RuntimeError("Call parse() before calling samples().")
 
-        seen: set[tuple[str, str | None]] = set()
         result: list[dict[str, str | None]] = []
 
         for record in self.records:
             sid = record.get("Sample_ID", "")
-            lane = record.get("Lane")
-            key = (sid, lane)
-            if key in seen:
-                continue
-            seen.add(key)
 
             sample: dict[str, str | None] = {
                 "sample_id": sid,
@@ -604,6 +617,7 @@ class SampleSheetV1:
             raise ValueError("Empty [Data] section.")
 
         columns = [c.strip() for c in lines[0].split(",")]
+        _warn_duplicate_columns("[Data]", columns)
         records: list[dict[str, str]] = []
 
         dropped = 0

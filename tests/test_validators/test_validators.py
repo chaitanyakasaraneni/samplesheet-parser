@@ -328,10 +328,10 @@ class TestDuplicateSampleId:
         sheet = SampleSheetV1(str(p))
         sheet.parse()
         result = SampleSheetValidator().validate(sheet)
-        # Note: V1 samples() deduplicates by Sample_ID, so the validator
-        # receives only one sample - no duplicate to flag at validation time.
-        # The duplicate index should still be caught.
-        assert result is not None  # just confirm it doesn't crash
+        # samples() returns one record per row (no de-duplication), so a
+        # duplicate Sample_ID in the same lane is flagged at validation time.
+        assert any(e.code == "DUPLICATE_SAMPLE_ID" for e in result.errors)
+        assert not result.is_valid
 
     def test_duplicate_sample_id_in_same_lane_raises_error(self):
         """Line 402: duplicate Sample_ID in same lane produces DUPLICATE_SAMPLE_ID error."""
@@ -348,6 +348,44 @@ class TestDuplicateSampleId:
         validator._check_duplicate_sample_ids(samples, result)
         codes = [e.code for e in result.errors]
         assert "DUPLICATE_SAMPLE_ID" in codes
+
+
+class TestReadCycles:
+    def test_negative_read_cycles_warns_but_stays_valid(self, tmp_path):
+        p = tmp_path / "neg.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\n\n[Reads]\nRead1Cycles,-5\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ACGTACGT\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        result = SampleSheetValidator().validate(sheet)
+        assert any(w.code == "INVALID_READ_CYCLES" for w in result.warnings)
+        # A warning must not flip validity (keeps lenient/standard behaviour).
+        assert not any(e.code == "INVALID_READ_CYCLES" for e in result.errors)
+
+    def test_valid_read_cycles_no_warning(self, tmp_path):
+        p = tmp_path / "ok.csv"
+        p.write_text(
+            "[Header]\nFileFormatVersion,2\n\n[Reads]\nRead1Cycles,151\nIndex1Cycles,0\n\n"
+            "[BCLConvert_Data]\nSample_ID,Index\nS1,ACGTACGT\n"
+        )
+        sheet = SampleSheetV2(str(p))
+        sheet.parse()
+        result = SampleSheetValidator().validate(sheet)
+        assert not any(w.code == "INVALID_READ_CYCLES" for w in result.warnings)
+
+    def test_non_numeric_read_cycles_is_skipped(self):
+        """A non-integer cycle value is skipped without raising or warning."""
+        from samplesheet_parser.validators import SampleSheetValidator, ValidationResult
+
+        class _Stub:
+            reads = {"Read1Cycles": "N/A"}
+            read_lengths = None
+
+        result = ValidationResult()
+        SampleSheetValidator()._check_read_cycles(_Stub(), result)
+        assert not any(w.code == "INVALID_READ_CYCLES" for w in result.warnings)
 
 
 class TestAdapterValidation:

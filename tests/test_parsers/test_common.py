@@ -1,6 +1,6 @@
 """Tests for the shared parser helpers."""
 
-from samplesheet_parser.parsers._common import strip_trailing_empty_fields
+from samplesheet_parser.parsers._common import duplicate_columns, strip_trailing_empty_fields
 
 
 class TestStripTrailingEmptyFields:
@@ -21,3 +21,18 @@ class TestStripTrailingEmptyFields:
 
     def test_all_empty_collapses_to_empty_string(self):
         assert strip_trailing_empty_fields(",,,") == ""
+
+
+class TestDuplicateColumns:
+    def test_detects_single_duplicate(self):
+        assert duplicate_columns(["Sample_ID", "Index", "Index"]) == ["Index"]
+
+    def test_no_duplicates(self):
+        assert duplicate_columns(["Sample_ID", "Index", "Index2"]) == []
+
+    def test_reports_each_duplicate_once_sorted(self):
+        cols = ["A", "B", "A", "B", "B", "C"]
+        assert duplicate_columns(cols) == ["A", "B"]
+
+    def test_ignores_empty_names(self):
+        assert duplicate_columns(["Sample_ID", "", "", "Index"]) == []
